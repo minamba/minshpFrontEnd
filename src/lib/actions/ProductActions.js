@@ -40,9 +40,10 @@ export function getProductUserFailure(error) {
 
 
 //update
-export function updateProductUserRequest() {
+export function updateProductUserRequest(product) {
     return {
         type: actionsProduct.UPDATE_PRODUCT_USER_REQUEST,
+        payload: product,
     }
 }
 
@@ -62,16 +63,17 @@ export function updateProductUserFailure(error) {
 
 
 //delete
-export function deleteProductUserRequest() {
+export function deleteProductUserRequest(IdProduct) {
     return {
         type: actionsProduct.DELETE_PRODUCT_USER_REQUEST,
+        payload: IdProduct,
     }
 }
 
-export function deleteProductUserSuccess(product) {
+export function deleteProductUserSuccess(IdProduct) {
     return {
         type: actionsProduct.DELETE_PRODUCT_USER_SUCCESS,
-        payload: product,
+        payload: IdProduct,
     }
 }
 
@@ -84,9 +86,10 @@ export function deleteProductUserFailure(error) {
 
 
 //add
-export function addProductUserRequest() {
+export function addProductUserRequest(product) {
     return {
         type: actionsProduct.ADD_PRODUCT_USER_REQUEST,
+        payload: product,
     }
 }
 

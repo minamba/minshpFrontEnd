@@ -7,7 +7,7 @@ import * as api from "../api/products";
 function* getProducts() {
     try {
         const response = yield call (api.getProducts);
-        console.log(response.data);
+        console.log("Products :",response.data);
         yield put (actions.getProductUserSuccess({products : response.data}));
     }
     catch (error) {
@@ -25,15 +25,18 @@ function* getProducts() {
 //     }
 // }
 
-// function* updateProduct(action) {
-//     try {
-//         const response = yield call (api.updateProduct, action.payload);
-//         yield put (actions.updateProductUserSuccess({product : response.data}));
-//     }
-//     catch (error) {
-//         yield put (actions.updateProductUserFailure({error : error.response?.data || error.message}));
-//     }
-// }
+function* updateProduct(action) {
+    try {
+        const response = yield call (api.updateProduct, action.payload);
+        console.log("Product updated :",response.data);
+        const products = yield call (api.getProducts);
+        yield put (actions.getProductUserSuccess({product : products.data}));
+        yield put (actions.updateProductUserSuccess({product : response.data}));
+    }
+    catch (error) {
+        yield put (actions.updateProductUserFailure({error : error.response?.data || error.message}));
+    }
+}
 
 // function* deleteProduct(action) {
 //     try {
@@ -55,21 +58,21 @@ function* watchGetProducts() {
 }
 
 // function* watchAddProduct() {
-//     yield takeEvery(actions.addProductUserRequest, addProduct);
+//     yield takeLatest(actions.addProductUserRequest, addProduct);
 // }
 
-// function* watchUpdateProduct() {
-//     yield takeEvery(actions.updateProductUserRequest, updateProduct);
-// }
+function* watchUpdateProduct() {
+    yield takeLatest(actions.actionsProduct.UPDATE_PRODUCT_USER_REQUEST, updateProduct);
+}
 
 // function* watchDeleteProduct() {
-//     yield takeEvery(actions.deleteProductUserRequest, deleteProduct);
+//     yield takeLatest(actions.deleteProductUserRequest, deleteProduct);
 // }
 
 function* productsSaga() {
     yield fork(watchGetProducts);
     // yield fork(watchAddProduct);
-    // yield fork(watchUpdateProduct);
+     yield fork(watchUpdateProduct);
     // yield fork(watchDeleteProduct);
 }
 

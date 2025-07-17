@@ -7,14 +7,26 @@ import { useEffect } from "react";
 import {Navbar, Footer} from '../../components/index';
 import {ProductAdmin} from './ProductAdmin';
 import {CategoryAdmin} from './CategoryAdmin';
+import {CustomerAdmin} from './CustomerAdmin';
+import {StockAdmin} from './StockAdmin';
+import {PromotionAdmin} from './PromotionAdmin';
+import {FeatureAdmin} from './FeatureAdmin';
+import {FeatureProductAdmin} from './FeatureProductAdmin';
+import {OrderAdmin} from './OrderAdmin';
+import {ImageAdmin} from './ImageAdmin';
+import {VideoAdmin} from './VideoAdmin';
 import { useDispatch } from "react-redux";
 import { getProductUserRequest } from "../../lib/actions/ProductActions";
+import { getCategoryRequest } from "../../lib/actions/CategoryActions";
+import { getStockRequest } from "../../lib/actions/StockActions";
 
 export const BaseApp = () => {
 
     const dispatch = useDispatch();
     useEffect(() => {
         dispatch(getProductUserRequest());
+        dispatch(getCategoryRequest());
+        dispatch(getStockRequest());
     }, []);
 
     useEffect(() => {
@@ -30,6 +42,14 @@ export const BaseApp = () => {
                         <Route path="/" element={<Home/>} />
                         <Route path="/admin/products" element={<ProductAdmin/>} />
                         <Route path="/admin/categories" element={<CategoryAdmin/>} />
+                        <Route path="/admin/customers" element={<CustomerAdmin/>} />
+                        <Route path="/admin/stocks" element={<StockAdmin/>} />
+                        <Route path="/admin/promotions" element={<PromotionAdmin/>} />
+                        <Route path="/admin/features" element={<FeatureAdmin/>} />
+                        <Route path="/admin/featureProducts" element={<FeatureProductAdmin/>} />
+                        <Route path="/admin/orders" element={<OrderAdmin/>} />
+                        <Route path="/admin/images" element={<ImageAdmin/>} />
+                        <Route path="/admin/videos" element={<VideoAdmin/>} />
                     </Routes>
                 </main>
                 <Footer/>

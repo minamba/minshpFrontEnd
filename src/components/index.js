@@ -4,6 +4,10 @@ import { FaFacebookF, FaInstagram, FaTwitter, FaLinkedin } from 'react-icons/fa'
 import {Link, NavLink} from 'react-router-dom';
 import { useEffect } from 'react';
 import { useSelector } from 'react-redux';
+import { updateProductUserRequest } from '../lib/actions/ProductActions';
+import { updateStockRequest } from '../lib/actions/StockActions';
+import { getProductUserRequest } from '../lib/actions/ProductActions';
+import { useDispatch } from 'react-redux'; 
 
 
 
@@ -53,6 +57,14 @@ export const Navbar = () => {
               <div className="navbar-dropdown-menu">
                 <Link to="/admin/products" onClick={() => setIsOpen(false)}>Produits</Link>
                 <Link to="/admin/categories" onClick={() => setIsOpen(false)}>Catégories</Link>
+                <Link to="/admin/customers" onClick={() => setIsOpen(false)}>Clients</Link>
+                <Link to="/admin/stocks" onClick={() => setIsOpen(false)}>Stocks</Link>
+                <Link to="/admin/promotions" onClick={() => setIsOpen(false)}>Promotions</Link>
+                <Link to="/admin/features" onClick={() => setIsOpen(false)}>Caractéristiques</Link>
+                <Link to="/admin/featureProducts" onClick={() => setIsOpen(false)}>Caractéristiques produits</Link>
+                <Link to="/admin/orders" onClick={() => setIsOpen(false)}>Commandes</Link>
+                <Link to="/admin/images" onClick={() => setIsOpen(false)}>Images</Link>
+                <Link to="/admin/videos" onClick={() => setIsOpen(false)}>Vidéos</Link>
               </div>
             )}
           </div>
@@ -72,6 +84,9 @@ export const Navbar = () => {
 
 export const ProductTable = () => {
   const productsFromStore = useSelector((state) => state.products.products) || [];
+  const categoriesFromStore = useSelector((state) => state.categories.categories) || [];
+  const stocksFromStore = useSelector((state) => state.stocks.stocks) || [];
+  const dispatch = useDispatch();
   const [products, setProducts] = useState(productsFromStore);
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -109,13 +124,14 @@ export const ProductTable = () => {
     setIsEditing(true);
     setCurrentId(product.id);
     setFormData({
+      id: product.id,
       name: product.name,
       description: product.description,
       price: product.price,
       category: product.category,
-      image: product.image,
-      stock: product.stock,
-      promotion: product.promotion,
+      image: product.images[0]?.url? product.images[0].url : "Pas d'image",
+      stock: product.stocks?.quantity,
+      idStock: product.stocks?.id
     });
     setShowModal(true);
   };
@@ -136,7 +152,15 @@ export const ProductTable = () => {
           p.id === currentId ? { ...p, ...formData } : p
         )
       );
+      const idCategory = categoriesFromStore.find((cat) => cat.name === formData.category)?.id;
+      const  idStock = stocksFromStore.find((stock) => stock.id === formData.idStock)?.id;
       console.log('Produit modifié:', formData);
+      dispatch(updateProductUserRequest({Id: formData.id, Name : formData.name, Description : formData.description, Price : formData.price, IdCategory : idCategory}));
+      dispatch(updateStockRequest({Id: idStock, Quantity : formData.stock}));
+
+      setTimeout(() => {
+        dispatch(getProductUserRequest());
+      }, 2000);
     } else {
       // Ajouter un produit
       const newProduct = {
@@ -174,13 +198,13 @@ export const ProductTable = () => {
           <tbody>
             {products.map((prod) => (
               <tr key={prod.id}>
-                <td><img src={prod.image} alt={prod.name} className="img-thumbnail" width={60} /></td>
+                <td><img src={prod.images[0]?.url} alt={prod.name} className="img-thumbnail" width={60} /></td>
                 <td>{prod.name}</td>
                 <td>{prod.description}</td>
                 <td>{prod.price}</td>
                 <td>{prod.category}</td>
-                <td>{prod.stock}</td>
-                <td>{prod.promotion}</td>
+                <td>{prod.stocks?.quantity? prod.stocks.quantity : "Rupture"}</td>
+                <td>{prod.promotions?.length > 0 ? "Oui" : "Non"}</td>
                 <td>
                   <button className='btn btn-sm btn-warning me-2' onClick={() => handleEditClick(prod)}>
                     <i className="bi bi-pencil"></i>
@@ -214,10 +238,19 @@ export const ProductTable = () => {
               </div>
               <div className="mb-3">
                 <label>Catégorie</label>
-                <select name="category" className="form-select" value={formData.category} onChange={handleInputChange} required>
+                <select
+                  name="category"
+                  className="form-select"
+                  value={formData.category}
+                  onChange={handleInputChange}
+                  required
+                >
                   <option value="">Sélectionnez une catégorie</option>
-                  <option value="Projecteurs">Projecteurs</option>
-                  <option value="Accessoires">Accessoires</option>
+                  {categoriesFromStore.map((cat) => (
+                    <option key={cat.id} value={cat.name}>
+                      {cat.name}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div className="mb-3">
@@ -226,6 +259,10 @@ export const ProductTable = () => {
                   {formData.image && <img src={formData.image} alt="Aperçu" width={60} />}
                   <input type="file" accept="image/*" onChange={handleImageUpload} />
                 </div>
+              </div>
+              <div className="mb-3">
+                <label>Stock</label>
+                <input type="number" name="stock" className="form-control" value={formData.stock? formData.stock : 0} onChange={handleInputChange} required />
               </div>
               <div className="d-flex justify-content-end">
                 <button type="button" className="btn btn-secondary me-2" onClick={() => setShowModal(false)}>Annuler</button>
