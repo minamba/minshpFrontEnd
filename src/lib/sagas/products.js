@@ -15,15 +15,16 @@ function* getProducts() {
     }
 }
 
-// function* addProduct(action) {
-//     try {
-//         const response = yield call (api.addProduct, action.payload);
-//         yield put (actions.addProductUserSuccess({product : response.data}));
-//     }
-//     catch (error) {
-//         yield put (actions.addProductUserFailure({error : error.response?.data || error.message}));
-//     }
-// }
+function* addProduct(action) {
+    try {
+        const response = yield call (api.addProduct, action.payload);
+        console.log("Product added :",response.data);
+        yield put (actions.addProductUserSuccess({product : response.data}));
+    }
+    catch (error) {
+        yield put (actions.addProductUserFailure({error : error.response?.data || error.message}));
+    }
+}
 
 function* updateProduct(action) {
     try {
@@ -38,17 +39,18 @@ function* updateProduct(action) {
     }
 }
 
-// function* deleteProduct(action) {
-//     try {
-//             yield call(api.deleteProduct, action.payload);
-//             const response = yield call(api.getProducts);
+function* deleteProduct(action) {
+    try {
+            yield call(api.deleteProduct, action.payload);
+            console.log("Product deleted :",action.payload);
+            const response = yield call(api.getProducts);
 
-//             yield put (actions.getProductUserSuccess({products : response.data}));
-//     }
-//     catch (error) {
-//         yield put (actions.deleteProductUserFailure({error : error.response?.data || error.message}));
-//     }
-// }
+            yield put (actions.getProductUserSuccess({products : response.data}));
+    }
+    catch (error) {
+        yield put (actions.deleteProductUserFailure({error : error.response?.data || error.message}));
+    }
+}
 
 
 
@@ -57,23 +59,23 @@ function* watchGetProducts() {
     yield takeLatest(actions.actionsProduct.GET_PRODUCT_USER_REQUEST, getProducts);
 }
 
-// function* watchAddProduct() {
-//     yield takeLatest(actions.addProductUserRequest, addProduct);
-// }
+function* watchAddProduct() {
+    yield takeLatest(actions.actionsProduct.ADD_PRODUCT_USER_REQUEST, addProduct);
+}
 
 function* watchUpdateProduct() {
     yield takeLatest(actions.actionsProduct.UPDATE_PRODUCT_USER_REQUEST, updateProduct);
 }
 
-// function* watchDeleteProduct() {
-//     yield takeLatest(actions.deleteProductUserRequest, deleteProduct);
-// }
+function* watchDeleteProduct() {
+    yield takeLatest(actions.actionsProduct.DELETE_PRODUCT_USER_REQUEST, deleteProduct);
+}
 
 function* productsSaga() {
     yield fork(watchGetProducts);
-    // yield fork(watchAddProduct);
-     yield fork(watchUpdateProduct);
-    // yield fork(watchDeleteProduct);
+    yield fork(watchAddProduct);
+    yield fork(watchUpdateProduct);
+    yield fork(watchDeleteProduct);
 }
 
 export default productsSaga;

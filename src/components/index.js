@@ -7,6 +7,9 @@ import { useSelector } from 'react-redux';
 import { updateProductUserRequest } from '../lib/actions/ProductActions';
 import { updateStockRequest } from '../lib/actions/StockActions';
 import { getProductUserRequest } from '../lib/actions/ProductActions';
+import { addProductUserRequest } from '../lib/actions/ProductActions';
+import { postUploadRequest } from '../lib/actions/UploadActions';
+import { deleteProductUserRequest } from '../lib/actions/ProductActions';
 import { useDispatch } from 'react-redux'; 
 
 
@@ -80,7 +83,7 @@ export const Navbar = () => {
   );
 };
 
-
+//////////////////////// Product Table ////////////////////////
 
 export const ProductTable = () => {
   const productsFromStore = useSelector((state) => state.products.products) || [];
@@ -88,6 +91,7 @@ export const ProductTable = () => {
   const stocksFromStore = useSelector((state) => state.stocks.stocks) || [];
   const dispatch = useDispatch();
   const [products, setProducts] = useState(productsFromStore);
+  const [selectedProduct, setSelectedProduct] = useState(null); // product used for looking features
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [currentId, setCurrentId] = useState(null);
@@ -99,11 +103,15 @@ export const ProductTable = () => {
     image: '',
     stock: 0,
     promotion: 'Non',
+    main : false,
   });
 
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value,
+    }));
   };
 
   const handleImageUpload = (e) => {
@@ -129,9 +137,10 @@ export const ProductTable = () => {
       description: product.description,
       price: product.price,
       category: product.category,
-      image: product.images[0]?.url? product.images[0].url : "Pas d'image",
+      main : !!product.main, //transform to boolean
       stock: product.stocks?.quantity,
-      idStock: product.stocks?.id
+      idStock: product.stocks?.id,
+
     });
     setShowModal(true);
   };
@@ -140,8 +149,12 @@ export const ProductTable = () => {
   const handleDeleteClick = (id) => {
     if (window.confirm('Supprimer ce produit ?')) {
       setProducts((prev) => prev.filter((p) => p.id !== id));
+      dispatch(deleteProductUserRequest(id));
     }
   };
+
+  //get idCategory
+  const idCategory = categoriesFromStore.find((cat) => cat.name === formData.category)?.id;
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -152,10 +165,10 @@ export const ProductTable = () => {
           p.id === currentId ? { ...p, ...formData } : p
         )
       );
-      const idCategory = categoriesFromStore.find((cat) => cat.name === formData.category)?.id;
+      
       const  idStock = stocksFromStore.find((stock) => stock.id === formData.idStock)?.id;
       console.log('Produit modifié:', formData);
-      dispatch(updateProductUserRequest({Id: formData.id, Name : formData.name, Description : formData.description, Price : formData.price, IdCategory : idCategory}));
+      dispatch(updateProductUserRequest({Id: formData.id, Name : formData.name, Description : formData.description, Price : formData.price, IdCategory : idCategory, Main : formData.main}));
       dispatch(updateStockRequest({Id: idStock, Quantity : formData.stock}));
 
       setTimeout(() => {
@@ -164,11 +177,19 @@ export const ProductTable = () => {
     } else {
       // Ajouter un produit
       const newProduct = {
-        ...formData,
-        id: products.length ? Math.max(...products.map((p) => p.id)) + 1 : 1,
+        ...formData
       };
       setProducts((prev) => [...prev, newProduct]);
       console.log('Produit ajouté:', newProduct);
+      dispatch(addProductUserRequest({Name : formData.name, Description : formData.description, Price : formData.price, Stock : formData.stock, IdCategory : idCategory}));
+      
+      setTimeout(() => {
+        dispatch(getProductUserRequest());
+      }, 2000);
+
+
+
+
     }
     setShowModal(false);
   };
@@ -192,25 +213,30 @@ export const ProductTable = () => {
               <th>Catégorie</th>
               <th>Stock</th>
               <th>Promotion</th>
+              <th>Vitrine</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {products.map((prod) => (
               <tr key={prod.id}>
-                <td><img src={prod.images[0]?.url} alt={prod.name} className="img-thumbnail" width={60} /></td>
+                <td><img src={prod.images?.[0]?.url} alt={prod.name} className="img-thumbnail" width={60} /></td>
                 <td>{prod.name}</td>
                 <td>{prod.description}</td>
                 <td>{prod.price}</td>
                 <td>{prod.category}</td>
                 <td>{prod.stocks?.quantity? prod.stocks.quantity : "Rupture"}</td>
                 <td>{prod.promotions?.length > 0 ? "Oui" : "Non"}</td>
+                <td>{prod.main ? "Oui" : "Non"}</td>
                 <td>
                   <button className='btn btn-sm btn-warning me-2' onClick={() => handleEditClick(prod)}>
                     <i className="bi bi-pencil"></i>
                   </button>
-                  <button className='btn btn-sm btn-danger' onClick={() => handleDeleteClick(prod.id)}>
+                  <button className='btn btn-sm btn-danger me-2' onClick={() => handleDeleteClick(prod.id)}>
                     <i className="bi bi-trash"></i>
+                  </button>
+                  <button className='btn btn-sm btn-primary' onClick={() => setSelectedProduct(prod)}>
+                    <i className="bi bi-card-checklist"></i>
                   </button>
                 </td>
               </tr>
@@ -218,6 +244,34 @@ export const ProductTable = () => {
           </tbody>
         </table>
       </div>
+
+      {selectedProduct && (
+        <div className="modal-backdrop">
+          <div className="modal-content-custom" style={{ maxWidth: '600px', wordWrap: 'break-word' }}>
+            <h3 className="mb-3">{selectedProduct.name}</h3>
+            <hr/>
+            <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+              {selectedProduct.features && selectedProduct.features.length > 0 ? (
+                <ul>
+                  {selectedProduct.features.map((feat) => (
+                    <li key={feat.id} style={{ marginBottom: '8px', textAlign: 'justify' }}>
+                      {feat.description}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p>Aucune caractéristique disponible.</p>
+              )}
+            </div>
+            <div className="d-flex justify-content-end mt-3">
+              <button className="btn btn-secondary" onClick={() => setSelectedProduct(null)}>
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {showModal && (
         <div className="modal-backdrop">
@@ -234,7 +288,7 @@ export const ProductTable = () => {
               </div>
               <div className="mb-3">
                 <label>Prix (€)</label>
-                <input type="number" name="price" className="form-control" value={formData.price} onChange={handleInputChange} required />
+                <input type="number" name="price" className="form-control" value={formData.price} onChange={handleInputChange} step="0.01" required />
               </div>
               <div className="mb-3">
                 <label>Catégorie</label>
@@ -254,15 +308,12 @@ export const ProductTable = () => {
                 </select>
               </div>
               <div className="mb-3">
-                <label>Image du produit</label>
-                <div className="d-flex align-items-center gap-2">
-                  {formData.image && <img src={formData.image} alt="Aperçu" width={60} />}
-                  <input type="file" accept="image/*" onChange={handleImageUpload} />
-                </div>
-              </div>
-              <div className="mb-3">
                 <label>Stock</label>
                 <input type="number" name="stock" className="form-control" value={formData.stock? formData.stock : 0} onChange={handleInputChange} required />
+              </div>
+              <div className="mb-3">
+                <label>Vitrine</label>
+                <input type="checkbox" name="main" className="form-check-input ms-2" checked={formData.main} onChange={handleInputChange} />
               </div>
               <div className="d-flex justify-content-end">
                 <button type="button" className="btn btn-secondary me-2" onClick={() => setShowModal(false)}>Annuler</button>
@@ -276,6 +327,144 @@ export const ProductTable = () => {
   );
 };
 
+//////////////////////// Feature Table ////////////////////////
+
+export const FeatureTable = () => {
+  const featuresFromStore = useSelector((state) => state.features.features) || [];
+  const dispatch = useDispatch();
+
+  const [features, setFeatures] = useState(featuresFromStore);
+  const [showModal, setShowModal] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [currentId, setCurrentId] = useState(null);
+  const [formData, setFormData] = useState({ name: '' });
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleAddClick = () => {
+    setIsEditing(false);
+    setCurrentId(null);
+    setFormData({ name: '' });
+    setShowModal(true);
+  };
+
+  const handleEditClick = (feature) => {
+    setIsEditing(true);
+    setCurrentId(feature.id);
+    setFormData({ name: feature.name });
+    setShowModal(true);
+  };
+
+  const handleDeleteClick = (id) => {
+    if (window.confirm('Supprimer cette caractéristique ?')) {
+      setFeatures((prev) => prev.filter((f) => f.id !== id));
+      // dispatch(deleteFeatureRequest(id));
+    }
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (isEditing) {
+      setFeatures((prev) =>
+        prev.map((f) => (f.id === currentId ? { ...f, name: formData.name } : f))
+      );
+      // dispatch(updateFeatureRequest({ id: currentId, name: formData.name }));
+    } else {
+      const newFeature = {
+        id: features.length ? Math.max(...features.map((f) => f.id)) + 1 : 1,
+        name: formData.name,
+      };
+      setFeatures((prev) => [...prev, newFeature]);
+      // dispatch(addFeatureRequest(newFeature));
+    }
+    setShowModal(false);
+  };
+
+  return (
+    <div>
+      <div className="d-flex justify-content-end mb-3">
+        <button className="btn btn-success" onClick={handleAddClick}>
+          Ajouter une caractéristique
+        </button>
+      </div>
+
+      <div className="table-responsive">
+        <table className="table table-striped table-hover shadow-sm">
+          <thead className="table-dark">
+            <tr>
+              <th>Nom</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {features.map((feat) => (
+              <tr key={feat.id}>
+                <td>{feat.name}</td>
+                <td>
+                  <button
+                    className="btn btn-sm btn-warning me-2"
+                    onClick={() => handleEditClick(feat)}
+                  >
+                    <i className="bi bi-pencil"></i>
+                  </button>
+                  <button
+                    className="btn btn-sm btn-danger"
+                    onClick={() => handleDeleteClick(feat.id)}
+                  >
+                    <i className="bi bi-trash"></i>
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {showModal && (
+        <div className="modal-backdrop">
+          <div className="modal-content-custom" style={{ maxWidth: '400px' }}>
+            <h2 className="mb-3">
+              {isEditing ? 'Modifier la caractéristique' : 'Ajouter une caractéristique'}
+            </h2>
+            <form onSubmit={handleSubmit}>
+              <div className="mb-3">
+                <label>Nom</label>
+                <input
+                  type="text"
+                  name="name"
+                  className="form-control"
+                  value={formData.name}
+                  onChange={handleInputChange}
+                  required
+                />
+              </div>
+              <div className="d-flex justify-content-end">
+                <button
+                  type="button"
+                  className="btn btn-secondary me-2"
+                  onClick={() => setShowModal(false)}
+                >
+                  Annuler
+                </button>
+                <button type="submit" className="btn btn-dark">
+                  {isEditing ? 'Modifier' : 'Ajouter'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+
+
+//////////////////////// Footer ////////////////////////
 
 export const Footer = () => {
     const year = new Date().getFullYear();

@@ -9,6 +9,7 @@ import promotionReducer from "./PromotionReducers";
 import stockReducer from "./StockReducers";
 import customerReducer from "./CustomerReducers";
 import videoReducer from "./VideoReducers";
+import uploadReducer from "./UploadReducers";
 
 export default combineReducers({
     products : productReducer,
@@ -21,4 +22,5 @@ export default combineReducers({
     stocks : stockReducer,
     customers : customerReducer,
     videos : videoReducer,
+    upload : uploadReducer
 })
