@@ -15,40 +15,42 @@ function* getStocks() {
     }
 }
 
-// function* addProduct(action) {
-//     try {
-//         const response = yield call (api.addProduct, action.payload);
-//         yield put (actions.addProductUserSuccess({product : response.data}));
-//     }
-//     catch (error) {
-//         yield put (actions.addProductUserFailure({error : error.response?.data || error.message}));
-//     }
-// }
+function* addStock(action) {
+    try {
+        const response = yield call (api.addStock, action.payload);
+        console.log("Stock added :",response.data);
+        const stocks = yield call (api.getStocks);
+        yield put (actions.getStockSuccess({stocks : stocks.data}));
+    }
+    catch (error) {
+        yield put (actions.addStockFailure({error : error.response?.data || error.message}));
+    }
+}
+
 
 function* updateStock(action) {
     try {
         const response = yield call (api.updateStock, action.payload);
         console.log("Stock updated :",response.data);
         const stocks = yield call (api.getStocks);
-        yield put (actions.getStockSuccess({stock : stocks.data}));
-        yield put (actions.updateStockSuccess({stock : response.data}));
+        yield put (actions.getStockSuccess({stocks : stocks.data}));
     }
     catch (error) {
         yield put (actions.updateStockFailure({error : error.response?.data || error.message}));
     }
 }
 
-// function* deleteProduct(action) {
-//     try {
-//             yield call(api.deleteProduct, action.payload);
-//             const response = yield call(api.getProducts);
+function* deleteStock(action) {
+    try {
+            yield call(api.deleteStock, action.payload);
+            const response = yield call(api.getStocks);
 
-//             yield put (actions.getProductUserSuccess({products : response.data}));
-//     }
-//     catch (error) {
-//         yield put (actions.deleteProductUserFailure({error : error.response?.data || error.message}));
-//     }
-// }
+            yield put (actions.getStockSuccess({stocks : response.data}));
+    }
+    catch (error) {
+        yield put (actions.deleteStockFailure({error : error.response?.data || error.message}));
+    }
+}
 
 
 
@@ -57,23 +59,23 @@ function* watchGetStocks() {
     yield takeLatest(actions.actionsStock.GET_STOCK_REQUEST, getStocks);
 }
 
-// function* watchAddProduct() {
-//     yield takeLatest(actions.addProductUserRequest, addProduct);
-// }
+function* watchAddStock() {
+    yield takeLatest(actions.actionsStock.ADD_STOCK_REQUEST, addStock);
+}
 
 function* watchUpdateStock() {
     yield takeLatest(actions.actionsStock.UPDATE_STOCK_REQUEST, updateStock);
 }
 
-// function* watchDeleteProduct() {
-//     yield takeLatest(actions.deleteProductUserRequest, deleteProduct);
-// }
+function* watchDeleteStock() {
+    yield takeLatest(actions.actionsStock.DELETE_STOCK_REQUEST, deleteStock);
+}
 
 function* stocksSaga() {
     yield fork(watchGetStocks);
-    // yield fork(watchAddProduct);
-     yield fork(watchUpdateStock);
-    // yield fork(watchDeleteProduct);
+    yield fork(watchAddStock);
+    yield fork(watchUpdateStock);
+    yield fork(watchDeleteStock);
 }
 
 export default stocksSaga;

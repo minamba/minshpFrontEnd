@@ -2,6 +2,8 @@ import productsSaga from "./products";
 import categoriesSaga from "./categories";
 import stocksSaga from "./stocks";
 import uploadSaga from "./upload";
+import featuresSaga from "./features";
+import productFeaturesSaga from "./productFeatures";
 import { all } from "redux-saga/effects";
 
 export default function* rootSaga() {
@@ -10,5 +12,7 @@ export default function* rootSaga() {
         categoriesSaga(),
         stocksSaga(),
         uploadSaga(),
+        featuresSaga(),
+        productFeaturesSaga(),
     ]);
 }

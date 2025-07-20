@@ -90,7 +90,6 @@ export const ProductTable = () => {
   const categoriesFromStore = useSelector((state) => state.categories.categories) || [];
   const stocksFromStore = useSelector((state) => state.stocks.stocks) || [];
   const dispatch = useDispatch();
-  const [products, setProducts] = useState(productsFromStore);
   const [selectedProduct, setSelectedProduct] = useState(null); // product used for looking features
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -105,6 +104,11 @@ export const ProductTable = () => {
     promotion: 'Non',
     main : false,
   });
+
+  useEffect(() => {
+    dispatch(getProductUserRequest());
+  }, [dispatch]);
+
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -148,7 +152,6 @@ export const ProductTable = () => {
 
   const handleDeleteClick = (id) => {
     if (window.confirm('Supprimer ce produit ?')) {
-      setProducts((prev) => prev.filter((p) => p.id !== id));
       dispatch(deleteProductUserRequest(id));
     }
   };
@@ -156,41 +159,24 @@ export const ProductTable = () => {
   //get idCategory
   const idCategory = categoriesFromStore.find((cat) => cat.name === formData.category)?.id;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async(e) => {
     e.preventDefault();
     if (isEditing) {
       // Modifier le produit
-      setProducts((prev) =>
-        prev.map((p) =>
-          p.id === currentId ? { ...p, ...formData } : p
-        )
-      );
-      
-      const  idStock = stocksFromStore.find((stock) => stock.id === formData.idStock)?.id;
       console.log('Produit modifié:', formData);
-      dispatch(updateProductUserRequest({Id: formData.id, Name : formData.name, Description : formData.description, Price : formData.price, IdCategory : idCategory, Main : formData.main}));
-      dispatch(updateStockRequest({Id: idStock, Quantity : formData.stock}));
-
-      setTimeout(() => {
-        dispatch(getProductUserRequest());
-      }, 2000);
+      await dispatch(updateProductUserRequest({Id: formData.id, Name : formData.name, Description : formData.description, Price : formData.price, IdCategory : idCategory, Main : formData.main, Stock : formData.stock}));
     } else {
       // Ajouter un produit
       const newProduct = {
         ...formData
       };
-      setProducts((prev) => [...prev, newProduct]);
       console.log('Produit ajouté:', newProduct);
-      dispatch(addProductUserRequest({Name : formData.name, Description : formData.description, Price : formData.price, Stock : formData.stock, IdCategory : idCategory}));
-      
-      setTimeout(() => {
-        dispatch(getProductUserRequest());
-      }, 2000);
-
-
-
-
+      await dispatch(addProductUserRequest({Name : formData.name, Description : formData.description, Price : formData.price, Stock : formData.stock, IdCategory : idCategory}));
     }
+
+    //je recharge les produits
+    await dispatch(getProductUserRequest());
+    
     setShowModal(false);
   };
 
@@ -218,7 +204,7 @@ export const ProductTable = () => {
             </tr>
           </thead>
           <tbody>
-            {products.map((prod) => (
+            {productsFromStore.map((prod) => (
               <tr key={prod.id}>
                 <td><img src={prod.images?.[0]?.url} alt={prod.name} className="img-thumbnail" width={60} /></td>
                 <td>{prod.name}</td>

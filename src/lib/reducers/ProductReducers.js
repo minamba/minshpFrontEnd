@@ -21,19 +21,19 @@ export default function productReducer(state = initialState, action) {
             }
 
         case actionsProduct.ADD_PRODUCT_USER_SUCCESS:
-            return {...state.products, ...action.payload.product}
+            return {...state.products, ...action.payload}
   
 
         case actionsProduct.UPDATE_PRODUCT_USER_SUCCESS:
             state.products.map(product => {
                     if(product.id === action.payload.id)
-                        return {...product, ...action.payload.product}
+                        return {...product, ...action.payload}
                     else
                         return product
                 })
 
         case actionsProduct.DELETE_PRODUCT_USER_SUCCESS:
-            return state.products.filter(product => product.id !== action.payload.id)
+            return state.products.filter(product => product.id !== action.payload)
 
         default:
             return state

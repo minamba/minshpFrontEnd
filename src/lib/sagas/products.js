@@ -31,8 +31,7 @@ function* updateProduct(action) {
         const response = yield call (api.updateProduct, action.payload);
         console.log("Product updated :",response.data);
         const products = yield call (api.getProducts);
-        yield put (actions.getProductUserSuccess({product : products.data}));
-        yield put (actions.updateProductUserSuccess({product : response.data}));
+        yield put (actions.getProductUserSuccess({products : products.data}));
     }
     catch (error) {
         yield put (actions.updateProductUserFailure({error : error.response?.data || error.message}));
