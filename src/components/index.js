@@ -84,16 +84,17 @@ export const Navbar = () => {
 };
 
 //////////////////////// Product Table ////////////////////////
-
 export const ProductTable = () => {
   const productsFromStore = useSelector((state) => state.products.products) || [];
   const categoriesFromStore = useSelector((state) => state.categories.categories) || [];
-  const stocksFromStore = useSelector((state) => state.stocks.stocks) || [];
   const dispatch = useDispatch();
-  const [selectedProduct, setSelectedProduct] = useState(null); // product used for looking features
+
+  const [selectedProduct, setSelectedProduct] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [currentId, setCurrentId] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -102,13 +103,12 @@ export const ProductTable = () => {
     image: '',
     stock: 0,
     promotion: 'Non',
-    main : false,
+    main: false,
   });
 
   useEffect(() => {
     dispatch(getProductUserRequest());
   }, [dispatch]);
-
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -118,17 +118,10 @@ export const ProductTable = () => {
     }));
   };
 
-  const handleImageUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setFormData((prev) => ({ ...prev, image: URL.createObjectURL(file) }));
-    }
-  };
-
   const handleAddClick = () => {
     setIsEditing(false);
     setCurrentId(null);
-    setFormData({ name: '', description: '', price: '', category: '', image: '', stock: 0, promotion: 'Non' });
+    setFormData({ name: '', description: '', price: '', category: '', image: '', stock: 0, promotion: 'Non', main: false });
     setShowModal(true);
   };
 
@@ -141,14 +134,12 @@ export const ProductTable = () => {
       description: product.description,
       price: product.price,
       category: product.category,
-      main : !!product.main, //transform to boolean
+      main: !!product.main,
       stock: product.stocks?.quantity,
       idStock: product.stocks?.id,
-
     });
     setShowModal(true);
   };
-
 
   const handleDeleteClick = (id) => {
     if (window.confirm('Supprimer ce produit ?')) {
@@ -156,43 +147,91 @@ export const ProductTable = () => {
     }
   };
 
-  //get idCategory
   const idCategory = categoriesFromStore.find((cat) => cat.name === formData.category)?.id;
 
-  const handleSubmit = async(e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (isEditing) {
-      // Modifier le produit
-      console.log('Produit modifié:', formData);
-      await dispatch(updateProductUserRequest({Id: formData.id, Name : formData.name, Description : formData.description, Price : formData.price, IdCategory : idCategory, Main : formData.main, Stock : formData.stock}));
+      await dispatch(updateProductUserRequest({
+        Id: formData.id,
+        Name: formData.name,
+        Description: formData.description,
+        Price: formData.price,
+        IdCategory: idCategory,
+        Main: formData.main,
+        Stock: formData.stock,
+      }));
     } else {
-      // Ajouter un produit
-      const newProduct = {
-        ...formData
-      };
-      console.log('Produit ajouté:', newProduct);
-      await dispatch(addProductUserRequest({Name : formData.name, Description : formData.description, Price : formData.price, Stock : formData.stock, IdCategory : idCategory}));
+      await dispatch(addProductUserRequest({
+        Name: formData.name,
+        Description: formData.description,
+        Price: formData.price,
+        Stock: formData.stock,
+        IdCategory: idCategory,
+      }));
     }
-
-    //je recharge les produits
     await dispatch(getProductUserRequest());
-    
     setShowModal(false);
   };
 
+  const sortedProducts = [...productsFromStore].sort((a, b) =>
+    a.name.toLowerCase().localeCompare(b.name.toLowerCase())
+  );
+
+  const filteredProducts = sortedProducts.filter((prod) => {
+    const query = searchQuery.toLowerCase();
+    const name = prod.name?.toLowerCase() || '';
+    const description = prod.description?.toLowerCase() || '';
+    const main = prod.main ? 'oui' : 'non';
+    const category = prod.category || '';
+
+    const matchesQuery =
+      name.includes(query) ||
+      description.includes(query) ||
+      main.includes(query);
+
+    const matchesCategory = categoryFilter ? category === categoryFilter : true;
+
+    return matchesQuery && matchesCategory;
+  });
+
   return (
-     <div>
-      <div className="d-flex justify-content-end mb-3">
+    <div>
+      <div className="d-flex justify-content-between align-items-center mb-3">
+        <h2>Produits</h2>
         <button className='btn btn-success' onClick={handleAddClick}>
           Ajouter un produit
         </button>
+      </div>
+
+      <div className="d-flex gap-3 mb-3">
+        <input
+          type="text"
+          className="form-control"
+          placeholder="Rechercher par nom, description ou vitrine (oui/non)..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
+
+        <select
+          className="form-select"
+          value={categoryFilter}
+          onChange={(e) => setCategoryFilter(e.target.value)}
+        >
+          <option value="">Toutes les catégories</option>
+          {categoriesFromStore.map((cat) => (
+            <option key={cat.id} value={cat.name}>
+              {cat.name}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className='table-responsive'>
         <table className='table table-striped table-hover shadow-sm'>
           <thead className='table-dark'>
             <tr>
-              <th>Produit</th>
+              <th>Image</th>
               <th>Nom</th>
               <th>Description</th>
               <th>Prix (€)</th>
@@ -204,38 +243,45 @@ export const ProductTable = () => {
             </tr>
           </thead>
           <tbody>
-            {productsFromStore.map((prod) => (
-              <tr key={prod.id}>
-                <td><img src={prod.images?.[0]?.url} alt={prod.name} className="img-thumbnail" width={60} /></td>
-                <td>{prod.name}</td>
-                <td>{prod.description}</td>
-                <td>{prod.price}</td>
-                <td>{prod.category}</td>
-                <td>{prod.stocks?.quantity? prod.stocks.quantity : "Rupture"}</td>
-                <td>{prod.promotions?.length > 0 ? "Oui" : "Non"}</td>
-                <td>{prod.main ? "Oui" : "Non"}</td>
-                <td>
-                  <button className='btn btn-sm btn-warning me-2' onClick={() => handleEditClick(prod)}>
-                    <i className="bi bi-pencil"></i>
-                  </button>
-                  <button className='btn btn-sm btn-danger me-2' onClick={() => handleDeleteClick(prod.id)}>
-                    <i className="bi bi-trash"></i>
-                  </button>
-                  <button className='btn btn-sm btn-primary' onClick={() => setSelectedProduct(prod)}>
-                    <i className="bi bi-card-checklist"></i>
-                  </button>
-                </td>
+            {filteredProducts.length > 0 ? (
+              filteredProducts.map((prod) => (
+                <tr key={prod.id}>
+                  <td><img src={prod.images?.[0]?.url} alt={prod.name} className="img-thumbnail" width={60} /></td>
+                  <td>{prod.name}</td>
+                  <td>{prod.description}</td>
+                  <td>{prod.price}</td>
+                  <td>{prod.category}</td>
+                  <td>{prod.stocks?.quantity ? prod.stocks.quantity : "Rupture"}</td>
+                  <td>{prod.promotions?.length > 0 ? "Oui" : "Non"}</td>
+                  <td>{prod.main ? "Oui" : "Non"}</td>
+                  <td>
+                    <button className='btn btn-sm btn-warning me-2' onClick={() => handleEditClick(prod)}>
+                      <i className="bi bi-pencil"></i>
+                    </button>
+                    <button className='btn btn-sm btn-danger me-2' onClick={() => handleDeleteClick(prod.id)}>
+                      <i className="bi bi-trash"></i>
+                    </button>
+                    <button className='btn btn-sm btn-primary' onClick={() => setSelectedProduct(prod)}>
+                      <i className="bi bi-card-checklist"></i>
+                    </button>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan="9" className="text-center">Aucun produit trouvé.</td>
               </tr>
-            ))}
+            )}
           </tbody>
         </table>
       </div>
 
+      {/* Modal pour détails produit */}
       {selectedProduct && (
         <div className="modal-backdrop">
           <div className="modal-content-custom" style={{ maxWidth: '600px', wordWrap: 'break-word' }}>
             <h3 className="mb-3">{selectedProduct.name}</h3>
-            <hr/>
+            <hr />
             <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
               {selectedProduct.features && selectedProduct.features.length > 0 ? (
                 <ul>
@@ -258,7 +304,7 @@ export const ProductTable = () => {
         </div>
       )}
 
-
+      {/* Modal ajout/modif produit */}
       {showModal && (
         <div className="modal-backdrop">
           <div className="modal-content-custom">
@@ -295,7 +341,7 @@ export const ProductTable = () => {
               </div>
               <div className="mb-3">
                 <label>Stock</label>
-                <input type="number" name="stock" className="form-control" value={formData.stock? formData.stock : 0} onChange={handleInputChange} required />
+                <input type="number" name="stock" className="form-control" value={formData.stock ? formData.stock : 0} onChange={handleInputChange} required />
               </div>
               <div className="mb-3">
                 <label>Vitrine</label>
@@ -312,142 +358,6 @@ export const ProductTable = () => {
     </div>
   );
 };
-
-//////////////////////// Feature Table ////////////////////////
-
-export const FeatureTable = () => {
-  const featuresFromStore = useSelector((state) => state.features.features) || [];
-  const dispatch = useDispatch();
-
-  const [features, setFeatures] = useState(featuresFromStore);
-  const [showModal, setShowModal] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [currentId, setCurrentId] = useState(null);
-  const [formData, setFormData] = useState({ name: '' });
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleAddClick = () => {
-    setIsEditing(false);
-    setCurrentId(null);
-    setFormData({ name: '' });
-    setShowModal(true);
-  };
-
-  const handleEditClick = (feature) => {
-    setIsEditing(true);
-    setCurrentId(feature.id);
-    setFormData({ name: feature.name });
-    setShowModal(true);
-  };
-
-  const handleDeleteClick = (id) => {
-    if (window.confirm('Supprimer cette caractéristique ?')) {
-      setFeatures((prev) => prev.filter((f) => f.id !== id));
-      // dispatch(deleteFeatureRequest(id));
-    }
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (isEditing) {
-      setFeatures((prev) =>
-        prev.map((f) => (f.id === currentId ? { ...f, name: formData.name } : f))
-      );
-      // dispatch(updateFeatureRequest({ id: currentId, name: formData.name }));
-    } else {
-      const newFeature = {
-        id: features.length ? Math.max(...features.map((f) => f.id)) + 1 : 1,
-        name: formData.name,
-      };
-      setFeatures((prev) => [...prev, newFeature]);
-      // dispatch(addFeatureRequest(newFeature));
-    }
-    setShowModal(false);
-  };
-
-  return (
-    <div>
-      <div className="d-flex justify-content-end mb-3">
-        <button className="btn btn-success" onClick={handleAddClick}>
-          Ajouter une caractéristique
-        </button>
-      </div>
-
-      <div className="table-responsive">
-        <table className="table table-striped table-hover shadow-sm">
-          <thead className="table-dark">
-            <tr>
-              <th>Nom</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {features.map((feat) => (
-              <tr key={feat.id}>
-                <td>{feat.name}</td>
-                <td>
-                  <button
-                    className="btn btn-sm btn-warning me-2"
-                    onClick={() => handleEditClick(feat)}
-                  >
-                    <i className="bi bi-pencil"></i>
-                  </button>
-                  <button
-                    className="btn btn-sm btn-danger"
-                    onClick={() => handleDeleteClick(feat.id)}
-                  >
-                    <i className="bi bi-trash"></i>
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {showModal && (
-        <div className="modal-backdrop">
-          <div className="modal-content-custom" style={{ maxWidth: '400px' }}>
-            <h2 className="mb-3">
-              {isEditing ? 'Modifier la caractéristique' : 'Ajouter une caractéristique'}
-            </h2>
-            <form onSubmit={handleSubmit}>
-              <div className="mb-3">
-                <label>Nom</label>
-                <input
-                  type="text"
-                  name="name"
-                  className="form-control"
-                  value={formData.name}
-                  onChange={handleInputChange}
-                  required
-                />
-              </div>
-              <div className="d-flex justify-content-end">
-                <button
-                  type="button"
-                  className="btn btn-secondary me-2"
-                  onClick={() => setShowModal(false)}
-                >
-                  Annuler
-                </button>
-                <button type="submit" className="btn btn-dark">
-                  {isEditing ? 'Modifier' : 'Ajouter'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-
 
 
 //////////////////////// Footer ////////////////////////

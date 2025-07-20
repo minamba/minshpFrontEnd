@@ -7,8 +7,8 @@ import * as api from "../api/productFeatures";
 function* getProductFeatures() {
     try {
         const response = yield call (api.getProductFeatures);
-        console.log("Features :",response.data);
-        yield put (actions.getFeatureProductSuccess({features : response.data}));
+        console.log("Features product :",response.data);
+        yield put (actions.getFeatureProductSuccess({featureProducts : response.data}));
     }
     catch (error) {
         yield put (actions.getFeatureProductFailure({error : error.response?.data || error.message}));
@@ -18,9 +18,9 @@ function* getProductFeatures() {
 function* addProductFeature(action) {
     try {
         const response = yield call (api.addProductFeature, action.payload);
-        console.log("Feature added :",response.data);
+        console.log("Feature product added :",response.data);
         const features = yield call (api.getProductFeatures);
-        yield put (actions.getFeatureProductSuccess({features : features.data}));
+        yield put (actions.getFeatureProductSuccess({featureProduct : features.data}));
     }
     catch (error) {
         yield put (actions.addFeatureProductFailure({error : error.response?.data || error.message}));
@@ -31,9 +31,9 @@ function* addProductFeature(action) {
 function* updateProductFeature(action) {
     try {
         const response = yield call (api.updateProductFeature, action.payload);
-        console.log("Feature updated :",response.data);
+        console.log("Feature product updated :",response.data);
         const features = yield call (api.getProductFeatures);
-        yield put (actions.getFeatureProductSuccess({features : features.data}));
+        yield put (actions.getFeatureProductSuccess({featureProduct : features.data}));
     }
     catch (error) {
         yield put (actions.updateFeatureProductFailure({error : error.response?.data || error.message}));
@@ -45,7 +45,7 @@ function* deleteProductFeature(action) {
             yield call(api.deleteProductFeature, action.payload);
             const response = yield call(api.getProductFeatures);
 
-            yield put (actions.getFeatureProductSuccess({features : response.data}));
+            yield put (actions.getFeatureProductSuccess({featureProducts : response.data}));
     }
     catch (error) {
         yield put (actions.deleteFeatureProductFailure({error : error.response?.data || error.message}));

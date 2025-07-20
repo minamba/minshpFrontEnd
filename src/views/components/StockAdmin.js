@@ -17,6 +17,7 @@ export const StockAdmin = () => {
     const [showModal, setShowModal] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [currentId, setCurrentId] = useState(null);
+    const [searchQuery, setSearchQuery] = useState('');
     const [formData, setFormData] = useState({
         quantity: 0,
         idProduct: ''
@@ -48,7 +49,7 @@ export const StockAdmin = () => {
         setFormData({
             id: stock.id,
             quantity: stock.quantity,
-            idProduct: stock.idProduct // Assure-toi que ton objet stock contient l’id du produit
+            idProduct: stock.idProduct
         });
         setShowModal(true);
     };
@@ -78,11 +79,29 @@ export const StockAdmin = () => {
         setShowModal(false);
     };
 
+    // Tri et filtre des stocks
+    const stocksWithProductNames = stocksFromStore
+        .map((stock) => ({
+            ...stock,
+            productName: productsFromStore.find(p => p.id === stock.idProduct)?.name || 'Produit inconnu'
+        }))
+        .filter((stock) =>
+            stock.productName.toLowerCase().includes(searchQuery.toLowerCase())
+        )
+        .sort((a, b) => a.productName.localeCompare(b.productName));
+
     return (
         <div className='container py-5'>
             <h1 className="text-center mb-4">Gestion des stocks</h1>
 
-            <div className="d-flex justify-content-end mb-3">
+            <div className="d-flex justify-content-between align-items-center mb-3">
+                <input
+                    type="text"
+                    className="form-control w-50"
+                    placeholder="Rechercher par nom de produit..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                />
                 <button className='btn btn-success' onClick={handleAddClick}>
                     Ajouter un stock
                 </button>
@@ -98,11 +117,10 @@ export const StockAdmin = () => {
                         </tr>
                     </thead>
                     <tbody>
-                        {stocksFromStore.map((stock) => {
-                            const product = productsFromStore.find(p => p.id === stock.idProduct);
-                            return (
+                        {stocksWithProductNames.length > 0 ? (
+                            stocksWithProductNames.map((stock) => (
                                 <tr key={stock.id} onClick={() => handleEditClick(stock)} style={{ cursor: 'pointer' }}>
-                                    <td>{product ? product.name : 'Produit inconnu'}</td>
+                                    <td>{stock.productName}</td>
                                     <td>{stock.quantity}</td>
                                     <td>
                                         <button
@@ -125,8 +143,12 @@ export const StockAdmin = () => {
                                         </button>
                                     </td>
                                 </tr>
-                            );
-                        })}
+                            ))
+                        ) : (
+                            <tr>
+                                <td colSpan="3" className="text-center">Aucun stock trouvé.</td>
+                            </tr>
+                        )}
                     </tbody>
                 </table>
             </div>

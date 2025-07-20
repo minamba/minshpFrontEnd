@@ -26,6 +26,12 @@ export const Product = () => {
     setCartOpen(true);
   };
 
+  const sortedProducts = [...productsFromStore].sort((a, b) => {
+    const nameA = a.name.toLowerCase();
+    const nameB = b.name.toLowerCase();
+    return nameA.localeCompare(nameB);
+  });
+
   return (
     <div className="product-page">
       <div className="product-main">

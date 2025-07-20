@@ -14,7 +14,13 @@ export const FeatureProductAdmin = () => {
     const featureProductsFromStore = useSelector((state) => state.featureProducts.featureProducts) || [];
     const productsFromStore = useSelector((state) => state.products.products) || [];
     const featuresFromStore = useSelector((state) => state.features.features) || [];
+    const categoriesFromStore = useSelector((state) => state.categories.categories) || [];
+    const [searchQuery, setSearchQuery] = useState('');
     const dispatch = useDispatch();
+
+
+    console.log( "productsFromStore:",productsFromStore);
+
 
     const [showModal, setShowModal] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
@@ -73,7 +79,7 @@ export const FeatureProductAdmin = () => {
         } else {
             await dispatch(addFeatureProductRequest({
                 idProduct: formData.idProduct,
-                idFeature: formData.idFeature
+                id_feature: formData.idFeature
             }));
         }
         await dispatch(getFeatureProductRequest());
@@ -90,6 +96,51 @@ export const FeatureProductAdmin = () => {
         return feature ? feature.description : 'Feature inconnue';
     };
 
+
+    const getCategoryName = (id) => {
+        const feature = featuresFromStore.find((f) => f.id === id);
+        if (!feature) return 'Feature inconnue';
+        
+        const category = categoriesFromStore.find((c) => c.id === feature.idCategory);
+        return category ? category.name : 'Catégorie inconnue';
+    };
+
+    // Ajoute une fonction pour récupérer la catégorie du produit sélectionné
+    const getSelectedProductCategoryId = () => {
+        const selectedProduct = productsFromStore.find(p => String(p.id) === String(formData.idProduct));
+        if (!selectedProduct) return null;
+    
+        // Assure-toi qu'il y a bien un champ 'category' ou 'idCategory' dans le produit
+        const category = categoriesFromStore?.find(c => c.name === selectedProduct.category || c.id === selectedProduct.idCategory);
+        return category ? category.id : null;
+    };
+
+        // Filtre dynamique des features selon la catégorie du produit sélectionné
+        const filteredFeatures = () => {
+            const selectedCategoryId = getSelectedProductCategoryId();
+            if (!selectedCategoryId) return [];
+            return featuresFromStore.filter(f => f.idCategory === selectedCategoryId);
+        };
+
+
+        const sortedFeatureProducts = [...featureProductsFromStore].sort((a, b) => {
+            const nameA = getProductName(a.idProduct).toLowerCase();
+            const nameB = getProductName(b.idProduct).toLowerCase();
+            return nameA.localeCompare(nameB);
+        });
+
+        const filteredAndSortedFeatureProducts = sortedFeatureProducts.filter((fp) => {
+            const productName = getProductName(fp.idProduct).toLowerCase();
+            const featureDesc = getFeatureDescription(fp.idFeature).toLowerCase();
+            const categoryName = getCategoryName(fp.idFeature).toLowerCase();
+            const query = searchQuery.toLowerCase();
+            return (
+                productName.includes(query) ||
+                featureDesc.includes(query) ||
+                categoryName.includes(query)
+            );
+        });
+
     return (
         <div className='container py-5'>
             <h1 className="text-center mb-4">Gestion des caractéristiques produits</h1>
@@ -100,20 +151,32 @@ export const FeatureProductAdmin = () => {
                 </button>
             </div>
 
+            <div className="mb-3">
+                <input
+                    type="text"
+                    className="form-control"
+                    placeholder="Rechercher par produit, catégorie ou caractéristique..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                />
+            </div>
+
             <div className='table-responsive'>
                 <table className='table table-striped table-hover shadow-sm'>
                     <thead className='table-dark'>
                         <tr>
                             <th>Produit</th>
                             <th>Caractéristique</th>
+                            <th>Catégorie</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {featureProductsFromStore.map((fp) => (
+                        {filteredAndSortedFeatureProducts.map((fp) => (
                             <tr key={fp.id} onClick={() => handleEditClick(fp)} style={{ cursor: 'pointer' }}>
                                 <td>{getProductName(fp.idProduct)}</td>
                                 <td>{getFeatureDescription(fp.idFeature)}</td>
+                                <td>{getCategoryName(fp.idFeature)}</td>
                                 <td>
                                     <button
                                         className='btn btn-sm btn-warning me-2'
@@ -145,7 +208,7 @@ export const FeatureProductAdmin = () => {
                     <div className="modal-content-custom">
                         <h2 className="mb-3">{isEditing ? 'Modifier l\'association' : 'Ajouter une association'}</h2>
                         <form onSubmit={handleSubmit}>
-                            <div className="mb-3">
+                        <div className="mb-3">
                                 <label>Produit</label>
                                 <select
                                     name="idProduct"
@@ -162,6 +225,7 @@ export const FeatureProductAdmin = () => {
                                     ))}
                                 </select>
                             </div>
+
                             <div className="mb-3">
                                 <label>Caractéristique</label>
                                 <select
@@ -172,13 +236,14 @@ export const FeatureProductAdmin = () => {
                                     required
                                 >
                                     <option value="">Sélectionnez une caractéristique</option>
-                                    {featuresFromStore.map((feature) => (
+                                    {filteredFeatures().map((feature) => (
                                         <option key={feature.id} value={feature.id}>
                                             {feature.description}
                                         </option>
                                     ))}
                                 </select>
                             </div>
+
                             <div className="d-flex justify-content-end">
                                 <button
                                     type="button"

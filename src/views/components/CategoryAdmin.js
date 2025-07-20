@@ -65,6 +65,12 @@ export const CategoryAdmin = () => {
     setShowModal(false);
   };
 
+  const sortedCategories = [...categoriesFromStore].sort((a, b) => {
+    const nameA = a.name.toLowerCase();
+    const nameB = b.name.toLowerCase();
+    return nameA.localeCompare(nameB);
+  });
+
   return (
     <div className='container py-5'>
       <h1 className="text-center mb-4">Gestion des catégories</h1>
@@ -84,7 +90,7 @@ export const CategoryAdmin = () => {
             </tr>
           </thead>
           <tbody>
-            {categoriesFromStore.map((cat) => (
+            {sortedCategories.map((cat) => (
               <tr key={cat.id} onClick={() => handleEditClick(cat)} style={{ cursor: 'pointer' }}>
                 <td>{cat.name}</td>
                 <td>

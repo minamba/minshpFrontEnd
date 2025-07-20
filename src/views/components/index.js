@@ -19,6 +19,7 @@ import { useDispatch } from "react-redux";
 import { getProductUserRequest } from "../../lib/actions/ProductActions";
 import { getCategoryRequest } from "../../lib/actions/CategoryActions";
 import { getStockRequest } from "../../lib/actions/StockActions";
+import { getFeatureProductRequest } from "../../lib/actions/FeatureProductActions";
 
 export const BaseApp = () => {
 
@@ -27,6 +28,7 @@ export const BaseApp = () => {
         dispatch(getProductUserRequest());
         dispatch(getCategoryRequest());
         dispatch(getStockRequest());
+        dispatch(getFeatureProductRequest());
     }, []);
 
     useEffect(() => {
@@ -34,6 +36,7 @@ export const BaseApp = () => {
       }, []);
 
     return (
+        
         <Fragment>
             <Router>
                 <Navbar/>
