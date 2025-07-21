@@ -6,7 +6,9 @@ import featuresSaga from "./features";
 import productFeaturesSaga from "./productFeatures";
 import promotionsSaga from "./promotions";
 import imagesSaga from "./images";
+import videosSaga from "./videos";
 import { all } from "redux-saga/effects";
+
 
 export default function* rootSaga() {
     yield all([
@@ -18,5 +20,6 @@ export default function* rootSaga() {
         productFeaturesSaga(),
         promotionsSaga(),
         imagesSaga(),
+        videosSaga()
     ]);
 }

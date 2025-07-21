@@ -81,14 +81,14 @@ export const ImageAdmin = () => {
         e.preventDefault();
 
         if (isEditing) {
-            await dispatch(updateImageRequest(formData));
+            await dispatch(postUploadRequest({Id: currentId, File: formData.file, Type: 'IMAGE', Description: formData.description, IdProduct: formData.idProduct, TypeUpload: 'UPLOAD'}));
         } else {
-            await dispatch(postUploadRequest({File: formData.file, Type: 'IMAGE', IdProduct: formData.idProduct, Description: formData.description}));
+            await dispatch(postUploadRequest({File: formData.file, Type: 'IMAGE', IdProduct: formData.idProduct, Description: formData.description, TypeUpload: 'ADD'}));
         }
 
         await dispatch(getImageRequest());
         setShowModal(false);
-    };
+    }
 
     const getProductName = (id) => {
         const product = productsFromStore.find(p => p.id === id);
