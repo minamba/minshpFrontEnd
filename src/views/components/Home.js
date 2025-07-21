@@ -1,15 +1,34 @@
 import React from 'react';
 import '../../App.css';
+import { useSelector } from 'react-redux';
 
 export const Home = () => {
-  const galleryImages = [
-    'https://source.unsplash.com/800x600/?projector,home-cinema',
-    'https://source.unsplash.com/800x600/?projector,technology',
-    'https://source.unsplash.com/800x600/?projector,living-room',
-    'https://source.unsplash.com/800x600/?projector,screen',
-    'https://source.unsplash.com/800x600/?projector,speaker',
-    'https://source.unsplash.com/800x600/?projector,modern',
-  ];
+const prodductsfromStore = useSelector((state) => state.products.products) || [];
+const imagesfromStore = useSelector((state) => state.images.images) || [];
+const videosfromStore = useSelector((state) => state.videos.videos) || [];
+const mainProduct = prodductsfromStore.find((p) => p.main === true);
+
+const mainProductImages = mainProduct
+    ? imagesfromStore.filter((i) => i.idProduct === mainProduct.id)
+    : [];
+
+const mainProductVideos = mainProduct
+    ? videosfromStore.filter((v) => v.idProduct === mainProduct.id)
+    : [];
+
+console.log("prodductsfromStore blabla : ", prodductsfromStore);
+console.log("imagesfromStore blabla : ", imagesfromStore);
+console.log("videosfromStore blabla : ", videosfromStore);
+console.log("mainProduct : ", mainProduct);
+console.log("mainProductImages: ", mainProductImages);
+console.log("mainProductVideos : ", mainProductVideos);
+
+
+const getProductImage = (id) => {
+    const product = prodductsfromStore.find((p) => p.id === id);
+    const images = imagesfromStore.filter((i) => i.idProduct === id);
+    return images.length > 0 ? images[0].url : null;
+};
 
   return (
     <div className="home-container">
@@ -19,8 +38,8 @@ export const Home = () => {
           <source src="/Videos/xgimi.mp4" type="video/mp4" />
         </video>
         <div className="hero-content text-center">
-          <h1 className="hero-title">Le Projecteur Ultime</h1>
-          <p className="hero-subtitle">L'expérience cinéma à domicile réinventée.</p>
+          <h1 className="hero-title">{mainProductVideos[0]?.title || 'Titre manquant'}</h1>
+          <p className="hero-subtitle">{mainProductVideos[0]?.description || 'Description manquante'}</p>
           <a href="#features" className="hero-button">Découvrir</a>
         </div>
       </section>
@@ -29,26 +48,26 @@ export const Home = () => {
       <section className="features-section" id="features">
         <div className="feature" data-aos="fade-up">
           <div className="feature-text">
-            <h2>Design minimaliste</h2>
-            <p>Un design épuré qui s'intègre parfaitement à votre espace de vie.</p>
+            <h2>{mainProductImages[0]?.title || 'Titre manquant'}</h2>
+            <p>{mainProductImages[0]?.description || 'Description manquante'}</p>
           </div>
-          <img src="https://source.unsplash.com/800x600/?projector,design" alt="Design minimaliste" />
+          <img src={mainProductImages[0]?.url || '/Images/placeholder.jpg'} alt="Design minimaliste" />
         </div>
 
         <div className="feature reverse" data-aos="fade-up">
           <div className="feature-text">
-            <h2>Qualité d'image 4K HDR</h2>
-            <p>Des images d'une netteté et d'une profondeur exceptionnelles.</p>
+            <h2>{mainProductImages[1]?.title || 'Titre manquant'}</h2>
+            <p>{mainProductImages[1]?.description || 'Description manquante'}</p>
           </div>
-          <img src="https://source.unsplash.com/800x600/?projector,4k" alt="Qualité d'image 4K" />
+          <img src={mainProductImages[1]?.url || '/Images/placeholder.jpg'} alt="Qualité d'image 4K" />
         </div>
 
         <div className="feature" data-aos="fade-up">
           <div className="feature-text">
-            <h2>Son immersif</h2>
-            <p>Un son qui vous enveloppe, pour une immersion totale.</p>
+            <h2>{mainProductImages[2]?.title || 'Titre manquant'}</h2>
+            <p>{mainProductImages[2]?.description || 'Description manquante'}</p>
           </div>
-          <img src="https://source.unsplash.com/800x600/?sound,speaker" alt="Son immersif" />
+          <img src={mainProductImages[2]?.url || '/Images/placeholder.jpg'} alt="Son immersif" />
         </div>
       </section>
 
@@ -56,9 +75,9 @@ export const Home = () => {
       <section className="gallery-section">
         <h2 data-aos="fade-up">Galerie</h2>
         <div className="gallery-grid">
-          {galleryImages.map((src, index) => (
+          {prodductsfromStore.map((p, index) => (
             <div key={index} className="gallery-item" data-aos="zoom-in">
-              <img src={src} alt={`Projecteur ${index + 1}`} />
+              <img src={getProductImage(p.id)} alt={`Projecteur ${index + 1}`} />
             </div>
           ))}
         </div>

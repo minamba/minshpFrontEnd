@@ -20,6 +20,8 @@ import { getProductUserRequest } from "../../lib/actions/ProductActions";
 import { getCategoryRequest } from "../../lib/actions/CategoryActions";
 import { getStockRequest } from "../../lib/actions/StockActions";
 import { getFeatureProductRequest } from "../../lib/actions/FeatureProductActions";
+import { getImageRequest } from "../../lib/actions/ImageActions";
+import { getVideoRequest } from "../../lib/actions/VideoActions";
 
 export const BaseApp = () => {
 
@@ -29,6 +31,8 @@ export const BaseApp = () => {
         dispatch(getCategoryRequest());
         dispatch(getStockRequest());
         dispatch(getFeatureProductRequest());
+        dispatch(getImageRequest());
+        dispatch(getVideoRequest());
     }, []);
 
     useEffect(() => {

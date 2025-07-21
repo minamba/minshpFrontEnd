@@ -22,7 +22,8 @@ export const ImageAdmin = () => {
     const [formData, setFormData] = useState({
         file: null, // fichier image
         description: '',
-        idProduct: ''
+        idProduct: '',
+        title: ''
     });
     const [previewUrl, setPreviewUrl] = useState('');
 
@@ -53,7 +54,7 @@ export const ImageAdmin = () => {
     const handleAddClick = () => {
         setIsEditing(false);
         setCurrentId(null);
-        setFormData({ file: null, description: '', idProduct: '' });
+        setFormData({ file: null, description: '', idProduct: '', title: '' });
         setPreviewUrl('');
         setShowModal(true);
     };
@@ -64,7 +65,8 @@ export const ImageAdmin = () => {
         setFormData({
             file: null, // on attend qu'un nouveau fichier soit choisi
             description: image.description,
-            idProduct: image.idProduct
+            idProduct: image.idProduct,
+            title: image.title
         });
         setPreviewUrl(image.url); // prévisualiser l’image existante
         setShowModal(true);
@@ -81,9 +83,9 @@ export const ImageAdmin = () => {
         e.preventDefault();
 
         if (isEditing) {
-            await dispatch(postUploadRequest({Id: currentId, File: formData.file, Type: 'IMAGE', Description: formData.description, IdProduct: formData.idProduct, TypeUpload: 'UPLOAD'}));
+            await dispatch(postUploadRequest({Id: currentId, File: formData.file, Type: 'IMAGE', Description: formData.description, IdProduct: formData.idProduct, Title: formData.title, TypeUpload: 'UPLOAD'}));
         } else {
-            await dispatch(postUploadRequest({File: formData.file, Type: 'IMAGE', IdProduct: formData.idProduct, Description: formData.description, TypeUpload: 'ADD'}));
+            await dispatch(postUploadRequest({File: formData.file, Type: 'IMAGE', IdProduct: formData.idProduct, Description: formData.description, Title: formData.title, TypeUpload: 'ADD'}));
         }
 
         await dispatch(getImageRequest());
@@ -134,6 +136,7 @@ export const ImageAdmin = () => {
                             <th>Image</th>
                             <th>Description</th>
                             <th>Produit</th>
+                            <th>Titre</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -145,6 +148,7 @@ export const ImageAdmin = () => {
                                 </td>
                                 <td>{img.description}</td>
                                 <td>{getProductName(img.idProduct)}</td>
+                                <td>{img.title}</td>
                                 <td>
                                     <button
                                         className='btn btn-sm btn-warning me-2'

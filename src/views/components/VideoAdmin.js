@@ -22,7 +22,8 @@ export const VideoAdmin = () => {
     const [formData, setFormData] = useState({
         file: null,
         description: '',
-        idProduct: ''
+        idProduct: '',
+        title: ''
     });
     const [previewUrl, setPreviewUrl] = useState('');
 
@@ -53,7 +54,7 @@ export const VideoAdmin = () => {
     const handleAddClick = () => {
         setIsEditing(false);
         setCurrentId(null);
-        setFormData({ file: null, description: '', idProduct: '' });
+        setFormData({ file: null, description: '', idProduct: '', title: '' });
         setPreviewUrl('');
         setShowModal(true);
     };
@@ -64,7 +65,8 @@ export const VideoAdmin = () => {
         setFormData({
             file: null,
             description: video.description,
-            idProduct: video.idProduct
+            idProduct: video.idProduct,
+            title: video.title
         });
         setPreviewUrl(video.url);
         setShowModal(true);
@@ -81,9 +83,9 @@ export const VideoAdmin = () => {
         e.preventDefault();
 
         if (isEditing) {
-            await dispatch(postUploadRequest({Id: currentId, File: formData.file, Type: 'VIDEO', Description: formData.description, IdProduct: formData.idProduct, TypeUpload: 'UPLOAD'}));
+            await dispatch(postUploadRequest({Id: currentId, File: formData.file, Type: 'VIDEO', Description: formData.description, IdProduct: formData.idProduct, Title: formData.title, TypeUpload: 'UPLOAD'}));
         } else {
-            await dispatch(postUploadRequest({File: formData.file, Type: 'VIDEO', IdProduct: formData.idProduct, Description: formData.description, TypeUpload: 'ADD'}));
+            await dispatch(postUploadRequest({File: formData.file, Type: 'VIDEO', IdProduct: formData.idProduct, Description: formData.description, Title: formData.title, TypeUpload: 'ADD'}));
         }
 
         await dispatch(getVideoRequest());
@@ -135,6 +137,7 @@ export const VideoAdmin = () => {
                             <th>Vidéo</th>
                             <th>Description</th>
                             <th>Produit</th>
+                            <th>Titre</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -142,13 +145,14 @@ export const VideoAdmin = () => {
                         {filteredVideos.map((vid) => (
                             <tr key={vid.id} onClick={() => handleEditClick(vid)} style={{ cursor: 'pointer' }}>
                                 <td>
-                                    <video width="120" controls>
+                                    <video width="200" controls>
                                         <source src={vid.url} type="video/mp4" />
                                         Votre navigateur ne supporte pas la vidéo.
                                     </video>
                                 </td>
                                 <td>{vid.description}</td>
                                 <td>{getProductName(vid.idProduct)}</td>
+                                <td>{vid.title}</td>
                                 <td>
                                     <button
                                         className='btn btn-sm btn-warning me-2'
