@@ -41,7 +41,8 @@ export const Navbar = () => {
     <nav className="navbar-container">
       <div className="navbar-content">
         <div className="navbar-logo">
-          <a href="/">MonSite</a>
+          <a href="/">
+          <img className="logo-img" src="../images/logo3.png" alt="Logo"/></a>
         </div>
 
         <div className={`navbar-links ${isOpen ? 'active' : ''}`}>
@@ -368,9 +369,9 @@ export const Footer = () => {
     return (
       <footer className="footer-container">
         <div className="footer-content">
-          <div className="footer-logo">
-            <a href="/">MonSite</a>
-          </div>
+          {/* <div className="footer-logo">
+            <a href="/">MinShp</a>
+          </div> */}
   
           <div className="footer-links">
             <a href="#conditions">Conditions</a>
@@ -393,7 +394,7 @@ export const Footer = () => {
           </div>
   
           <div className="footer-copy">
-            &copy; {year} MonSite. Tous droits réservés.
+            &copy; {year} MinShp. Tous droits réservés.
           </div>
         </div>
       </footer>

@@ -16,7 +16,7 @@ html, body {
 }
 
 main {
-  padding-top: 60px; /* pour compenser la navbar fixed */
+  padding-top: 100px; /* pour compenser la navbar fixed */
   flex: 1;
 }
 
@@ -170,21 +170,23 @@ h1{
 .navbar-container {
   position: fixed;
   top: 0;
-  width: 100%;
-  height: 60px;
-  background-color: rgba(0, 0, 0, 0.8);
-  backdrop-filter: blur(10px);
-  z-index: 1000;
+  left: 0;
+  right: 0;
+  height: 100px;
+  background-color: #333; /* ou ta couleur */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000; /* plus élevé pour passer devant le reste */
 }
 
 .navbar-content {
-  max-width: 1200px;
-  margin: 0 auto;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 1.5rem;
+    width: 100%;
+    max-width: 1200px; /* ou 100% si tu veux qu'elle aille bord à bord */
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
 }
 
 .navbar-logo a {
@@ -281,6 +283,19 @@ h1{
   background-color: #fff;
   margin: 4px 0;
   transition: all 0.3s;
+}
+
+.navbar-logo {
+  display: flex;
+  align-items: center;
+}
+
+.logo-img {
+  max-height: 200px; /* ajuste selon la hauteur souhaitée */
+  height: auto;
+  width: auto;
+  object-fit: contain;
+  margin-top: 5px;
 }
 
 
