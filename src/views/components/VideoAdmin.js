@@ -23,7 +23,8 @@ export const VideoAdmin = () => {
         file: null,
         description: '',
         idProduct: '',
-        title: ''
+        title: '',
+        position: ''
     });
     const [previewUrl, setPreviewUrl] = useState('');
 
@@ -54,7 +55,7 @@ export const VideoAdmin = () => {
     const handleAddClick = () => {
         setIsEditing(false);
         setCurrentId(null);
-        setFormData({ file: null, description: '', idProduct: '', title: '' });
+        setFormData({ file: null, description: '', idProduct: '', title: '', position: '' });
         setPreviewUrl('');
         setShowModal(true);
     };
@@ -66,7 +67,8 @@ export const VideoAdmin = () => {
             file: null,
             description: video.description,
             idProduct: video.idProduct,
-            title: video.title
+            title: video.title,
+            position: String(video.position)
         });
         setPreviewUrl(video.url);
         setShowModal(true);
@@ -83,9 +85,9 @@ export const VideoAdmin = () => {
         e.preventDefault();
 
         if (isEditing) {
-            await dispatch(postUploadRequest({Id: currentId, File: formData.file, Type: 'VIDEO', Description: formData.description, IdProduct: formData.idProduct, Title: formData.title, TypeUpload: 'UPLOAD'}));
+            await dispatch(postUploadRequest({Id: currentId, File: formData.file, Type: 'VIDEO', Description: formData.description, IdProduct: formData.idProduct, Title: formData.title, Position: parseInt(formData.position, 10), TypeUpload: 'UPLOAD'}));
         } else {
-            await dispatch(postUploadRequest({File: formData.file, Type: 'VIDEO', IdProduct: formData.idProduct, Description: formData.description, Title: formData.title, TypeUpload: 'ADD'}));
+            await dispatch(postUploadRequest({File: formData.file, Type: 'VIDEO', IdProduct: formData.idProduct, Description: formData.description, Title: formData.title, Position: parseInt(formData.position, 10), TypeUpload: 'ADD'}));
         }
 
         await dispatch(getVideoRequest());
@@ -138,6 +140,7 @@ export const VideoAdmin = () => {
                             <th>Description</th>
                             <th>Produit</th>
                             <th>Titre</th>
+                            <th>Position</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -153,6 +156,7 @@ export const VideoAdmin = () => {
                                 <td>{vid.description}</td>
                                 <td>{getProductName(vid.idProduct)}</td>
                                 <td>{vid.title}</td>
+                                <td>{vid.position}</td>
                                 <td>
                                     <button
                                         className='btn btn-sm btn-warning me-2'
@@ -215,6 +219,26 @@ export const VideoAdmin = () => {
                                     className="form-control"
                                     rows="3"
                                     value={formData.description}
+                                    onChange={handleInputChange}
+                                    required
+                                />
+                            </div>
+                            <div className="mb-3">
+                                <label>Titre</label>
+                                <input type="text"
+                                    name="title"
+                                    className="form-control"
+                                    value={formData.title}
+                                    onChange={handleInputChange}
+                                    required
+                                />
+                            </div>
+                            <div className="mb-3">
+                                <label>Position</label>
+                                <input type="number"
+                                    name="position"
+                                    className="form-control"
+                                    value={formData.position}
                                     onChange={handleInputChange}
                                     required
                                 />

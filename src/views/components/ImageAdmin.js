@@ -23,7 +23,8 @@ export const ImageAdmin = () => {
         file: null, // fichier image
         description: '',
         idProduct: '',
-        title: ''
+        title: '',
+        position: '',
     });
     const [previewUrl, setPreviewUrl] = useState('');
 
@@ -54,7 +55,7 @@ export const ImageAdmin = () => {
     const handleAddClick = () => {
         setIsEditing(false);
         setCurrentId(null);
-        setFormData({ file: null, description: '', idProduct: '', title: '' });
+        setFormData({ file: null, description: '', idProduct: '', title: '', position: '' });
         setPreviewUrl('');
         setShowModal(true);
     };
@@ -66,7 +67,8 @@ export const ImageAdmin = () => {
             file: null, // on attend qu'un nouveau fichier soit choisi
             description: image.description,
             idProduct: image.idProduct,
-            title: image.title
+            title: image.title,
+            position: image.position
         });
         setPreviewUrl(image.url); // prévisualiser l’image existante
         setShowModal(true);
@@ -83,9 +85,9 @@ export const ImageAdmin = () => {
         e.preventDefault();
 
         if (isEditing) {
-            await dispatch(postUploadRequest({Id: currentId, File: formData.file, Type: 'IMAGE', Description: formData.description, IdProduct: formData.idProduct, Title: formData.title, TypeUpload: 'UPLOAD'}));
+            await dispatch(postUploadRequest({Id: currentId, File: formData.file, Type: 'IMAGE', Description: formData.description, IdProduct: formData.idProduct, Title: formData.title, Position: formData.position, TypeUpload: 'UPLOAD'}));
         } else {
-            await dispatch(postUploadRequest({File: formData.file, Type: 'IMAGE', IdProduct: formData.idProduct, Description: formData.description, Title: formData.title, TypeUpload: 'ADD'}));
+            await dispatch(postUploadRequest({File: formData.file, Type: 'IMAGE', IdProduct: formData.idProduct, Description: formData.description, Title: formData.title, Position: formData.position, TypeUpload: 'ADD'}));
         }
 
         await dispatch(getImageRequest());
@@ -137,6 +139,7 @@ export const ImageAdmin = () => {
                             <th>Description</th>
                             <th>Produit</th>
                             <th>Titre</th>
+                            <th>Position</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -149,6 +152,7 @@ export const ImageAdmin = () => {
                                 <td>{img.description}</td>
                                 <td>{getProductName(img.idProduct)}</td>
                                 <td>{img.title}</td>
+                                <td>{img.position}</td>
                                 <td>
                                     <button
                                         className='btn btn-sm btn-warning me-2'
@@ -208,6 +212,26 @@ export const ImageAdmin = () => {
                                     className="form-control"
                                     rows="3"
                                     value={formData.description}
+                                    onChange={handleInputChange}
+                                    required
+                                />
+                            </div>
+                            <div className="mb-3">
+                                <label>Titre</label>
+                                <input type="text"
+                                    name="title"
+                                    className="form-control"
+                                    value={formData.title}
+                                    onChange={handleInputChange}
+                                    required
+                                />
+                            </div>
+                            <div className="mb-3">
+                                <label>Position</label>
+                                <input type="text"
+                                    name="position"
+                                    className="form-control"
+                                    value={formData.position}
                                     onChange={handleInputChange}
                                     required
                                 />
