@@ -34,9 +34,13 @@ const getProductImage = (id) => {
     <div className="home-container">
       {/* HERO SECTION */}
       <section className="hero-section">
-        <video className="hero-video" autoPlay muted loop>
-          <source src="/Videos/xgimi.mp4" type="video/mp4" />
-        </video>
+      {mainProductVideos.length > 0 && mainProductVideos[0].url ? (
+          <video className="hero-video" autoPlay muted loop>
+            <source src={mainProductVideos[0].url} type="video/mp4" />
+          </video>
+        ) : (
+          <p>Vidéo manquante</p>
+        )}
         <div className="hero-content text-center">
           <h1 className="hero-title">{mainProductVideos[0]?.title || 'Titre manquant'}</h1>
           <p className="hero-subtitle">{mainProductVideos[0]?.description || 'Description manquante'}</p>
