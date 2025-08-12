@@ -13,7 +13,7 @@ export const VideoAdmin = () => {
     const productsFromStore = useSelector((state) => state.products.products) || [];
     const dispatch = useDispatch();
 
-    console.log("videosFromStore", videosFromStore);
+    //console.log("videosFromStore", videosFromStore);
 
     const [showModal, setShowModal] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
@@ -65,10 +65,10 @@ export const VideoAdmin = () => {
         setCurrentId(video.id);
         setFormData({
             file: null,
-            description: video.description,
-            idProduct: video.idProduct,
-            title: video.title,
-            position: String(video.position)
+            description: video.description ?? '',
+            idProduct: video.idProduct ?? '',
+            title: video.title ?? '',
+            position: video.position != null ? String(video.position) : '',
         });
         setPreviewUrl(video.url);
         setShowModal(true);
@@ -85,9 +85,9 @@ export const VideoAdmin = () => {
         e.preventDefault();
 
         if (isEditing) {
-            await dispatch(postUploadRequest({Id: currentId, File: formData.file, Type: 'VIDEO', Description: formData.description, IdProduct: formData.idProduct, Title: formData.title, Position: parseInt(formData.position, 10), TypeUpload: 'UPLOAD'}));
+            await dispatch(postUploadRequest({Id: currentId, File: formData.file, Type: 'VIDEO', Description: formData.description, IdProduct: formData.idProduct, Position: parseInt(formData.position, 10), TypeUpload: 'UPLOAD', Title: formData.title}));
         } else {
-            await dispatch(postUploadRequest({File: formData.file, Type: 'VIDEO', IdProduct: formData.idProduct, Description: formData.description, Title: formData.title, Position: parseInt(formData.position, 10), TypeUpload: 'ADD'}));
+            await dispatch(postUploadRequest({File: formData.file, Type: 'VIDEO', IdProduct: formData.idProduct, Description: formData.description, Position: parseInt(formData.position, 10), TypeUpload: 'ADD', Title: formData.title}));
         }
 
         await dispatch(getVideoRequest());

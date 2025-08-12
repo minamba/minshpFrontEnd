@@ -15,12 +15,14 @@ export const FeatureProductAdmin = () => {
     const productsFromStore = useSelector((state) => state.products.products) || [];
     const featuresFromStore = useSelector((state) => state.features.features) || [];
     const categoriesFromStore = useSelector((state) => state.categories.categories) || [];
+    const featureCategoriesFromStore = useSelector((state) => state.featureCategories.featureCategories) || []; 
     const [searchQuery, setSearchQuery] = useState('');
     const dispatch = useDispatch();
 
 
     console.log( "productsFromStore:",productsFromStore);
-
+    console.log( "featuresFromStore:",featuresFromStore);
+    console.log( "featureCategoriesFromStore:",featureCategoriesFromStore);
 
     const [showModal, setShowModal] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
@@ -115,6 +117,14 @@ export const FeatureProductAdmin = () => {
         return category ? category.id : null;
     };
 
+    const getFeatureCategoryName = (id) => {
+        const feature = featuresFromStore.find((f) => f.id === id);
+        if (!feature) return 'Feature inconnue';
+        
+        const featureCategory = featureCategoriesFromStore.find((fc) => fc.id === feature.idFeatureCategory);
+        return featureCategory ? featureCategory.name : 'inconnue';
+    };
+
         // Filtre dynamique des features selon la catégorie du produit sélectionné
         const filteredFeatures = () => {
             const selectedCategoryId = getSelectedProductCategoryId();
@@ -168,6 +178,7 @@ export const FeatureProductAdmin = () => {
                             <th>Produit</th>
                             <th>Caractéristique</th>
                             <th>Catégorie</th>
+                            <th>Catégorie de caractéristique</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -177,6 +188,7 @@ export const FeatureProductAdmin = () => {
                                 <td>{getProductName(fp.idProduct)}</td>
                                 <td>{getFeatureDescription(fp.idFeature)}</td>
                                 <td>{getCategoryName(fp.idFeature)}</td>
+                                <td>{getFeatureCategoryName(fp.idFeature)}</td>
                                 <td>
                                     <button
                                         className='btn btn-sm btn-warning me-2'

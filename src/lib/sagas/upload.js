@@ -11,6 +11,7 @@ import * as apiVideo from "../api/videos";
 function* postUpload(action) {
     try {
         const response = yield call(api.uploadFile, action.payload);
+        console.log("File uploaded :",response.data);
         const images = yield call (apiImg.getImages);
         const videos = yield call (apiVideo.getVideos);
         yield put (actionsImg.getImageSuccess({images : images.data}));

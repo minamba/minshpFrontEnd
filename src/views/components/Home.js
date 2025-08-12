@@ -1,6 +1,7 @@
 import React from 'react';
 import '../../App.css';
 import { useSelector } from 'react-redux';
+import { Link } from "react-router-dom";
 
 export const Home = () => {
   const products = useSelector((state) => state.products.products) || [];
@@ -25,6 +26,21 @@ export const Home = () => {
     return productImages.length > 0 ? productImages[0].url : null;
   };
 
+  // Catégories (nom + 1 image)
+  const categories = React.useMemo(() => {
+    const map = new Map();
+    products.forEach((p) => {
+      const key = p.category || 'Autres';
+      if (!map.has(key)) {
+        map.set(key, {
+          name: key,
+          image: getProductImage(p.id) || '/Images/placeholder.jpg',
+        });
+      }
+    });
+    return Array.from(map.values());
+  }, [products, images]);
+
   return (
     <div className="home-container">
       {/* HERO SECTION */}
@@ -47,14 +63,13 @@ export const Home = () => {
       {/* FEATURES SECTION */}
       {mainProductImages.length > 0 && (
         <section className="features-section" id="features">
-          {[1, 2, 3].map((position, index) => {
-            const image = mainProductImages.find((img) => img.position === position);
+          {mainProductImages.map((image, index) => {
             if (!image) return null;
 
             return (
               <div
-                key={position}
-                className={`feature ${index === 1 ? 'reverse' : ''}`}
+                key={image.position}
+                className={`feature ${index % 2 === 1 ? 'reverse' : ''}`}
                 data-aos="fade-up"
               >
                 <div className="feature-text">
@@ -64,25 +79,98 @@ export const Home = () => {
 
                 <img
                   src={image.url || '/Images/placeholder.jpg'}
-                  alt={image.title || `Image ${position}`}
+                  alt={image.title || `Image ${image.position}`}
                 />
               </div>
             );
           })}
+
+          {/* Bouton sous la features section */}
+          <div className="features-cta">
+          {mainProduct && (
+            <Link to={`/product/${mainProduct.id}`} className="btn-pill btn-primary">
+              En savoir plus
+            </Link>
+          )}
+          </div>
         </section>
       )}
 
-      {/* GALLERY SECTION */}
-      <section className="gallery-section">
-        <h2 data-aos="fade-up">Galerie</h2>
-        <div className="gallery-grid">
-          {galleryProducts.map((product, index) => (
-            <div key={product.id} className="gallery-item" data-aos="zoom-in">
-              <img src={getProductImage(product.id)} alt={`Projecteur ${index + 1}`} />
+          {/* CATEGORIES SECTION */}
+          {categories.length > 0 && (
+            <section className="categories-section section-alt" id="categories">
+              <div className="new-header">
+                <h2 className="new-title">Catégories</h2>
+              </div>
+
+              <div className="categories-grid">
+                {categories.map((cat) => (
+                  <article key={cat.name} className="category-card" data-aos="zoom-in">
+                    <h3 className="category-title">{cat.name}</h3>
+                    <img
+                      src={cat.image}
+                      alt={`Catégorie ${cat.name}`}
+                      className="category-image"
+                    />
+                  </article>
+                ))}
+              </div>
+            </section>
+          )}
+
+
+
+        {/* NOUVEAUTÉS */}
+        <section className="new-section" id="nouveautes">
+          <div className="new-header">
+            <h2 className="new-title">Nouveautés</h2>
+
+            {/* Petites actions à droite (maquettes) */}
+            <div className="new-actions">
+              <button type="button" className="icon-btn" aria-label="Précédent">‹</button>
+              <button type="button" className="icon-btn" aria-label="Voir plus">+</button>
             </div>
-          ))}
-        </div>
-      </section>
+          </div>
+
+          <div className="new-grid">
+            {(galleryProducts || []).slice(0, 8).map((product, index) => {
+              const img = getProductImage(product.id) || '/Images/placeholder.jpg';
+
+              // prix : supporte number (699.95) ou string "699.95"
+              const raw = product.price;
+              const priceNum = typeof raw === 'number' ? raw : parseFloat(raw);
+              const hasPrice = Number.isFinite(priceNum);
+              const euros = hasPrice ? Math.floor(priceNum) : null;
+              const cents = hasPrice
+                ? Math.round((priceNum - Math.floor(priceNum)) * 100)
+                    .toString()
+                    .padStart(2, '0')
+                : null;
+
+              const name = product.name || product.title || `Produit ${index + 1}`;
+
+              return (
+                <article key={product.id} className="product-card" data-aos="zoom-in">
+                  <div className="product-thumb">
+                    <Link to={`/product/${product.id}`}>
+                      <img src={img} alt={name} />
+                    </Link>
+                  </div>
+
+                  <h3 className="product-name">{name}</h3>
+
+                  {hasPrice && (
+                    <div className="product-price">
+                      <span className="euros">{euros}€</span>
+                      <sup className="cents">{cents}</sup>
+                    </div>
+                  )}
+                </article>
+              );
+            })}
+          </div>
+        </section>
+
     </div>
   );
 };

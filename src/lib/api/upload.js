@@ -1,6 +1,6 @@
 import axios from "axios";
 
-export const uploadFile = async ({Id,File, Type, IdProduct, Description, TypeUpload, Position}) => {
+export const uploadFile = async ({Id,File, Type, IdProduct, Description, TypeUpload, Position, Title}) => {
     try{
     const formData = new FormData();
     if(Id){
@@ -12,6 +12,7 @@ export const uploadFile = async ({Id,File, Type, IdProduct, Description, TypeUpl
     formData.append("Description", Description);
     formData.append("TypeUpload", TypeUpload);
     formData.append("Position", Position);
+    formData.append("Title", Title);
     const response = await axios.post("/upload", formData);
     return response.data;
     }catch(error){

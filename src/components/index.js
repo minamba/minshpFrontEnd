@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import '../App.css';
 import { FaFacebookF, FaInstagram, FaTwitter, FaLinkedin } from 'react-icons/fa';
-import {Link, NavLink} from 'react-router-dom';
+import {Link, NavLink, useParams} from 'react-router-dom';
 import { useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { updateProductUserRequest } from '../lib/actions/ProductActions';
@@ -10,7 +10,9 @@ import { getProductUserRequest } from '../lib/actions/ProductActions';
 import { addProductUserRequest } from '../lib/actions/ProductActions';
 import { postUploadRequest } from '../lib/actions/UploadActions';
 import { deleteProductUserRequest } from '../lib/actions/ProductActions';
+import { getFeaturesCategoryByProductRequest } from '../lib/actions/FeatureCategoryActions';
 import { useDispatch } from 'react-redux'; 
+import { useMemo } from "react";
 
 
 
@@ -62,6 +64,7 @@ export const Navbar = () => {
                 <Link to="/admin/products" onClick={() => setIsOpen(false)}>Produits</Link>
                 <Link to="/admin/categories" onClick={() => setIsOpen(false)}>Catégories</Link>
                 <Link to="/admin/customers" onClick={() => setIsOpen(false)}>Clients</Link>
+                <Link to="/admin/featureCategories" onClick={() => setIsOpen(false)}>Catégories des caractéristiques</Link>
                 <Link to="/admin/stocks" onClick={() => setIsOpen(false)}>Stocks</Link>
                 <Link to="/admin/promotions" onClick={() => setIsOpen(false)}>Promotions</Link>
                 <Link to="/admin/features" onClick={() => setIsOpen(false)}>Caractéristiques</Link>
@@ -98,6 +101,8 @@ export const ProductTable = () => {
   const [categoryFilter, setCategoryFilter] = useState('');
   const [formData, setFormData] = useState({
     name: '',
+    brand: '',
+    model: '',
     description: '',
     price: '',
     category: '',
@@ -122,7 +127,7 @@ export const ProductTable = () => {
   const handleAddClick = () => {
     setIsEditing(false);
     setCurrentId(null);
-    setFormData({ name: '', description: '', price: '', category: '', image: '', stock: 0, promotion: 'Non', main: false });
+    setFormData({ name: '', brand: '', model: '', description: '', price: '', category: '', image: '', stock: 0, promotion: 'Non', main: false });
     setShowModal(true);
   };
 
@@ -132,6 +137,8 @@ export const ProductTable = () => {
     setFormData({
       id: product.id,
       name: product.name,
+      brand: product.brand,
+      model: product.model,
       description: product.description,
       price: product.price,
       category: product.category,
@@ -156,6 +163,8 @@ export const ProductTable = () => {
       await dispatch(updateProductUserRequest({
         Id: formData.id,
         Name: formData.name,
+        Brand: formData.brand,
+        Model: formData.model,
         Description: formData.description,
         Price: formData.price,
         IdCategory: idCategory,
@@ -165,6 +174,8 @@ export const ProductTable = () => {
     } else {
       await dispatch(addProductUserRequest({
         Name: formData.name,
+        Brand: formData.brand,
+        Model: formData.model,
         Description: formData.description,
         Price: formData.price,
         Stock: formData.stock,
@@ -175,9 +186,16 @@ export const ProductTable = () => {
     setShowModal(false);
   };
 
-  const sortedProducts = [...productsFromStore].sort((a, b) =>
-    a.name.toLowerCase().localeCompare(b.name.toLowerCase())
-  );
+  const sortedProducts = useMemo(() => {
+    const parse = d => (d ? Date.parse(d) : 0); // renvoie un nombre ou 0 si null/undefined
+    return [...productsFromStore].sort((a, b) => {
+      const diff = parse(b?.creationDate) - parse(a?.creationDate);
+      // fallback stable si dates égales ou invalides
+      return diff !== 0
+        ? diff
+        : (a?.name || "").localeCompare(b?.name || "");
+    });
+  }, [productsFromStore]);
 
   const filteredProducts = sortedProducts.filter((prod) => {
     const query = searchQuery.toLowerCase();
@@ -185,10 +203,14 @@ export const ProductTable = () => {
     const description = prod.description?.toLowerCase() || '';
     const main = prod.main ? 'oui' : 'non';
     const category = prod.category || '';
+    const brand = prod.brand?.toLowerCase() || '';
+    const model = prod.model?.toLowerCase() || '';
 
     const matchesQuery =
       name.includes(query) ||
       description.includes(query) ||
+      brand.includes(query) ||
+      model.includes(query) ||
       main.includes(query);
 
     const matchesCategory = categoryFilter ? category === categoryFilter : true;
@@ -234,12 +256,16 @@ export const ProductTable = () => {
             <tr>
               <th>Image</th>
               <th>Nom</th>
+              <th>Marque</th>
+              <th>Modèle</th>
               <th>Description</th>
               <th>Prix (€)</th>
               <th>Catégorie</th>
               <th>Stock</th>
               <th>Promotion</th>
               <th>Vitrine</th>
+              <th>Date création</th>
+              <th>Date modif</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -249,12 +275,16 @@ export const ProductTable = () => {
                 <tr key={prod.id}>
                   <td><img src={prod.images?.[0]?.url} alt={prod.name} className="img-thumbnail" width={60} /></td>
                   <td>{prod.name}</td>
+                  <td>{prod.brand}</td>
+                  <td>{prod.model}</td>
                   <td>{prod.description}</td>
                   <td>{prod.price}</td>
                   <td>{prod.category}</td>
                   <td>{prod.stocks?.quantity ? prod.stocks.quantity : "Rupture"}</td>
                   <td>{prod.promotions?.length > 0 ? "Oui" : "Non"}</td>
                   <td>{prod.main ? "Oui" : "Non"}</td>
+                  <td>{new Date(prod.creationDate).toLocaleDateString()}</td>
+                  <td>{prod.modificationDate? new Date(prod.modificationDate).toLocaleDateString() : "NM"}</td>
                   <td>
                     <button className='btn btn-sm btn-warning me-2' onClick={() => handleEditClick(prod)}>
                       <i className="bi bi-pencil"></i>
@@ -316,6 +346,14 @@ export const ProductTable = () => {
                 <input type="text" name="name" className="form-control" value={formData.name} onChange={handleInputChange} required />
               </div>
               <div className="mb-3">
+                <label>Marque</label>
+                <input type="text" name="brand" className="form-control" value={formData.brand} onChange={handleInputChange} required />
+              </div>
+              <div className="mb-3">
+                <label>Modèle</label>
+                <input type="text" name="model" className="form-control" value={formData.model} onChange={handleInputChange} required />
+              </div>
+              <div className="mb-3">
                 <label>Description</label>
                 <textarea name="description" className="form-control" value={formData.description} onChange={handleInputChange} required />
               </div>
@@ -359,6 +397,61 @@ export const ProductTable = () => {
     </div>
   );
 };
+
+//////////////////////// Caracteristiques ////////////////////////
+export const ProductSpecs = (pid) => {
+ 
+  const products = useSelector((s) => s.products.products) || [];
+  const product = products.find((p) => p.id === pid);
+  const dispatch = useDispatch();
+
+  useEffect(() => {
+    if (!pid) return;
+    dispatch(getFeaturesCategoryByProductRequest(pid));
+  }, [dispatch, pid]);
+
+
+  // adapte le chemin si besoin
+  const featuresCategoryByProduct =
+    useSelector((s) => s.featureCategories?.featuresCategoryByProduct) || [];
+
+  const specs = useMemo(() => {
+    if (!product) return {};
+
+    // --- 1) bloc FIXE ---
+    const base = {
+      "Informations générales": [
+        { label: "Désignation", value: product?.name || product?.title || "Produit" },
+        { label: "Marque", value: product?.brand || "—" },
+        { label: "Modèle", value: product?.model || "—" },
+      ],
+    };
+
+    // --- 2) blocs DYNAMIQUES (depuis l’API) ---
+    const dynamic = Object.fromEntries(
+      (featuresCategoryByProduct || []).map((cat) => [
+        cat.featureCategoryName ?? cat.name ?? "Caractéristiques",
+        Object.entries(cat.specs || {}).map(([label, value]) => ({
+          label,
+          value:
+            value === null || value === undefined || value === ""
+              ? "—"
+              : typeof value === "boolean"
+              ? value
+                ? "Oui"
+                : "Non"
+              : String(value),
+        })),
+      ])
+    );
+
+    // --- 3) fusion (l’ordre d’insertion garde la section fixe en premier) ---
+    return { ...base, ...dynamic };
+  }, [product, featuresCategoryByProduct]);
+
+  return specs;
+};
+
 
 
 //////////////////////// Footer ////////////////////////

@@ -15,6 +15,7 @@ import {FeatureProductAdmin} from './FeatureProductAdmin';
 import {OrderAdmin} from './OrderAdmin';
 import {ImageAdmin} from './ImageAdmin';
 import {VideoAdmin} from './VideoAdmin';
+import {FeatureCategoryAdmin} from './FeatureCategoryAdmin';
 import { useDispatch } from "react-redux";
 import { getProductUserRequest } from "../../lib/actions/ProductActions";
 import { getCategoryRequest } from "../../lib/actions/CategoryActions";
@@ -22,6 +23,9 @@ import { getStockRequest } from "../../lib/actions/StockActions";
 import { getFeatureProductRequest } from "../../lib/actions/FeatureProductActions";
 import { getImageRequest } from "../../lib/actions/ImageActions";
 import { getVideoRequest } from "../../lib/actions/VideoActions";
+import { getFeatureCategoryRequest } from "../../lib/actions/FeatureCategoryActions";
+import {Product} from './Product';
+import { getFeaturesCategoryByProductRequest } from "../../lib/actions/FeatureCategoryActions";
 
 export const BaseApp = () => {
 
@@ -33,6 +37,7 @@ export const BaseApp = () => {
         dispatch(getFeatureProductRequest());
         dispatch(getImageRequest());
         dispatch(getVideoRequest());
+        dispatch(getFeatureCategoryRequest());
     }, []);
 
     useEffect(() => {
@@ -57,6 +62,8 @@ export const BaseApp = () => {
                         <Route path="/admin/orders" element={<OrderAdmin/>} />
                         <Route path="/admin/images" element={<ImageAdmin/>} />
                         <Route path="/admin/videos" element={<VideoAdmin/>} />
+                        <Route path="/product/:id" element={<Product/>} />
+                        <Route path="/admin/featureCategories" element={<FeatureCategoryAdmin/>} />
                     </Routes>
                 </main>
                 <Footer/>
