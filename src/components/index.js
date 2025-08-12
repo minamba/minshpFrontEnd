@@ -273,7 +273,7 @@ export const ProductTable = () => {
             {filteredProducts.length > 0 ? (
               filteredProducts.map((prod) => (
                 <tr key={prod.id}>
-                  <td><img src={prod.images?.[0]?.url} alt={prod.name} className="img-thumbnail" width={60} /></td>
+                  <td><img src={prod.images?.[0]?.url} alt={prod.name} width={100} /></td>
                   <td>{prod.name}</td>
                   <td>{prod.brand}</td>
                   <td>{prod.model}</td>

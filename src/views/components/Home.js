@@ -2,11 +2,13 @@ import React from 'react';
 import '../../App.css';
 import { useSelector } from 'react-redux';
 import { Link } from "react-router-dom";
+import { useMemo } from 'react';
 
 export const Home = () => {
   const products = useSelector((state) => state.products.products) || [];
   const images = useSelector((state) => state.images.images) || [];
   const videos = useSelector((state) => state.videos.videos) || [];
+  const categoriesFromStore = useSelector((state) => state.categories.categories) || [];
 
   const mainProduct = products.find((p) => p.main === true);
   const galleryProducts = products.filter((p) => p.id !== mainProduct?.id);
@@ -26,20 +28,18 @@ export const Home = () => {
     return productImages.length > 0 ? productImages[0].url : null;
   };
 
-  // Catégories (nom + 1 image)
-  const categories = React.useMemo(() => {
-    const map = new Map();
-    products.forEach((p) => {
-      const key = p.category || 'Autres';
-      if (!map.has(key)) {
-        map.set(key, {
-          name: key,
-          image: getProductImage(p.id) || '/Images/placeholder.jpg',
-        });
-      }
-    });
-    return Array.from(map.values());
-  }, [products, images]);
+
+  const getCategoryImage = (idCategory) => {
+    const image = images.find((i) => i.idCategory === idCategory);
+    return image ? image.url : '/Images/placeholder.jpg';
+  };
+
+
+  const newestEightProducts = useMemo(() => {
+    return [...galleryProducts]
+      .sort((a, b) => new Date(b.creationDate) - new Date(a.creationDate))
+      .slice(0, 8);
+  }, [galleryProducts]);
 
   return (
     <div className="home-container">
@@ -97,18 +97,18 @@ export const Home = () => {
       )}
 
           {/* CATEGORIES SECTION */}
-          {categories.length > 0 && (
-            <section className="categories-section section-alt" id="categories">
+          {categoriesFromStore.length > 0 && (
+            <section className="categories-section section-alt bg-light" id="categories">
               <div className="new-header">
                 <h2 className="new-title">Catégories</h2>
               </div>
 
               <div className="categories-grid">
-                {categories.map((cat) => (
+                {categoriesFromStore.map((cat) => (
                   <article key={cat.name} className="category-card" data-aos="zoom-in">
                     <h3 className="category-title">{cat.name}</h3>
                     <img
-                      src={cat.image}
+                      src={getCategoryImage(cat.id)}
                       alt={`Catégorie ${cat.name}`}
                       className="category-image"
                     />
@@ -133,42 +133,33 @@ export const Home = () => {
           </div>
 
           <div className="new-grid">
-            {(galleryProducts || []).slice(0, 8).map((product, index) => {
-              const img = getProductImage(product.id) || '/Images/placeholder.jpg';
+              {newestEightProducts.map((product, index) => {
+                const img = getProductImage(product.id) || '/Images/placeholder.jpg';
+                const raw = product.price;
+                const priceNum = typeof raw === 'number' ? raw : parseFloat(raw);
+                const hasPrice = Number.isFinite(priceNum);
+                const euros = hasPrice ? Math.floor(priceNum) : null;
+                const cents = hasPrice ? Math.round((priceNum - Math.floor(priceNum)) * 100).toString().padStart(2,'0') : null;
+                const name = product.name || product.title || `Produit ${index + 1}`;
 
-              // prix : supporte number (699.95) ou string "699.95"
-              const raw = product.price;
-              const priceNum = typeof raw === 'number' ? raw : parseFloat(raw);
-              const hasPrice = Number.isFinite(priceNum);
-              const euros = hasPrice ? Math.floor(priceNum) : null;
-              const cents = hasPrice
-                ? Math.round((priceNum - Math.floor(priceNum)) * 100)
-                    .toString()
-                    .padStart(2, '0')
-                : null;
-
-              const name = product.name || product.title || `Produit ${index + 1}`;
-
-              return (
-                <article key={product.id} className="product-card" data-aos="zoom-in">
-                  <div className="product-thumb">
-                    <Link to={`/product/${product.id}`}>
-                      <img src={img} alt={name} />
-                    </Link>
-                  </div>
-
-                  <h3 className="product-name">{name}</h3>
-
-                  {hasPrice && (
-                    <div className="product-price">
-                      <span className="euros">{euros}€</span>
-                      <sup className="cents">{cents}</sup>
+                return (
+                  <article key={product.id} className="product-card" data-aos="zoom-in">
+                    <div className="product-thumb">
+                      <Link to={`/product/${product.id}`}>
+                        <img src={img} alt={name} />
+                      </Link>
                     </div>
-                  )}
-                </article>
-              );
-            })}
-          </div>
+                    <h3 className="product-name">{name}</h3>
+                    {hasPrice && (
+                      <div className="product-price">
+                        <span className="euros">{euros}€</span>
+                        <sup className="cents">{cents}</sup>
+                      </div>
+                    )}
+                  </article>
+                );
+              })}
+            </div>
         </section>
 
     </div>
