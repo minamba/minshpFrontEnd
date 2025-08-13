@@ -8,6 +8,7 @@ import promotionsSaga from "./promotions";
 import imagesSaga from "./images";
 import videosSaga from "./videos";
 import featureCategoriesSaga from "./featureCategories";
+import cartSaga from "./carts";
 import { all } from "redux-saga/effects";
 
 
@@ -22,6 +23,7 @@ export default function* rootSaga() {
         promotionsSaga(),
         imagesSaga(),
         videosSaga(),
-        featureCategoriesSaga()
+        featureCategoriesSaga(),
+        cartSaga()
     ]);
 }

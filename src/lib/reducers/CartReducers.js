@@ -1,0 +1,63 @@
+// reducers/CartReducers.js
+import { actionsCart } from "../actions/CartActions";
+
+const initialState = {
+  items: [], // [{ id, title, price, qty, image? }]
+};
+
+export default function cartReducer(state = initialState, action) {
+  switch (action.type) {
+
+    case actionsCart.GET_CART_SUCCESS:
+      return { ...state, items: action.payload || [] };
+
+    // ------- ADD -------
+    case actionsCart.ADD_TO_CART_SUCCESS: {
+      const { item, quantity } = action.payload || {};
+      const q = Math.max(1, Number(quantity || 1));
+      if (!item || !item.id) return state;
+
+      const exists = state.items.find(it => it.id === item.id);
+      const nextItems = exists
+        ? state.items.map(it =>
+            it.id === item.id ? { ...it, qty: (it.qty || 0) + q } : it
+          )
+        : [
+            ...state.items,
+            {
+              id: item.id,
+              title: item.name || item.title || "Produit",
+              price: Number(item.price) || 0,
+              qty: q,
+              image: item.image || item.url || null,
+            },
+          ];
+
+      return { ...state, items: nextItems };
+    }
+
+    // ------- UPDATE QTY -------
+    case actionsCart.UPDATE_CART_SUCCESS: {
+      const { item, quantity } = action.payload || {};
+      const id = item?.id ?? action.payload?.id;
+      const q = Math.max(1, Number(quantity || 1));
+      if (!id) return state;
+
+      const nextItems = state.items.map(it =>
+        it.id === id ? { ...it, qty: q } : it
+      );
+      return { ...state, items: nextItems };
+    }
+
+    // ------- DELETE -------
+    case actionsCart.DELETE_FROM_CART_SUCCESS: {
+      const id = action.payload?.id ?? action.payload;
+      if (!id) return state;
+      const nextItems = state.items.filter(it => it.id !== id);
+      return { ...state, items: nextItems };
+    }
+
+    default:
+      return state;
+  }
+}

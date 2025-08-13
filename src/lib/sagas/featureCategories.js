@@ -18,7 +18,7 @@ function* getFeatureCategories() {
 function* getFeaturesCategoryByProduct(action) {
     try {
         const response = yield call (api.getFeaturesCategoryByProduct, action.payload);
-        console.log("Features category by product :",response.data);
+        //console.log("Features category by product :",response.data);
         yield put (actions.getFeatureCategoryByProductSuccess({featuresCategoryByProduct : response.data}));
     }
     catch (error) {

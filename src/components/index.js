@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import '../App.css';
 import { FaFacebookF, FaInstagram, FaTwitter, FaLinkedin } from 'react-icons/fa';
 import {Link, NavLink, useParams} from 'react-router-dom';
-import { useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { updateProductUserRequest } from '../lib/actions/ProductActions';
 import { updateStockRequest } from '../lib/actions/StockActions';
@@ -13,51 +12,142 @@ import { deleteProductUserRequest } from '../lib/actions/ProductActions';
 import { getFeaturesCategoryByProductRequest } from '../lib/actions/FeatureCategoryActions';
 import { useDispatch } from 'react-redux'; 
 import { useMemo } from "react";
+import { Badge } from 'react-bootstrap';
 
-
+// ... ton code existant ...
 
 export const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
+  const [productsOpen, setProductsOpen] = useState(false);
+
+  // Catégories
+  const categories = useSelector((s) => s.categories?.categories) || [];
+
+  // 🛒 LIRE LE PANIER DEPUIS REDUX
+  // Vu ton combineReducers, le reducer "cart" est sous la clé "items"
+  const cartItems = useSelector((s) => s.items?.items) || [];
+
+  // Total d'articles = somme des quantités
+  const cartCount = cartItems.reduce(
+    (acc, it) => acc + Number(it.qty ?? it.quantity ?? 1),
+    0
+  );
+
+  // petite anim quand la valeur change
+  const [bump, setBump] = useState(false);
+  useEffect(() => {
+    if (cartCount <= 0) return;
+    setBump(true);
+    const t = setTimeout(() => setBump(false), 300);
+    return () => clearTimeout(t);
+  }, [cartCount]);
 
   const toggleMenu = () => {
-    setIsOpen(!isOpen);
-    if (isOpen) setAdminOpen(false); // ferme sous-menu si on ferme le burger
+    const next = !isOpen;
+    setIsOpen(next);
+    if (!next) {
+      setAdminOpen(false);
+      setProductsOpen(false);
+    }
   };
 
   const toggleAdmin = () => {
     if (window.innerWidth <= 900) {
-      // clic uniquement en mobile
-      setAdminOpen(!adminOpen);
+      setAdminOpen((v) => !v);
+      setProductsOpen(false);
     }
   };
 
-  // ferme le sous-menu au resize (si on passe desktop <-> mobile)
+  const toggleProducts = () => {
+    if (window.innerWidth <= 900) {
+      setProductsOpen((v) => !v);
+      setAdminOpen(false);
+    }
+  };
+
   useEffect(() => {
-    const handleResize = () => setAdminOpen(false);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    const handleResize = () => {
+      setAdminOpen(false);
+      setProductsOpen(false);
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   return (
     <nav className="navbar-container">
       <div className="navbar-content">
+        {/* Logo */}
         <div className="navbar-logo">
           <a href="/">
-          <img className="logo-img" src="../images/logo3.png" alt="Logo"/></a>
+            <img className="logo-img" src="../images/logo_16.png" alt="Logo" />
+          </a>
         </div>
 
-        <div className={`navbar-links ${isOpen ? 'active' : ''}`}>
-          <a href="#products">Tous nos produits</a>
+        {/* Liens */}
+        <div className={`navbar-links ${isOpen ? "active" : ""}`}>
+          {/* Tous nos produits */}
+          <div
+            className="navbar-dropdown"
+            onMouseEnter={() => window.innerWidth > 900 && setProductsOpen(true)}
+            onMouseLeave={() => window.innerWidth > 900 && setProductsOpen(false)}
+          >
+            <button className="navbar-dropdown-toggle" onClick={toggleProducts}>
+              Tous nos produits <span className={`arrow ${productsOpen ? "up" : "down"}`}>▾</span>
+            </button>
+            {productsOpen && (
+              <div className="navbar-dropdown-menu">
+                {categories.length > 0 ? (
+                  categories.map((cat) => (
+                    <Link
+                      key={cat.id}
+                      to={`/category/${cat.id}`}
+                      onClick={() => {
+                        setIsOpen(false);
+                        setProductsOpen(false);
+                      }}
+                    >
+                      {cat.name}
+                    </Link>
+                  ))
+                ) : (
+                  <span style={{ padding: "0.5rem 1rem", opacity: 0.8 }}>
+                    Aucune catégorie
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+
           <a href="#sales">Soldes & promos</a>
 
+          {/* Compte */}
+          <Link to="/account" onClick={() => setIsOpen(false)}>
+            <i className="bi bi-person-fill nav-icon nav-icon--blue" aria-hidden="true" />
+            <span>Compte</span>
+          </Link>
+
+          {/* Panier + badge */}
+          <Link to="/cart" onClick={() => setIsOpen(false)} className="nav-cart-link">
+            <span className="nav-cart-ico">
+              <i className="bi bi-cart-fill nav-icon" aria-hidden="true" />
+              {/* Afficher le badge seulement si > 0 (ou laisse {cartCount} si tu préfères) */}
+              {cartCount > 0 && (
+                <span className={`nav-badge ${bump ? "bump" : ""}`}>{cartCount}</span>
+              )}
+            </span>
+            <span>Panier</span>
+          </Link>
+
+          {/* Admin */}
           <div
             className="navbar-dropdown"
             onMouseEnter={() => window.innerWidth > 900 && setAdminOpen(true)}
             onMouseLeave={() => window.innerWidth > 900 && setAdminOpen(false)}
           >
             <button className="navbar-dropdown-toggle" onClick={toggleAdmin}>
-              Admin <span className={`arrow ${adminOpen ? 'up' : 'down'}`}>▾</span>
+              Admin <span className={`arrow ${adminOpen ? "up" : "down"}`}>▾</span>
             </button>
             {adminOpen && (
               <div className="navbar-dropdown-menu">
@@ -69,7 +159,6 @@ export const Navbar = () => {
                 <Link to="/admin/promotions" onClick={() => setIsOpen(false)}>Promotions</Link>
                 <Link to="/admin/features" onClick={() => setIsOpen(false)}>Caractéristiques</Link>
                 <Link to="/admin/featureProducts" onClick={() => setIsOpen(false)}>Caractéristiques produits</Link>
-                <Link to="/admin/orders" onClick={() => setIsOpen(false)}>Commandes</Link>
                 <Link to="/admin/images" onClick={() => setIsOpen(false)}>Images</Link>
                 <Link to="/admin/videos" onClick={() => setIsOpen(false)}>Vidéos</Link>
               </div>
@@ -77,7 +166,8 @@ export const Navbar = () => {
           </div>
         </div>
 
-        <div className="navbar-toggle" onClick={toggleMenu}>
+        {/* Burger */}
+        <div className="navbar-toggle" onClick={toggleMenu} aria-label="Ouvrir le menu">
           <span className="bar"></span>
           <span className="bar"></span>
           <span className="bar"></span>
@@ -86,6 +176,7 @@ export const Navbar = () => {
     </nav>
   );
 };
+
 
 //////////////////////// Product Table ////////////////////////
 export const ProductTable = () => {
@@ -115,6 +206,24 @@ export const ProductTable = () => {
   useEffect(() => {
     dispatch(getProductUserRequest());
   }, [dispatch]);
+
+  // Fermer modales avec ESC + bloquer le scroll quand l'une est ouverte
+  useEffect(() => {
+    const anyOpen = showModal || !!selectedProduct;
+    document.body.classList.toggle('no-scroll', anyOpen);
+
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        if (showModal) setShowModal(false);
+        if (selectedProduct) setSelectedProduct(null);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.classList.remove('no-scroll');
+    };
+  }, [showModal, selectedProduct]);
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -187,13 +296,10 @@ export const ProductTable = () => {
   };
 
   const sortedProducts = useMemo(() => {
-    const parse = d => (d ? Date.parse(d) : 0); // renvoie un nombre ou 0 si null/undefined
+    const parse = d => (d ? Date.parse(d) : 0);
     return [...productsFromStore].sort((a, b) => {
       const diff = parse(b?.creationDate) - parse(a?.creationDate);
-      // fallback stable si dates égales ou invalides
-      return diff !== 0
-        ? diff
-        : (a?.name || "").localeCompare(b?.name || "");
+      return diff !== 0 ? diff : (a?.name || "").localeCompare(b?.name || "");
     });
   }, [productsFromStore]);
 
@@ -307,11 +413,22 @@ export const ProductTable = () => {
         </table>
       </div>
 
-      {/* Modal pour détails produit */}
+      {/* Modal pour détails produit (classes admin-modal-*) */}
       {selectedProduct && (
-        <div className="modal-backdrop">
-          <div className="modal-content-custom" style={{ maxWidth: '600px', wordWrap: 'break-word' }}>
-            <h3 className="mb-3">{selectedProduct.name}</h3>
+        <div
+          className="admin-modal-backdrop"
+          role="presentation"
+          onClick={() => setSelectedProduct(null)}
+        >
+          <div
+            className="admin-modal-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="prod-detail-title"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: '600px', wordWrap: 'break-word' }}
+          >
+            <h3 id="prod-detail-title" className="mb-3">{selectedProduct.name}</h3>
             <hr />
             <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
               {selectedProduct.features && selectedProduct.features.length > 0 ? (
@@ -335,11 +452,21 @@ export const ProductTable = () => {
         </div>
       )}
 
-      {/* Modal ajout/modif produit */}
+      {/* Modal ajout/modif produit (classes admin-modal-*) */}
       {showModal && (
-        <div className="modal-backdrop">
-          <div className="modal-content-custom">
-            <h2 className="mb-3">{isEditing ? 'Modifier le produit' : 'Ajouter un produit'}</h2>
+        <div
+          className="admin-modal-backdrop"
+          role="presentation"
+          onClick={() => setShowModal(false)}
+        >
+          <div
+            className="admin-modal-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="prod-edit-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="prod-edit-title" className="mb-3">{isEditing ? 'Modifier le produit' : 'Ajouter un produit'}</h2>
             <form onSubmit={handleSubmit}>
               <div className="mb-3">
                 <label>Nom</label>
@@ -452,7 +579,114 @@ export const ProductSpecs = (pid) => {
   return specs;
 };
 
+/////////////////////// Generique MODAL AFTER ADD PRODUCT TO THE CART ////////////////////////
+export const GenericModal = ({
+  open,
+  onClose,
+  title,
+  message,
+  icon,
+  variant = "default",   // "success" | "danger" | "warning" | "info" | "default"
+  actions = [],           // [{ label, onClick, variant: "primary"|"danger"|"light", autoFocus }]
+  closeOnBackdrop = true,
+  closeOnEsc = true,
+}) => {
+  const panelRef = useRef(null);
+  const autoBtnRef = useRef(null);
 
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => {
+      if (e.key === "Escape" && closeOnEsc) onClose?.();
+    };
+    window.addEventListener("keydown", onKey);
+
+    // focus par défaut (bouton autoFocus sinon le panneau)
+    setTimeout(() => {
+      if (autoBtnRef.current) autoBtnRef.current.focus();
+      else panelRef.current?.focus();
+    }, 0);
+
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, closeOnEsc, onClose]);
+
+  if (!open) return null;
+
+  const defaultIcons = {
+    success: (
+      <svg viewBox="0 0 24 24" width="56" height="56" aria-hidden="true">
+        <path fill="#16a34a" d="M12 2a10 10 0 1 0 .001 20.001A10 10 0 0 0 12 2zm-1.1 13.3-3.2-3.2 1.4-1.4 1.8 1.8 4.7-4.7 1.4 1.4-6.1 6.1z"/>
+      </svg>
+    ),
+    danger: (
+      <svg viewBox="0 0 24 24" width="56" height="56" aria-hidden="true">
+        <path fill="#dc2626" d="M12 2 1 21h22L12 2zm1 14h-2v2h2v-2zm0-8h-2v6h2V8z"/>
+      </svg>
+    ),
+    warning: (
+      <svg viewBox="0 0 24 24" width="56" height="56" aria-hidden="true">
+        <path fill="#f59e0b" d="M1 21h22L12 2 1 21zm11-3a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm1-5h-2V9h2v4z"/>
+      </svg>
+    ),
+    info: (
+      <svg viewBox="0 0 24 24" width="56" height="56" aria-hidden="true">
+        <path fill="#2563eb" d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+      </svg>
+    ),
+    default: null,
+  };
+
+  // classes buttons isolées
+  const btnClass = (v) =>
+    v === "primary" ? "gbtn gbtn--primary" :
+    v === "danger"  ? "gbtn gbtn--danger"  :
+                      "gbtn gbtn--light";
+
+  return (
+    <div
+      className="gmodal-backdrop"
+      role="presentation"
+      onClick={closeOnBackdrop ? onClose : undefined}
+    >
+      <div
+        className={`gmodal-panel ${variant ? `is-${variant}` : ""}`}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={title ? "gmodal-title" : undefined}
+        aria-describedby={message ? "gmodal-desc" : undefined}
+        onClick={(e) => e.stopPropagation()}
+        ref={panelRef}
+        tabIndex={-1}
+      >
+        {icon !== false && (icon ?? defaultIcons[variant]) ? (
+          <div className="gmodal-icon">{icon ?? defaultIcons[variant]}</div>
+        ) : null}
+
+        {title && <h3 id="gmodal-title" className="gmodal-title">{title}</h3>}
+
+        {message && (
+          <div id="gmodal-desc" className="gmodal-message">{message}</div>
+        )}
+
+        {actions?.length > 0 && (
+          <div className="gmodal-actions">
+            {actions.map((a, i) => (
+              <button
+                key={`${a.label}-${i}`}
+                type="button"
+                className={btnClass(a.variant)}
+                onClick={a.onClick}
+                ref={a.autoFocus ? autoBtnRef : undefined}
+              >
+                {a.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 //////////////////////// Footer ////////////////////////
 

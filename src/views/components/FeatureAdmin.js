@@ -23,14 +23,27 @@ export const FeatureAdmin = () => {
   const [formData, setFormData] = useState({
     description: '',
     idCategory: '',
-    idFeatureCategory: ''   // <-- ajouté
+    idFeatureCategory: ''
   });
 
   useEffect(() => {
     dispatch(getFeatureRequest());
-    dispatch(getCategoryRequest());            // <-- charger les catégories
-    dispatch(getFeatureCategoryRequest());     // <-- charger les catégories de caractéristiques
+    dispatch(getCategoryRequest());
+    dispatch(getFeatureCategoryRequest());
   }, [dispatch]);
+
+  // Fermer avec ESC + bloquer le scroll quand la modale est ouverte
+  useEffect(() => {
+    if (showModal) document.body.classList.add('no-scroll');
+    else document.body.classList.remove('no-scroll');
+
+    const onKey = (e) => e.key === 'Escape' && setShowModal(false);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.classList.remove('no-scroll');
+    };
+  }, [showModal]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -40,7 +53,7 @@ export const FeatureAdmin = () => {
   const handleAddClick = () => {
     setIsEditing(false);
     setCurrentId(null);
-    setFormData({ description: '', idCategory: '', idFeatureCategory: '' }); // reset complet
+    setFormData({ description: '', idCategory: '', idFeatureCategory: '' });
     setShowModal(true);
   };
 
@@ -49,9 +62,9 @@ export const FeatureAdmin = () => {
     setCurrentId(feature.id);
     setFormData({
       id: feature.id,
-      description: feature.description,
-      idCategory: feature.idCategory || '',
-      idFeatureCategory: feature.idFeatureCategory || '' // <-- pré-remplir
+      description: feature.description ?? '',
+      idCategory: feature.idCategory ?? '',
+      idFeatureCategory: feature.idFeatureCategory ?? ''
     });
     setShowModal(true);
   };
@@ -67,16 +80,18 @@ export const FeatureAdmin = () => {
     e.preventDefault();
     const payload = {
       id: currentId,
-      description: formData.description  || null,
+      description: formData.description || null,
       idCategory: formData.idCategory || null,
-      idFeatureCategory: formData.idFeatureCategory || null, // <-- envoyé au backend
+      idFeatureCategory: formData.idFeatureCategory || null,
     };
+
     if (isEditing) {
       await dispatch(updateFeatureRequest(payload));
     } else {
       const { id, ...createPayload } = payload;
       await dispatch(addFeatureRequest(createPayload));
     }
+
     await dispatch(getFeatureRequest());
     setShowModal(false);
   };
@@ -131,7 +146,11 @@ export const FeatureAdmin = () => {
           <tbody>
             {sortedAndFilteredFeatures.length > 0 ? (
               sortedAndFilteredFeatures.map((feature) => (
-                <tr key={feature.id} onClick={() => handleEditClick(feature)} style={{ cursor: 'pointer' }}>
+                <tr
+                  key={feature.id}
+                  onClick={() => handleEditClick(feature)}
+                  style={{ cursor: 'pointer' }}
+                >
                   <td>{feature.description}</td>
                   <td>{feature.categoryName}</td>
                   <td>{getFeatureCategoryName(feature.idFeatureCategory)}</td>
@@ -161,9 +180,22 @@ export const FeatureAdmin = () => {
       </div>
 
       {showModal && (
-        <div className="modal-backdrop">
-          <div className="modal-content-custom">
-            <h2 className="mb-3">{isEditing ? 'Modifier la caractéristique' : 'Ajouter une caractéristique'}</h2>
+        <div
+          className="admin-modal-backdrop"
+          role="presentation"
+          onClick={() => setShowModal(false)}
+        >
+          <div
+            className="admin-modal-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="feature-modal-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="feature-modal-title" className="mb-3">
+              {isEditing ? 'Modifier la caractéristique' : 'Ajouter une caractéristique'}
+            </h2>
+
             <form onSubmit={handleSubmit}>
               <div className="mb-3">
                 <label>Description</label>
@@ -193,7 +225,6 @@ export const FeatureAdmin = () => {
                 </select>
               </div>
 
-              {/* NOUVEAU: Catégorie de caractéristiques */}
               <div className="mb-3">
                 <label>Catégorie de caractéristiques</label>
                 <select
@@ -210,7 +241,11 @@ export const FeatureAdmin = () => {
               </div>
 
               <div className="d-flex justify-content-end">
-                <button type="button" className="btn btn-secondary me-2" onClick={() => setShowModal(false)}>
+                <button
+                  type="button"
+                  className="btn btn-secondary me-2"
+                  onClick={() => setShowModal(false)}
+                >
                   Annuler
                 </button>
                 <button type="submit" className="btn btn-dark">

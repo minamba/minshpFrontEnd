@@ -11,6 +11,7 @@ import customerReducer from "./CustomerReducers";
 import videoReducer from "./VideoReducers";
 import uploadReducer from "./UploadReducers";
 import featureCategoryReducer from "./FeatureCategoryReducers";
+import cartReducer from "./CartReducers";
 
 export default combineReducers({
     products : productReducer,
@@ -25,4 +26,5 @@ export default combineReducers({
     videos : videoReducer,
     upload : uploadReducer,
     featureCategories : featureCategoryReducer,
+    items : cartReducer,
 })

@@ -1,13 +1,21 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import '../../App.css';
 import { useSelector, useDispatch } from 'react-redux';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { ProductSpecs } from '../../components/index';
+import { addToCartRequest } from '../../lib/actions/CartActions';
+import { GenericModal } from '../../components/index';
 
 export const Product = () => {
   const { id } = useParams();
   const pid = Number(id);
   const dispatch = useDispatch();
+  const navigate = useNavigate();
+
+  // ⬆️ remonte en haut à chaque arrivée/changement d'id
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, [id]);
 
   // --- Store
   const products = useSelector((s) => s.products.products) || [];
@@ -30,7 +38,7 @@ export const Product = () => {
   // --- Vidéos
   const productVideos = useMemo(() => {
     if (!product) return [];
-    return (videos || []).filter((v) => v.idProduct === product.id);
+    return (videos || []).filter((v) => v.idProduct === product.id && v.position === 2);
   }, [videos, product]);
 
   const heroVideo = useMemo(
@@ -75,11 +83,27 @@ export const Product = () => {
   const euros = hasPrice ? Math.floor(priceNum) : 0;
   const cents = hasPrice ? Math.round((priceNum - Math.floor(priceNum)) * 100).toString().padStart(2, '0') : '00';
 
-  // --- Achat
+  // --- Achat + modale "Ajouté au panier"
   const [qty, setQty] = useState(1);
+  const [showAdded, setShowAdded] = useState(false);
+
   const addToCart = () => {
-    console.log('ADD TO CART ->', { productId: product?.id, qty });
-    alert('Produit ajouté au panier (exemple)');
+    if (!product) return;
+    const payloadItem = {
+      id: product.id,
+      name: product.name || product.title,
+      price: priceNum,
+      image: currentImage,
+    };
+    dispatch(addToCartRequest(payloadItem, qty));
+    setShowAdded(true); // ouverture de la modale
+  };
+
+  // fermer modale / aller au panier
+  const closeAdded = () => setShowAdded(false);
+  const goToCart = () => {
+    setShowAdded(false);
+    navigate('/cart');
   };
 
   // --- Specs
@@ -88,11 +112,10 @@ export const Product = () => {
 
   // --- Autoplay vidéo + blocage téléchargement / clic droit
   const videoRef = useRef(null);
-
   useEffect(() => {
     if (!hasVideo || !videoRef.current) return;
     const v = videoRef.current;
-    v.muted = true; // requis pour autoplay
+    v.muted = true;
     const tryPlay = v.play();
     if (tryPlay && typeof tryPlay.then === 'function') {
       tryPlay.catch(() => {
@@ -145,23 +168,17 @@ export const Product = () => {
         <div className="product-details" style={{ position: 'sticky', top: '1rem', alignSelf: 'flex-start' }}>
           <p className="product-brand">{product?.brand || ''}</p>
 
-          {/* Titre CENTRÉ */}
           <h1 className="product-title product-title--center">
             {product?.name || product?.title || 'Produit'}
           </h1>
 
-          {/* Contenu aligné à droite du titre (comme avant) */}
           <div className="details-stack">
-            {/* (description sous le titre SUPPRIMÉE) */}
-
             {hasPrice && (
               <>
                 <div className="product-price">
                   <span className="euros">{euros}€</span>
                   <sup className="cents">{cents}</sup>
                 </div>
-
-                {/* Nouvelle ligne sous le prix (même style que la description) */}
                 <p className="product-description" style={{ marginTop: '.25rem' }}>
                   Taxes incluses&nbsp;–&nbsp;Frais de livraison calculés lors du paiement.
                 </p>
@@ -179,7 +196,7 @@ export const Product = () => {
                 onChange={(e) => setQty(Number(e.target.value))}
                 aria-label="Quantité"
               >
-                {[1, 2, 3, 4, 5].map((n) => (
+                {[1,2,3,4,5,6,7,8,9,10].map((n) => (
                   <option key={n} value={n}>{n}</option>
                 ))}
               </select>
@@ -189,7 +206,6 @@ export const Product = () => {
               </button>
             </div>
 
-            {/* Infos livraison */}
             <ul className="trust-list">
               <li><span className="trust-ico" aria-hidden="true">📦</span> Envoi sous 24h</li>
               <li><span className="trust-ico" aria-hidden="true">🚚</span> Livraison rapide et sécurisée</li>
@@ -213,7 +229,7 @@ export const Product = () => {
         </div>
       )}
 
-      {/* ===== Description globale (section sous le bloc achat) — tu peux la garder ou la retirer si doublon ===== */}
+      {/* ===== Description ===== */}
       <section className="product-desc">
         <h2>Description</h2>
         <p>
@@ -241,7 +257,7 @@ export const Product = () => {
         </section>
       )}
 
-      {/* ===== Caractéristiques techniques ===== */}
+      {/* ===== Caractéristiques ===== */}
       <section className="specs-wrap">
         <h2 className="specs-title">Caractéristiques techniques : {product?.name}</h2>
 
@@ -273,6 +289,20 @@ export const Product = () => {
           </div>
         </div>
       </section>
+
+      {/* ===== Modale d'ajout au panier ===== */}
+      <GenericModal
+          open={showAdded}
+          onClose={closeAdded}
+          variant="success"
+          title="Ajouté au panier"
+          message="Cet article a bien été ajouté au panier."
+          actions={[
+            { label: "Fermer", variant: "light", onClick: closeAdded },
+            { label: "Voir mon panier", variant: "primary", onClick: goToCart, autoFocus: true },
+          ]}
+        />
+      
     </div>
   );
 };

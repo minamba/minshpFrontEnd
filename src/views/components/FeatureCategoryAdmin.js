@@ -5,28 +5,37 @@ import {
   addFeatureCategoryRequest,
   updateFeatureCategoryRequest,
   deleteFeatureCategoryRequest,
-} from "../../lib/actions/FeatureCategoryActions"; // <- adapte le chemin si besoin
+} from "../../lib/actions/FeatureCategoryActions";
 import "../../App.css";
 
 export const FeatureCategoryAdmin = () => {
   const dispatch = useDispatch();
 
-  // liste depuis le store
   const featureCategories =
     useSelector((s) => s.featureCategories?.featureCategories) || [];
 
-  // UI state
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [currentId, setCurrentId] = useState(null);
   const [formData, setFormData] = useState({ name: "" });
 
-  // charger la liste au mount
   useEffect(() => {
     dispatch(getFeatureCategoryRequest());
   }, [dispatch]);
 
-  // helpers UI
+  // ESC pour fermer + bloquer le scroll quand la modale est ouverte
+  useEffect(() => {
+    if (showModal) document.body.classList.add("no-scroll");
+    else document.body.classList.remove("no-scroll");
+
+    const onKey = (e) => e.key === "Escape" && setShowModal(false);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.classList.remove("no-scroll");
+    };
+  }, [showModal]);
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((p) => ({ ...p, [name]: value }));
@@ -55,9 +64,7 @@ export const FeatureCategoryAdmin = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (isEditing) {
-      await dispatch(
-        updateFeatureCategoryRequest({ id: currentId, name: formData.name })
-      );
+      await dispatch(updateFeatureCategoryRequest({ id: currentId, name: formData.name }));
     } else {
       await dispatch(addFeatureCategoryRequest({ name: formData.name }));
     }
@@ -129,13 +136,24 @@ export const FeatureCategoryAdmin = () => {
       </div>
 
       {showModal && (
-        <div className="modal-backdrop">
-          <div className="modal-content-custom">
-            <h2 className="mb-3">
+        <div
+          className="admin-modal-backdrop"
+          role="presentation"
+          onClick={() => setShowModal(false)}
+        >
+          <div
+            className="admin-modal-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="fc-modal-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="fc-modal-title" className="mb-3">
               {isEditing
                 ? "Modifier la catégorie de caractéristiques"
                 : "Ajouter une catégorie de caractéristiques"}
             </h2>
+
             <form onSubmit={handleSubmit}>
               <div className="mb-3">
                 <label>Nom</label>
@@ -146,6 +164,7 @@ export const FeatureCategoryAdmin = () => {
                   value={formData.name}
                   onChange={handleInputChange}
                   required
+                  autoFocus
                 />
               </div>
               <div className="d-flex justify-content-end">
