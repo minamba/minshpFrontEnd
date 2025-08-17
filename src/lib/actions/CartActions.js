@@ -14,6 +14,11 @@ export const actionsCart = {
     ADD_TO_CART_REQUEST : "ADD_TO_CART_REQUEST",
     ADD_TO_CART_SUCCESS : "ADD_TO_CART_SUCCESS",
     ADD_TO_CART_FAILURE : "ADD_TO_CART_FAILURE",
+
+
+    SAVE_CART_REQUEST : "SAVE_CART_REQUEST",
+    SAVE_CART_SUCCESS : "SAVE_CART_SUCCESS",
+    SAVE_CART_FAILURE : "SAVE_CART_FAILURE",
 }
 
 //get
@@ -102,6 +107,28 @@ export function addToCartSuccess(item, quantity) {
 export function addToCartFailure(error) {
     return {
         type: actionsCart.ADD_TO_CART_FAILURE,
+        payload: error,
+    }
+}
+
+//save
+export function saveCartRequest(items) {
+    return {
+        type: actionsCart.SAVE_CART_REQUEST,
+        payload: items,
+    }
+}
+
+export function saveCartSuccess(items) {
+    return {
+        type: actionsCart.SAVE_CART_SUCCESS,
+        payload: items,
+    }
+}
+
+export function saveCartFailure(error) {
+    return {
+        type: actionsCart.SAVE_CART_FAILURE,
         payload: error,
     }
 }

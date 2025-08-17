@@ -161,6 +161,7 @@ export const Navbar = () => {
                 <Link to="/admin/featureProducts" onClick={() => setIsOpen(false)}>Caractéristiques produits</Link>
                 <Link to="/admin/images" onClick={() => setIsOpen(false)}>Images</Link>
                 <Link to="/admin/videos" onClick={() => setIsOpen(false)}>Vidéos</Link>
+                <Link to="/admin/taxes" onClick={() => setIsOpen(false)}>Taxes</Link>
               </div>
             )}
           </div>
@@ -366,6 +367,7 @@ export const ProductTable = () => {
               <th>Modèle</th>
               <th>Description</th>
               <th>Prix (€)</th>
+              <th>Prix TTC (€)</th>
               <th>Catégorie</th>
               <th>Stock</th>
               <th>Promotion</th>
@@ -379,12 +381,13 @@ export const ProductTable = () => {
             {filteredProducts.length > 0 ? (
               filteredProducts.map((prod) => (
                 <tr key={prod.id}>
-                  <td><img src={prod.images?.[0]?.url} alt={prod.name} width={100} /></td>
+                  <td><Link to={`/product/${prod.id}`}><img src={prod.images?.[0]?.url} alt={prod.name} width={100} /></Link></td>
                   <td>{prod.name}</td>
                   <td>{prod.brand}</td>
                   <td>{prod.model}</td>
                   <td>{prod.description}</td>
                   <td>{prod.price}</td>
+                  <td>{prod.priceTtc}</td>
                   <td>{prod.category}</td>
                   <td>{prod.stocks?.quantity ? prod.stocks.quantity : "Rupture"}</td>
                   <td>{prod.promotions?.length > 0 ? "Oui" : "Non"}</td>

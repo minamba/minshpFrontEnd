@@ -15,6 +15,7 @@ import {FeatureProductAdmin} from './FeatureProductAdmin';
 import {OrderAdmin} from './OrderAdmin';
 import {ImageAdmin} from './ImageAdmin';
 import {VideoAdmin} from './VideoAdmin';
+import {TaxesAdmin} from './TaxesAdmin';
 import {Cart} from './Cart';
 import {FeatureCategoryAdmin} from './FeatureCategoryAdmin';
 import { useDispatch } from "react-redux";
@@ -66,6 +67,7 @@ export const BaseApp = () => {
                         <Route path="/product/:id" element={<Product/>} />
                         <Route path="/admin/featureCategories" element={<FeatureCategoryAdmin/>} />
                         <Route path="/cart" element={<Cart/>}/>
+                        <Route path="/admin/taxes" element={<TaxesAdmin/>}/>
                     </Routes>
                 </main>
                 <Footer/>

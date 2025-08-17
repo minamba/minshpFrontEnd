@@ -291,6 +291,43 @@ h1 { text-align: center; }
   box-shadow: 0 0 0 2px #333;  /* anneau si navbar sombre (#333) */
 }
 
+/* ---- Nouveautés : ligne statut + prix ---- */
+.new-price-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  margin-top:4px;
+}
+
+/* Pastille de stock compacte (cartes) */
+.card-stock{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  font-weight:600;
+  font-size:.9rem;
+  padding:4px 8px;
+  border-radius:999px;
+  background:#f3f4f6;
+}
+
+/* variantes de couleur */
+.card-stock.in   { color:#138a36; background:#eafaf0; }
+.card-stock.out  { color:#dc2626; background:#fee2e2; }
+.card-stock.warn { color:#b45309; background:#fff7ed; }
+
+/* point coloré */
+.card-stock-dot{
+  width:8px; height:8px;
+  border-radius:50%;
+  display:inline-block;
+}
+.card-stock-dot.in   { background:#22c55e; }
+.card-stock-dot.out  { background:#ef4444; }
+.card-stock-dot.warn { background:#f59e0b; }
+
+
 /* ===================== FOOTER ===================== */
 .footer-container { background:#000; color:#fff; padding:3rem 1rem; text-align:center; }
 .footer-content { max-width:1200px; margin:0 auto; }
@@ -423,6 +460,43 @@ h1 { text-align: center; }
 .specs-label{ min-width:220px; color:#333; font-weight:600; }
 .specs-line{ flex:1 1 auto; border-bottom:1px solid #cfcfcf; height:0; transform:translateY(2px); }
 .specs-value{ min-width:180px; text-align:right; color:#111; font-weight:500; }
+
+/* ==== Product component (extraction des styles inline) ==== */
+
+/* Empêche la sélection/clic droit rapide (déjà géré pour le menu via JS) */
+.product-page {
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+
+/* Détails collés en haut au scroll */
+.product-details {
+  position: sticky;
+  top: 1rem;
+  align-self: flex-start;
+}
+
+/* Bloc "Prix de référence" + -X% */
+.refprice-wrap { margin-bottom: 4px; }
+.refprice-label { font-size: .95rem; color: #6b7280; }
+.refprice-row { display: flex; align-items: center; gap: 8px; }
+.refprice-old { text-decoration: line-through; color: #6b7280; }
+.refprice-badge { color: #dc3f0b; font-weight: 700; }
+
+/* Légende promo "Jusqu'au … inclus" */
+.promo-until { color: #ef4444; font-weight: 600; font-size: .95rem; margin-top: 2px; }
+
+/* Ligne "dont …" sous le prix */
+.price-lead { margin-top: .1rem; font-size: 1em; }
+
+/* Statuts de stock dynamiques */
+.stock-row.stock-in { color: #138a36; }
+.stock-row.stock-out { color: #dc2626; }
+.stock-row.stock-warn { color: #f59e0b; }
+
+.stock-dot.out { background: #ef4444; }
+.stock-dot.warn { background: #f59e0b; }
+
 
 /* ===================== CART & MODAL ===================== */
 /* ===== CART PAGE ===== */
@@ -575,6 +649,43 @@ h1 { text-align: center; }
   box-shadow: 0 20px 60px rgba(0,0,0,.18);
   padding: 20px;
 }
+
+
+/* ===== Promotions (listes / nouveautés) ===== */
+.promo-pill{
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: #4681ff;        /* rouge doux */
+  color: #fff;
+  font-weight: 700;
+  font-size: .85rem;
+  padding: 4px 8px;
+  border-radius: 6px;
+  z-index: 2;
+}
+
+.price-row{
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.price-old{
+  text-decoration: line-through;
+  color: #6b7280;             /* gris */
+}
+
+.price-discount{
+  color: #dc3f0b;             /* orange -% */
+  font-weight: 700;
+}
+
+.product-price--promo{
+  color: #ef4444;             /* prix promo en rouge */
+}
+
 
 
 /* ===================== RESPONSIVE ===================== */

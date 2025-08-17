@@ -1,8 +1,12 @@
 // reducers/CartReducers.js
 import { actionsCart } from "../actions/CartActions";
 
+
+const saveToLocalStorage = (items) => {
+  localStorage.setItem("items", JSON.stringify(items));
+};
 const initialState = {
-  items: [], // [{ id, title, price, qty, image? }]
+  items: JSON.parse(localStorage.getItem("items") || "[]"),
 };
 
 export default function cartReducer(state = initialState, action) {
@@ -41,10 +45,11 @@ export default function cartReducer(state = initialState, action) {
       const { item, quantity } = action.payload || {};
       const id = item?.id ?? action.payload?.id;
       const q = Math.max(1, Number(quantity || 1));
+      const pr = item.price;
       if (!id) return state;
 
       const nextItems = state.items.map(it =>
-        it.id === id ? { ...it, qty: q } : it
+        it.id === id ? { ...it, qty: q, price : pr } : it
       );
       return { ...state, items: nextItems };
     }
@@ -55,6 +60,12 @@ export default function cartReducer(state = initialState, action) {
       if (!id) return state;
       const nextItems = state.items.filter(it => it.id !== id);
       return { ...state, items: nextItems };
+    }
+
+    // ------- SAVE ---------
+    case actionsCart.SAVE_CART_SUCCESS: {
+     saveToLocalStorage(action.payload)
+      return { ...state, items : action.payload || [] };
     }
 
     default:

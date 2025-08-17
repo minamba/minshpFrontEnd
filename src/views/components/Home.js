@@ -1,20 +1,23 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import '../../App.css';
 import { useSelector, useDispatch } from 'react-redux';
 import { Link, useNavigate } from "react-router-dom";
-import { addToCartRequest } from '../../lib/actions/CartActions';
+import { addToCartRequest, saveCartRequest } from '../../lib/actions/CartActions';
 import { GenericModal } from '../../components/index';
 
 export const Home = () => {
-  const products = useSelector((state) => state.products.products) || [];
-  const images = useSelector((state) => state.images.images) || [];
-  const videos = useSelector((state) => state.videos.videos) || [];
+  const products  = useSelector((state) => state.products.products) || [];
+  const images    = useSelector((state) => state.images.images) || [];
+  const videos    = useSelector((state) => state.videos.videos) || [];
   const categoriesFromStore = useSelector((state) => state.categories.categories) || [];
-  const dispatch = useDispatch();
-  const navigate = useNavigate();
+  const items     = useSelector((state) => state.items.items) || [];
+  const dispatch  = useDispatch();
+  const navigate  = useNavigate();
 
   const [showAdded, setShowAdded] = useState(false);
   const [lastAdded, setLastAdded] = useState(null);
+
+  useEffect(() => { dispatch(saveCartRequest(items)); }, [items, dispatch]);
 
   const mainProduct = products.find((p) => p.main === true);
   const galleryProducts = products.filter((p) => p.id !== mainProduct?.id);
@@ -31,12 +34,18 @@ export const Home = () => {
 
   const getProductImage = (id) => {
     const productImages = images.filter((i) => i.idProduct === id);
-    return productImages.length > 0 ? productImages[0].url : null;
+    return productImages.length > 0 ? productImages[0].url : '/Images/placeholder.jpg';
   };
 
   const getCategoryImage = (idCategory) => {
     const image = images.find((i) => i.idCategory === idCategory);
     return image ? image.url : '/Images/placeholder.jpg';
+  };
+
+  const parseDate = (val) => {
+    if (!val) return null;
+    const d = new Date(val);
+    return Number.isNaN(d.getTime()) ? null : d;
   };
 
   const newestEightProducts = useMemo(() => {
@@ -50,7 +59,7 @@ export const Home = () => {
 
   return (
     <div className="home-container">
-      {/* HERO SECTION */}
+      {/* HERO */}
       <section className="hero-section">
         {heroVideo?.url ? (
           <video className="hero-video" autoPlay muted loop>
@@ -67,12 +76,11 @@ export const Home = () => {
         </div>
       </section>
 
-      {/* FEATURES SECTION */}
+      {/* FEATURES */}
       {mainProductImages.length > 0 && (
         <section className="features-section" id="features">
           {mainProductImages.map((image, index) => {
             if (!image) return null;
-
             return (
               <div
                 key={image.position}
@@ -83,7 +91,6 @@ export const Home = () => {
                   <h2>{image.title || 'Titre manquant'}</h2>
                   <p>{image.description || 'Description manquante'}</p>
                 </div>
-
                 <img
                   src={image.url || '/Images/placeholder.jpg'}
                   alt={image.title || `Image ${image.position}`}
@@ -102,7 +109,7 @@ export const Home = () => {
         </section>
       )}
 
-      {/* CATEGORIES SECTION */}
+      {/* CATEGORIES */}
       {categoriesFromStore.length > 0 && (
         <section className="categories-section section-alt bg-light" id="categories">
           <div className="new-header">
@@ -128,7 +135,6 @@ export const Home = () => {
       <section className="new-section" id="nouveautes">
         <div className="new-header">
           <h2 className="new-title">Nouveautés</h2>
-
           <div className="new-actions">
             <button type="button" className="icon-btn" aria-label="Précédent">‹</button>
             <button type="button" className="icon-btn" aria-label="Voir plus">+</button>
@@ -137,13 +143,51 @@ export const Home = () => {
 
         <div className="new-grid">
           {newestEightProducts.map((product, index) => {
-            const img = getProductImage(product.id) || '/Images/placeholder.jpg';
-            const raw = product.price;
-            const priceNum = typeof raw === 'number' ? raw : parseFloat(raw);
-            const hasPrice = Number.isFinite(priceNum);
-            const euros = hasPrice ? Math.floor(priceNum) : null;
-            const cents = hasPrice ? Math.round((priceNum - Math.floor(priceNum)) * 100).toString().padStart(2,'0') : null;
+            const img = getProductImage(product.id);
             const name = product.name || product.title || `Produit ${index + 1}`;
+
+            // Prix de référence
+            const priceRef = Number(
+              typeof product.priceTtc === 'number' ? product.priceTtc : parseFloat(product.priceTtc)
+            ) || 0;
+
+            // Promo active ? (prend la 1ère)
+            const p0 = product?.promotions?.[0];
+            const hasPromo = (() => {
+              if (!p0) return false;
+              const pct = Number(p0.purcentage) || 0;
+              if (pct <= 0) return false;
+              const start = parseDate(p0.startDate);
+              const end   = parseDate(p0.endDate);
+              const now = new Date();
+              const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0,0,0,0);
+              if (start && start.getTime() > now.getTime()) return false;
+              if (end && end.getTime() < startOfToday.getTime()) return false;
+              return true;
+            })();
+
+            const discountPct = hasPromo ? Number(p0.purcentage) : 0;
+            const computedPromo = +(priceRef * (1 - discountPct / 100)).toFixed(2);
+            const promoted = Number(
+              typeof product.priceTtcPromoted === 'number'
+                ? product.priceTtcPromoted
+                : parseFloat(product.priceTtcPromoted)
+            );
+            const displayPrice = hasPromo
+              ? (Number.isFinite(promoted) ? promoted : computedPromo)
+              : priceRef;
+
+            const [euros, cents] = displayPrice.toFixed(2).split('.');
+
+            // Statut stock
+            const raw = (product?.stockStatus ?? '').trim();
+            const lower = raw.toLowerCase();
+            const isIn   = lower === 'en stock';
+            const isOut  = lower === 'en rupture';
+            const stockCls = isIn ? 'in' : isOut ? 'out' : 'warn';
+            const stockLabel =
+              lower.includes('plus que') ? 'Bientôt en rupture' :
+              raw || 'Disponibilité limitée';
 
             return (
               <article key={product.id} className="product-card" data-aos="zoom-in">
@@ -152,8 +196,9 @@ export const Home = () => {
                     <img src={img} alt={name} />
                   </Link>
 
-                  <div className="thumb-overlay" aria-hidden="true" />
+                  {hasPromo && <span className="promo-pill">Promotion</span>}
 
+                  <div className="thumb-overlay" aria-hidden="true" />
                   <button
                     type="button"
                     className="thumb-add-btn"
@@ -162,9 +207,8 @@ export const Home = () => {
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      // Envoie au store
-                      dispatch(addToCartRequest(product, 1));
-                      // Mémorise l’article pour le message de la modale
+                      const payloadItem = { id: product.id, name, price: displayPrice, image: img };
+                      dispatch(addToCartRequest(payloadItem, 1));
                       setLastAdded({ id: product.id, name });
                       setShowAdded(true);
                     }}
@@ -174,19 +218,33 @@ export const Home = () => {
                 </div>
 
                 <h3 className="product-name">{name}</h3>
-                {hasPrice && (
-                  <div className="product-price">
-                    <span className="euros">{euros}€</span>
-                    <sup className="cents">{cents}</sup>
+
+                {/* Statut + prix (pile à droite comme sur la capture) */}
+                <div className="new-price-row">
+                  <span className={`card-stock ${stockCls}`}>
+                    <span className={`card-stock-dot ${stockCls}`} />
+                    {stockLabel}
+                  </span>
+
+                  <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', lineHeight:1.1 }}>
+                    {hasPromo && (
+                      <span className="price-old">
+                        {priceRef.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+                      </span>
+                    )}
+                    <div className={`product-price ${hasPromo ? 'product-price--promo' : ''}`}>
+                      <span className="euros">{euros}€</span>
+                      <sup className="cents">{cents}</sup>
+                    </div>
                   </div>
-                )}
+                </div>
               </article>
             );
           })}
         </div>
       </section>
 
-      {/* MODALE : confirmation d’ajout au panier */}
+      {/* MODALE ajout panier */}
       <GenericModal
         open={showAdded}
         onClose={closeAdded}

@@ -8,10 +8,14 @@ import {
   deletePromotionRequest
 } from '../../lib/actions/PromotionActions';
 import { getProductUserRequest } from '../../lib/actions/ProductActions';
+import { updateCartRequest, getCartRequest } from '../../lib/actions/CartActions';
 
 export const PromotionAdmin = () => {
   const promotionsFromStore = useSelector((state) => state.promotions.promotions) || [];
   const productsFromStore   = useSelector((state) => state.products.products) || [];
+  // Panier : store puis fallback localStorage
+  const cartItems = useSelector((s) => s?.items?.items) ?? JSON.parse(localStorage.getItem('items') || '[]');
+
   const dispatch = useDispatch();
 
   const [showModal, setShowModal]       = useState(false);
@@ -25,19 +29,84 @@ export const PromotionAdmin = () => {
     endDate: ''
   });
 
+  // charge données au montage
   useEffect(() => {
     dispatch(getPromotionRequest());
     dispatch(getProductUserRequest());
+    dispatch(getCartRequest());
   }, [dispatch]);
 
+  useEffect(() => {
+    dispatch(getCartRequest());
+  }, [cartItems, dispatch]);
+
+  // ===== Utils dates & prix =====
+  const parseDate = (val) => {
+    if (!val) return null;
+    const d = new Date(val);
+    return Number.isNaN(d.getTime()) ? null : d;
+  };
+
+  // True si la promo est active (start <= now <= end)
+  const isPromoActive = (promo, nowMs = Date.now()) => {
+    const start = parseDate(promo?.startDate);
+    const end   = parseDate(promo?.endDate);
+    // on considère la fin à la fin de la journée
+    const endMs = end ? (end.getTime() + 24*60*60*1000 - 1) : null;
+    const startsOk = !start || start.getTime() <= nowMs;
+    const endsOk   = !end   || nowMs <= endMs;
+    return startsOk && endsOk;
+  };
+
+  // retourne la première promo ACTIVE d’un produit (tu peux changer le tri si besoin)
+  const getActivePromoForProduct = (productId, promos) => {
+    const nowMs = Date.now();
+    return (promos || [])
+      .filter(p => String(p.idProduct) === String(productId))
+      .filter(p => isPromoActive(p, nowMs))
+      .sort((a, b) => {
+        // plus récente d'abord (par startDate si dispo, sinon dateCreation)
+        const aKey = parseDate(a.startDate)?.getTime() ?? parseDate(a.dateCreation)?.getTime() ?? 0;
+        const bKey = parseDate(b.startDate)?.getTime() ?? parseDate(b.dateCreation)?.getTime() ?? 0;
+        return bKey - aKey;
+      })[0] || null;
+  };
+
+  const computePriceWithPromo = (product, promo) => {
+    const base = Number(product?.priceTtc ?? product?.price ?? 0);
+    if (!promo || !isPromoActive(promo)) return base;
+    const pct = Number(promo.purcentage) || 0;
+    return +(base * (1 - pct / 100)).toFixed(2);
+  };
+
+  // util: écrire prix dans localStorage.items
+  const writeCartPriceToLocalStorage = (productId, newPrice) => {
+    const ls = JSON.parse(localStorage.getItem('items') || '[]');
+    const next = ls.map(it =>
+      String(it.id) === String(productId) ? { ...it, price: Number(newPrice) } : it
+    );
+    localStorage.setItem('items', JSON.stringify(next));
+    return next;
+  };
+
+  // met à jour (Redux + localStorage) le prix d’un produit dans le panier
+  const syncCartPrice = (productId, price) => {
+    const inStore = (cartItems || []).find(ci => String(ci.id) === String(productId));
+    const qty = inStore?.qty ?? 1;
+
+    if (inStore) {
+      const updated = { ...inStore, price: Number(price) };
+      dispatch(updateCartRequest(updated, qty));
+    }
+    writeCartPriceToLocalStorage(productId, price);
+    dispatch(getCartRequest());
+  };
+
+  // ===== UI =====
   // ESC + bloque le scroll quand la modale est ouverte
   useEffect(() => {
-    if (showModal) document.body.classList.add('no-scroll');
-    else document.body.classList.remove('no-scroll');
-
-    const onKey = (e) => {
-      if (e.key === 'Escape') setShowModal(false);
-    };
+    document.body.classList.toggle('no-scroll', showModal);
+    const onKey = (e) => { if (e.key === 'Escape') setShowModal(false); };
     window.addEventListener('keydown', onKey);
     return () => {
       window.removeEventListener('keydown', onKey);
@@ -73,30 +142,62 @@ export const PromotionAdmin = () => {
   };
 
   const handleDeleteClick = async (id) => {
+    // on mémorise le produit impacté
+    const doomed = promotionsFromStore.find(p => p.id === id);
+    const productId = doomed?.idProduct;
+
     if (window.confirm('Supprimer cette promotion ?')) {
       await dispatch(deletePromotionRequest(id));
+
+      // recalcul immédiat du prix effectif après suppression
+      if (productId) {
+        const product = productsFromStore.find(p => String(p.id) === String(productId));
+        if (product) {
+          const nextPromos = promotionsFromStore.filter(p => p.id !== id);
+          const active = getActivePromoForProduct(productId, nextPromos);
+          const nextPrice = computePriceWithPromo(product, active); // si plus de promo active => prix TTC
+          syncCartPrice(productId, nextPrice);
+        }
+      }
+
       await dispatch(getPromotionRequest());
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    const payload = {
+      id: currentId,
+      idProduct: formData.idProduct,
+      purcentage: Number(formData.purcentage) || 0,
+      startDate: formData.startDate,
+      endDate: formData.endDate
+    };
+
     if (isEditing) {
-      await dispatch(updatePromotionRequest({
-        id: currentId,
-        idProduct: formData.idProduct,
-        purcentage: formData.purcentage,
-        startDate: formData.startDate,
-        endDate: formData.endDate
-      }));
+      await dispatch(updatePromotionRequest(payload));
     } else {
-      await dispatch(addPromotionRequest({
-        idProduct: formData.idProduct,
-        purcentage: formData.purcentage,
-        startDate: formData.startDate,
-        endDate: formData.endDate
-      }));
+      const { id, ...createPayload } = payload;
+      await dispatch(addPromotionRequest(createPayload));
     }
+
+    // recalcul du prix : si la promo est expirée (end < today) => prix TTC
+    const product = productsFromStore.find(p => String(p.id) === String(formData.idProduct));
+    if (product) {
+      // on part de la liste actuelle, et on remplace/ajoute virtuellement la promo courante
+      let projected = [...promotionsFromStore];
+      if (isEditing) {
+        projected = projected.map(p => p.id === currentId ? { ...p, ...payload } : p);
+      } else {
+        projected = [{ ...payload, id: 'tmp' }, ...projected];
+      }
+
+      const active = getActivePromoForProduct(formData.idProduct, projected);
+      const nextPrice = computePriceWithPromo(product, active);
+      syncCartPrice(formData.idProduct, nextPrice);
+    }
+
     await dispatch(getPromotionRequest());
     setShowModal(false);
   };
@@ -163,19 +264,13 @@ export const PromotionAdmin = () => {
                 <td>
                   <button
                     className='btn btn-sm btn-warning me-2'
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleEditClick(promo);
-                    }}
+                    onClick={(e) => { e.stopPropagation(); handleEditClick(promo); }}
                   >
                     <i className="bi bi-pencil"></i>
                   </button>
                   <button
                     className='btn btn-sm btn-danger'
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteClick(promo.id);
-                    }}
+                    onClick={(e) => { e.stopPropagation(); handleDeleteClick(promo.id); }}
                   >
                     <i className="bi bi-trash"></i>
                   </button>
@@ -238,6 +333,7 @@ export const PromotionAdmin = () => {
                   onChange={handleInputChange}
                   min="0"
                   max="100"
+                  step="0.01"
                   required
                 />
               </div>

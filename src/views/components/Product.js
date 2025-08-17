@@ -3,7 +3,7 @@ import '../../App.css';
 import { useSelector, useDispatch } from 'react-redux';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ProductSpecs } from '../../components/index';
-import { addToCartRequest } from '../../lib/actions/CartActions';
+import { addToCartRequest, saveCartRequest } from '../../lib/actions/CartActions';
 import { GenericModal } from '../../components/index';
 
 export const Product = () => {
@@ -12,30 +12,35 @@ export const Product = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
-  // ⬆️ remonte en haut à chaque arrivée/changement d'id
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
   }, [id]);
 
-  // --- Store
+  // Store
   const products = useSelector((s) => s.products.products) || [];
   const images   = useSelector((s) => s.images.images) || [];
   const videos   = useSelector((s) => s.videos?.videos) || [];
+  const items    = useSelector((s) => s.items.items) || [];
 
-  // --- Produit
+  // Save cart
+  useEffect(() => {
+    dispatch(saveCartRequest(items));
+  }, [items, dispatch]);
+
+  // Produit courant
   const product = useMemo(
     () => products.find((p) => String(p.id) === String(id)) || products[0],
     [products, id]
   );
 
-  // --- Images
+  // Images
   const productImages = useMemo(() => {
     if (!product) return [];
     const list = images.filter((i) => i.idProduct === product.id);
     return list.length ? list : [{ url: '/Images/placeholder.jpg', position: 1 }];
   }, [images, product]);
 
-  // --- Vidéos
+  // Vidéos
   const productVideos = useMemo(() => {
     if (!product) return [];
     return (videos || []).filter((v) => v.idProduct === product.id && v.position === 2);
@@ -51,17 +56,16 @@ export const Product = () => {
     [heroVideo]
   );
 
-  // --- Galerie
+  // Galerie
   const [currentIndex, setCurrentIndex] = useState(0);
   const currentImage = productImages[currentIndex]?.url || '/Images/placeholder.jpg';
-
   const [mainLoaded, setMainLoaded] = useState(false);
   useEffect(() => setMainLoaded(false), [currentImage]);
 
-  // --- Lightbox
+  // Lightbox
   const [isLightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
-  const openLightbox = (idx) => { setLightboxIndex(idx); setLightboxOpen(true); };
+  const openLightbox  = (idx) => { setLightboxIndex(idx); setLightboxOpen(true); };
   const closeLightbox = () => setLightboxOpen(false);
   const prev = () => setLightboxIndex((i) => (i - 1 + productImages.length) % productImages.length);
   const next = () => setLightboxIndex((i) => (i + 1) % productImages.length);
@@ -77,40 +81,89 @@ export const Product = () => {
     return () => window.removeEventListener('keydown', onKey);
   }, [isLightboxOpen]);
 
-  // --- Prix
-  const priceNum = typeof product?.price === 'number' ? product.price : parseFloat(product?.price);
-  const hasPrice = Number.isFinite(priceNum);
-  const euros = hasPrice ? Math.floor(priceNum) : 0;
-  const cents = hasPrice ? Math.round((priceNum - Math.floor(priceNum)) * 100).toString().padStart(2, '0') : '00';
+  // ===== PROMO =====
+  const priceRef = useMemo(() => {
+    const n = typeof product?.priceTtc === 'number' ? product.priceTtc : parseFloat(product?.priceTtc);
+    return Number.isFinite(n) ? n : 0;
+  }, [product]);
 
-  // --- Achat + modale "Ajouté au panier"
+  const parseDate = (val) => {
+    if (!val) return null;
+    const d = new Date(val);
+    return Number.isNaN(d.getTime()) ? null : d;
+  };
+  const formatEndShort = (val) => {
+    const d = parseDate(val);
+    if (!d) return null;
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    return `${dd}/${mm}`;
+  };
+
+  const rawFirstPromo = product?.promotions?.[0] ?? null;
+
+  const activePromo = useMemo(() => {
+    if (!rawFirstPromo) return null;
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+    const start = parseDate(rawFirstPromo.startDate);
+    const end   = parseDate(rawFirstPromo.endDate);
+    const pct   = Number(rawFirstPromo.purcentage) || 0;
+
+    if (pct <= 0) return null;
+    if (start && start.getTime() > now.getTime()) return null;
+    if (end && end.getTime() < startOfToday.getTime()) return null;
+    return rawFirstPromo;
+  }, [rawFirstPromo]);
+
+  const hasPromo    = !!activePromo;
+  const discountPct = hasPromo ? Number(activePromo.purcentage) : 0;
+  const promoUntil  = hasPromo && activePromo.endDate ? formatEndShort(activePromo.endDate) : null;
+
+  const discountedPrice = useMemo(() => {
+    if (!hasPromo) return priceRef;
+    const p = typeof product?.priceTtcPromoted === 'number'
+      ? product.priceTtcPromoted
+      : parseFloat(product?.priceTtcPromoted);
+    if (Number.isFinite(p)) return p;
+    return +(priceRef * (1 - discountPct / 100)).toFixed(2);
+  }, [hasPromo, product, priceRef, discountPct]);
+
+  const displayPrice = discountedPrice;
+  const hasPrice = Number.isFinite(displayPrice);
+  const [eurosStr, centsStr] = hasPrice ? displayPrice.toFixed(2).split('.') : ['0', '00'];
+  const euros = eurosStr;
+  const cents = centsStr;
+
+  // ===== STOCK =====
+  const stockStatusRaw = (product?.stockStatus ?? '').trim();
+  const stockIn  = stockStatusRaw.toLowerCase() === 'en stock';
+  const stockOut = stockStatusRaw.toLowerCase() === 'en rupture';
+  const stockStatusLabel = stockStatusRaw || 'Disponibilité limitée';
+  const stockRowClass = stockIn ? 'stock-in' : stockOut ? 'stock-out' : 'stock-warn';
+  const stockDotClass = stockIn ? 'in' : stockOut ? 'out' : 'warn';
+
+  // Achat
   const [qty, setQty] = useState(1);
   const [showAdded, setShowAdded] = useState(false);
-
   const addToCart = () => {
     if (!product) return;
     const payloadItem = {
       id: product.id,
       name: product.name || product.title,
-      price: priceNum,
+      price: displayPrice,
       image: currentImage,
     };
     dispatch(addToCartRequest(payloadItem, qty));
-    setShowAdded(true); // ouverture de la modale
+    setShowAdded(true);
   };
-
-  // fermer modale / aller au panier
   const closeAdded = () => setShowAdded(false);
-  const goToCart = () => {
-    setShowAdded(false);
-    navigate('/cart');
-  };
+  const goToCart = () => { setShowAdded(false); navigate('/cart'); };
 
-  // --- Specs
+  // Specs
   const specs = ProductSpecs(pid);
-  const sections = Object.keys(specs);
 
-  // --- Autoplay vidéo + blocage téléchargement / clic droit
+  // Vidéo autoplay
   const videoRef = useRef(null);
   useEffect(() => {
     if (!hasVideo || !videoRef.current) return;
@@ -134,11 +187,10 @@ export const Product = () => {
     <div
       className="product-page"
       onContextMenu={handleContextMenu}
-      style={{ WebkitTouchCallout: 'none', userSelect: 'none' }}
     >
       {/* Zone haute: galerie + infos achat */}
       <div className="product-main">
-        {/* Thumbnails */}
+        {/* Vignettes */}
         <div className="thumbs-col">
           {productImages.map((img, idx) => (
             <button
@@ -165,7 +217,7 @@ export const Product = () => {
         </div>
 
         {/* Détails */}
-        <div className="product-details" style={{ position: 'sticky', top: '1rem', alignSelf: 'flex-start' }}>
+        <div className="product-details">
           <p className="product-brand">{product?.brand || ''}</p>
 
           <h1 className="product-title product-title--center">
@@ -175,18 +227,46 @@ export const Product = () => {
           <div className="details-stack">
             {hasPrice && (
               <>
+                {/* Prix de référence + badge promo */}
+                {hasPromo && (
+                  <div className="refprice-wrap">
+                    <div className="refprice-label">Prix de référence</div>
+                    <div className="refprice-row">
+                      <span className="refprice-old">
+                        {priceRef.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+                      </span>
+                      <span className="refprice-badge">-{discountPct}%</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Prix affiché */}
                 <div className="product-price">
                   <span className="euros">{euros}€</span>
                   <sup className="cents">{cents}</sup>
                 </div>
-                <p className="product-description" style={{ marginTop: '.25rem' }}>
+
+                {/* Jusqu’au … inclus */}
+                {hasPromo && promoUntil && (
+                  <div className="promo-until">
+                    Jusqu'au {promoUntil} inclus
+                  </div>
+                )}
+
+                {/* Ligne “dont …” */}
+                <p className="price-lead">
+                  <em>{product?.taxWithoutTvaAmount}</em>
+                </p>
+
+                <p className="product-description">
                   Taxes incluses&nbsp;–&nbsp;Frais de livraison calculés lors du paiement.
                 </p>
               </>
             )}
 
-            <div className="stock-row">
-              <span className="stock-dot in" /> <span>En stock</span>
+            {/* Statut de stock */}
+            <div className={`stock-row ${stockRowClass}`}>
+              <span className={`stock-dot ${stockDotClass}`} /> <span>{stockStatusLabel}</span>
             </div>
 
             <div className="buy-row">
@@ -229,7 +309,7 @@ export const Product = () => {
         </div>
       )}
 
-      {/* ===== Description ===== */}
+      {/* Description */}
       <section className="product-desc">
         <h2>Description</h2>
         <p>
@@ -238,7 +318,7 @@ export const Product = () => {
         </p>
       </section>
 
-      {/* ===== Vidéo ===== */}
+      {/* Vidéo */}
       {hasVideo && (
         <section className="product-video-section">
           <video
@@ -257,23 +337,23 @@ export const Product = () => {
         </section>
       )}
 
-      {/* ===== Caractéristiques ===== */}
+      {/* Caractéristiques */}
       <section className="specs-wrap">
         <h2 className="specs-title">Caractéristiques techniques : {product?.name}</h2>
 
         <div className="specs-layout">
           <nav className="specs-nav">
-            {sections.map((s) => (
+            {Object.keys(ProductSpecs(pid)).map((s) => (
               <a key={s} href={`#${s.replace(/\s+/g, '')}`}>{s}</a>
             ))}
           </nav>
 
           <div className="specs-content">
-            {sections.map((s) => (
-              <section key={s} id={s.replace(/\s+/g, '')} className="specs-section">
-                <h3>{s}</h3>
+            {Object.entries(ProductSpecs(pid)).map(([section, rows]) => (
+              <section key={section} id={section.replace(/\s+/g, '')} className="specs-section">
+                <h3>{section}</h3>
                 <div className="specs-table">
-                  {specs[s].map((row, i) => {
+                  {rows.map((row, i) => {
                     const value = row.value === undefined || row.value === null || row.value === '' ? '—' : row.value;
                     return (
                       <div key={i} className="specs-row">
@@ -290,19 +370,18 @@ export const Product = () => {
         </div>
       </section>
 
-      {/* ===== Modale d'ajout au panier ===== */}
+      {/* Modale ajout panier */}
       <GenericModal
-          open={showAdded}
-          onClose={closeAdded}
-          variant="success"
-          title="Ajouté au panier"
-          message="Cet article a bien été ajouté au panier."
-          actions={[
-            { label: "Fermer", variant: "light", onClick: closeAdded },
-            { label: "Voir mon panier", variant: "primary", onClick: goToCart, autoFocus: true },
-          ]}
-        />
-      
+        open={showAdded}
+        onClose={closeAdded}
+        variant="success"
+        title="Ajouté au panier"
+        message="Cet article a bien été ajouté au panier."
+        actions={[
+          { label: "Fermer", variant: "light", onClick: closeAdded },
+          { label: "Voir mon panier", variant: "primary", onClick: goToCart, autoFocus: true },
+        ]}
+      />
     </div>
   );
 };
