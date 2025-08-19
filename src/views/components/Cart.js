@@ -3,46 +3,83 @@ import { useSelector, useDispatch } from "react-redux";
 import "bootstrap-icons/font/bootstrap-icons.css";
 import "../../App.css";
 import { Link } from "react-router-dom";
-import { updateCartRequest, deleteFromCartRequest, saveCartRequest, getCartRequest } from "../../lib/actions/CartActions";
-
-const PROMOS = {
-  PROMO5: 0.05,
-  PROMO10: 0.1,
-  WELCOME10: 0.1,
-};
+import {
+  updateCartRequest,
+  deleteFromCartRequest,
+  saveCartRequest,
+  getCartRequest
+} from "../../lib/actions/CartActions";
+import { GenericModal } from "../../components";
+import { updatePromotionCodeRequest } from "../../lib/actions/PromotionCodeActions";
 
 const fmt = (n) =>
   new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" })
     .format(Number.isFinite(n) ? n : 0);
 
+const norm = (s) => String(s ?? "").trim().toUpperCase();
+
+// promo active : start <= now <= end(23:59:59)
+const isPromoActive = (p) => {
+  const toDate = (v) => {
+    if (!v) return null;
+    const d = new Date(v);
+    return Number.isNaN(d.getTime()) ? null : d;
+  };
+  const now = new Date();
+  const start = toDate(p?.startDate);
+  const end   = toDate(p?.endDate);
+  const endOfDay = end ? new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59, 999) : null;
+  if (start && start > now) return false;
+  if (endOfDay && endOfDay < now) return false;
+  return true;
+};
+
+const getCategoryIdFromProduct = (p) =>
+  p?.idCategory ?? p?.categoryId ?? p?.idCategorie ?? p?.categorieId ?? p?.category?.id ?? p?.category ?? null;
+
+// MAJ prix d’un item dans le localStorage
+const updateLsPrice = (productId, newPrice) => {
+  let arr = [];
+  try { arr = JSON.parse(localStorage.getItem("items") || "[]"); } catch { arr = []; }
+  const next = (Array.isArray(arr) ? arr : []).map((i) =>
+    String(i.id) === String(productId) || String(i.productId) === String(productId)
+      ? { ...i, price: Number(newPrice) }
+      : i
+  );
+  localStorage.setItem("items", JSON.stringify(next));
+};
+
+// ⚠️ toujours relire le localStorage quand on en a besoin
+const readLsItems = () => {
+  try { return JSON.parse(localStorage.getItem("items") || "[]"); }
+  catch { return []; }
+};
+
 export const Cart = () => {
   const dispatch = useDispatch();
 
-  // Source principale : Redux (persisté en "items")
-  const reduxItems = useSelector((s) => s?.items?.items) || [];
-  const products   = useSelector((s) => s?.products?.products) || [];
-  const images     = useSelector((s) => s?.images?.images) || [];
-  const usingRedux = reduxItems.length > 0;
+  // Store
+  const reduxItems     = useSelector((s) => s?.items?.items) || [];
+  const products       = useSelector((s) => s?.products?.products) || [];
+  const images         = useSelector((s) => s?.images?.images) || [];
+  const promotionCodes = useSelector((s) => s?.promotionCodes?.promotionCodes) || [];
+  const usingRedux     = reduxItems.length > 0;
 
-  // Fallback localStorage uniquement si Redux est vide
-  const lsItems = useMemo(() => {
-    try { return JSON.parse(localStorage.getItem("items") || "[]"); }
-    catch { return []; }
-  }, []);
+  // ===== Code promo =====
+  const [promoInput, setPromoInput] = useState("");
+  const [appliedCode, setAppliedCode] = useState(null);
+  const [promoModal, setPromoModal] = useState({ open: false, message: "", variant: "" });
+  const closePromoModal = () => setPromoModal({ open: false, message: "", variant: "" });
 
-  // Charger le panier au montage (réhydratation Redux depuis LS si besoin)
+  // Charger le panier au montage
+  useEffect(() => { dispatch(getCartRequest()); }, [dispatch]);
+
+  // ✅ Persister Redux → storage à CHAQUE changement (même vide)
   useEffect(() => {
-    dispatch(getCartRequest());
-  }, [dispatch]);
+    dispatch(saveCartRequest(reduxItems));   // garantit l’effacement du LS quand le panier Redux devient vide
+  }, [reduxItems, dispatch]);
 
-  // Sauvegarder dès que Redux change (couvre UPDATE/DELETE/etc.)
-  useEffect(() => {
-    if (usingRedux) {
-      dispatch(saveCartRequest(reduxItems));
-    }
-  }, [usingRedux, reduxItems, dispatch]);
-
-  // Enrichit juste les infos manquantes (nom, image), **ne recalcul PAS le prix**
+  // Enrichit (nom, image)
   const enrich = (arr) =>
     (arr || []).map((it) => {
       const pid  = it.productId ?? it.id;
@@ -53,47 +90,34 @@ export const Cart = () => {
         images.find((im) => String(im.idProduct) === String(pid))?.url ||
         "/Images/placeholder.jpg";
 
-      // >>> prix : on fait confiance au panier (Redux/LS) <<<
       const price =
-        it.price != null
-          ? Number(it.price)
-          : Number(it.priceTtc ?? prod?.priceTtc ?? 0);
+        it.price != null ? Number(it.price)
+        : Number(it.priceTtc ?? prod?.priceTtc ?? 0);
 
-      return {
-        id: pid,
-        name,
-        price,
-        qty: Number(it.qty ?? 1),
-        imageUrl: img,
-      };
+      return { id: pid, name, price, qty: Number(it.qty ?? 1), imageUrl: img };
     });
 
-  // Tick pour rafraîchir l’UI si besoin (ex: tu veux des effets temporels)
+  // tick pour maj auto (si utile)
   const [clock, setClock] = useState(Date.now());
   useEffect(() => {
     const id = setInterval(() => setClock(Date.now()), 60_000);
     return () => clearInterval(id);
   }, []);
 
-  const sourceItems = usingRedux ? reduxItems : lsItems;
-  const [items, setItems] = useState(enrich(sourceItems));
+  // État local des lignes
+  const [items, setItems] = useState(() => enrich(usingRedux ? reduxItems : readLsItems()));
 
-  // Resync UI quand la source (Redux/LS) ou le catalogue change
+  // 🔁 Sync affichage avec la source (Redux ou LS) sans mémoriser un LS obsolète
   useEffect(() => {
-    setItems(enrich(usingRedux ? reduxItems : lsItems));
+    const src = usingRedux ? reduxItems : readLsItems();
+    setItems(enrich(src));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [usingRedux, reduxItems, lsItems, products, images, clock]);
+  }, [usingRedux, reduxItems, products, images, clock]);
 
-  // Gestion locale pour mode "LS only" (quand Redux est vide)
+  // Helpers LS-only
   const persistLsItems = (next) => {
     localStorage.setItem("items", JSON.stringify(
-      next.map(i => ({
-        id: i.id,
-        name: i.name,
-        price: i.price,
-        qty: i.qty,
-        image: i.imageUrl,
-      }))
+      next.map(i => ({ id: i.id, name: i.name, price: i.price, qty: i.qty, image: i.imageUrl }))
     ));
   };
 
@@ -104,39 +128,127 @@ export const Cart = () => {
       return;
     }
     const next = items.map((it) => (it.id === id ? { ...it, qty: q } : it));
-    setItems(next);
-    persistLsItems(next);
+    setItems(next); persistLsItems(next);
   };
 
   const removeItem = (id) => {
     if (usingRedux) {
+      // Redux : on supprime côté store ; l’effet saveCartRequest persistera (même si vide)
       dispatch(deleteFromCartRequest(id));
       return;
     }
+    // LS only
     const next = items.filter((it) => it.id !== id);
     setItems(next);
     persistLsItems(next);
   };
 
-  // Code promo panier (optionnel)
-  const [promoInput, setPromoInput] = useState("");
-  const [appliedCode, setAppliedCode] = useState(null);
-  const discountRate = PROMOS[appliedCode] || 0;
-
-  const applyPromo = () => {
-    const code = (promoInput || "").trim().toUpperCase();
-    if (PROMOS[code]) setAppliedCode(code);
-    else { setAppliedCode(null); alert("Code promo invalide."); }
+  // Statut de stock (comme Home)
+  const getStockUi = (productId) => {
+    const prod  = products.find((p) => String(p.id) === String(productId));
+    const raw   = (prod?.stockStatus ?? "").trim();
+    const lower = raw.toLowerCase();
+    const isIn  = lower === "en stock";
+    const isOut = lower === "en rupture";
+    const cls   = isIn ? "in" : isOut ? "out" : "warn";
+    const label = lower.includes("plus que") ? "Bientôt en rupture" : raw || "Disponibilité limitée";
+    return { cls, label };
   };
 
-  // Totaux
-  const subTotal   = items.reduce((s, it) => s + it.price * it.qty, 0);
-  const discount   = subTotal * discountRate;
-  const grandTotal = Math.max(0, subTotal - discount);
+  const applyPromo = () => {
+    const code = norm(promoInput);
+    if (!code) return;
 
-  useEffect(() => {
-    window.scrollTo({ top: 0, behavior: "instant" });
-  }, []);
+    const promo = promotionCodes.find(p => norm(p?.name) === code) || null;
+    if (!promo || !isPromoActive(promo)) {
+      setAppliedCode(null);
+      setPromoModal({ open:true, message: "Code promo invalide ou expiré.", variant: "warning" });
+      return;
+    }
+
+    if (promo.isUsed) {
+      setAppliedCode(null);
+      setPromoModal({ open:true, message: "Ce code promo a déjà été utilisé.", variant: "danger" });
+      return;
+    }
+
+    const pct = Number(promo.purcentage) || 0;
+    if (pct <= 0) {
+      setAppliedCode(null);
+      setPromoModal({ open:true, message: "Ce code n'a pas de pourcentage valide.", variant: "warning" });
+      return;
+    }
+
+    const promoId = promo.id ?? promo.idPromotionCode ?? promo.promoId;
+    const byCode = products
+      .filter(p => String(p?.idPromotionCode) === String(promoId))
+      .map(p => p.id);
+
+    const byCategory = promo?.idCategory != null
+      ? products
+          .filter(p => String(getCategoryIdFromProduct(p)) === String(promo.idCategory))
+          .map(p => p.id)
+      : [];
+
+    const affectedProductIds = Array.from(new Set([...byCode, ...byCategory]));
+
+    if (affectedProductIds.length === 0) {
+      setAppliedCode(null);
+      setPromoModal({ open:true, message: "Code valide, mais aucun article correspondant dans votre panier.", variant: "warning" });
+      return;
+    }
+
+    const updatedItems = [...items];
+    const changedNames = [];
+
+    for (const it of items) {
+      if (!affectedProductIds.includes(it.id)) continue;
+
+      const base = Number(it.price) || 0;                 // empile les remises
+      const newPrice = +(base * (1 - pct/100)).toFixed(2);
+
+      if (Math.abs((Number(it.price) || 0) - newPrice) < 0.001) continue;
+
+      const idx = updatedItems.findIndex(u => u.id === it.id);
+      if (idx >= 0) updatedItems[idx] = { ...updatedItems[idx], price: newPrice };
+
+      if (usingRedux) {
+        const orig = reduxItems.find(i => String(i.id) === String(it.id)) || { id: it.id, qty: it.qty };
+        const updated = { ...orig, price: newPrice };
+        dispatch(updateCartRequest(updated, it.qty));
+        updateLsPrice(it.id, newPrice);                   // patch immédiat LS
+      } else {
+        const next = items.map(i => i.id === it.id ? { ...i, price: newPrice } : i);
+        setItems(next);
+        persistLsItems(next);
+      }
+
+      changedNames.push(it.name);
+    }
+
+    setItems(updatedItems);
+
+    if (changedNames.length > 0) {
+      setAppliedCode(code);
+      setPromoModal({
+        open:true,
+        message: changedNames.length === 1
+          ? `Code promo appliqué sur le produit « ${changedNames[0]} ».`
+          : `Code promo appliqué sur ${changedNames.length} produits : ${changedNames.join(", ")}.`,
+        variant: "success"
+      });
+
+      dispatch(updatePromotionCodeRequest({ Id: promo.id, IsUsed: true }));
+    } else {
+      setAppliedCode(null);
+      setPromoModal({ open:true, message: "Code valide, mais aucun article correspondant dans votre panier." });
+    }
+  };
+
+  const subTotal   = items.reduce((s, it) => s + it.price * it.qty, 0);
+  const grandTotal = Math.max(0, subTotal);
+
+  useEffect(() => { window.scrollTo({ top: 0, behavior: "instant" }); }, []);
 
   return (
     <div className="cart-page">
@@ -157,48 +269,48 @@ export const Cart = () => {
             <div className="cart-empty">Votre panier est vide.</div>
           )}
 
-          {items.map((it) => (
-            <div key={it.id} className="cart-line">
-              <div className="line-left">
-                <Link to={`/product/${it.id}`}>
-                <img className="cart-thumb" src={it.imageUrl} alt={it.name} />
-                </Link>
-                <div className="line-info">
-                  <a className="line-name" href={`/product/${it.id}`}>
-                    {it.name}
-                  </a>
-                  <div className="line-stock">
-                    <span className="stock-dot in" /> En stock
+          {items.map((it) => {
+            const { cls, label } = getStockUi(it.id);
+            return (
+              <div key={it.id} className="cart-line">
+                <div className="line-left">
+                  <Link to={`/product/${it.id}`}>
+                    <img className="cart-thumb" src={it.imageUrl} alt={it.name} />
+                  </Link>
+                  <div className="line-info">
+                    <Link className="line-name" to={`/product/${it.id}`}>{it.name}</Link>
+                    <span className={`card-stock ${cls}`}>
+                      <span className={`card-stock-dot ${cls}`} />
+                      {label}
+                    </span>
                   </div>
                 </div>
-              </div>
 
-              <div className="line-qty">
-                <select
-                  value={it.qty}
-                  onChange={(e) => handleQty(it.id, Number(e.target.value))}
-                  className="qty-select"
+                <div className="line-qty">
+                  <select
+                    value={it.qty}
+                    onChange={(e) => handleQty(it.id, Number(e.target.value))}
+                    className="qty-select"
+                  >
+                    {[...Array(10)].map((_, i) => (
+                      <option key={i + 1} value={i + 1}>{i + 1}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="line-sub">{fmt(it.price * it.qty)}</div>
+
+                <button
+                  className="line-remove"
+                  onClick={() => removeItem(it.id)}
+                  title="Supprimer"
+                  aria-label="Supprimer"
                 >
-                  {[...Array(10)].map((_, i) => (
-                    <option key={i + 1} value={i + 1}>
-                      {i + 1}
-                    </option>
-                  ))}
-                </select>
+                  <i className="bi bi-x-lg" />
+                </button>
               </div>
-
-              <div className="line-sub">{fmt(it.price * it.qty)}</div>
-
-              <button
-                className="line-remove"
-                onClick={() => removeItem(it.id)}
-                title="Supprimer"
-                aria-label="Supprimer"
-              >
-                <i className="bi bi-x-lg" />
-              </button>
-            </div>
-          ))}
+            );
+          })}
 
           {/* Code promo panier */}
           <div className="cart-promo">
@@ -209,13 +321,14 @@ export const Cart = () => {
                 placeholder="Renseignez votre code ici"
                 value={promoInput}
                 onChange={(e) => setPromoInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") applyPromo(); }}
               />
               <button className="promo-btn" onClick={applyPromo}>OK</button>
             </div>
+
             {appliedCode && (
               <div className="promo-applied">
-                Code <strong>{appliedCode}</strong> appliqué (-
-                {Math.round(discountRate * 100)}%)
+                Code <strong>{appliedCode}</strong> appliqué.
               </div>
             )}
           </div>
@@ -224,14 +337,7 @@ export const Cart = () => {
         {/* Colonne droite: récap */}
         <aside className="cart-summary">
           <h3 className="sum-title">Montant total de vos produits</h3>
-
           <div className="sum-amount">{fmt(grandTotal)}</div>
-
-          {discountRate > 0 && (
-            <div className="sum-discount">
-              Remise {Math.round(discountRate * 100)}% : −{fmt(discount)}
-            </div>
-          )}
 
           <button className="checkout-btn">Passer commande</button>
 
@@ -240,6 +346,18 @@ export const Cart = () => {
           </p>
         </aside>
       </div>
+
+      {/* Modal code promo */}
+      <GenericModal
+        open={promoModal.open}
+        onClose={closePromoModal}
+        variant={promoModal.variant}
+        title="Code promo"
+        message={promoModal.message}
+        actions={[
+          { label: "OK", variant: "primary", onClick: closePromoModal, autoFocus: true },
+        ]}
+      />
     </div>
   );
 };

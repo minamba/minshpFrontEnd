@@ -13,6 +13,7 @@ import { getFeaturesCategoryByProductRequest } from '../lib/actions/FeatureCateg
 import { useDispatch } from 'react-redux'; 
 import { useMemo } from "react";
 import { Badge } from 'react-bootstrap';
+import { getPromotionCodesRequest } from '../lib/actions/PromotionCodeActions';
 
 // ... ton code existant ...
 
@@ -120,7 +121,7 @@ export const Navbar = () => {
             )}
           </div>
 
-          <a href="#sales">Soldes & promos</a>
+          <Link to="/promotion" onClick={() => setIsOpen(false)} href="#soldes">Soldes & promos</Link>
 
           {/* Compte */}
           <Link to="/account" onClick={() => setIsOpen(false)}>
@@ -162,6 +163,7 @@ export const Navbar = () => {
                 <Link to="/admin/images" onClick={() => setIsOpen(false)}>Images</Link>
                 <Link to="/admin/videos" onClick={() => setIsOpen(false)}>Vidéos</Link>
                 <Link to="/admin/taxes" onClick={() => setIsOpen(false)}>Taxes</Link>
+                <Link to="/admin/promotionCodes" onClick={() => setIsOpen(false)}>Codes promotionnels</Link>
               </div>
             )}
           </div>
@@ -481,7 +483,7 @@ export const ProductTable = () => {
               </div>
               <div className="mb-3">
                 <label>Modèle</label>
-                <input type="text" name="model" className="form-control" value={formData.model} onChange={handleInputChange} required />
+                <input type="text" name="model" className="form-control" value={formData.model} onChange={handleInputChange} />
               </div>
               <div className="mb-3">
                 <label>Description</label>
@@ -724,7 +726,7 @@ export const Footer = () => {
           </div>
   
           <div className="footer-copy">
-            &copy; {year} MinShp. Tous droits réservés.
+            &copy; {year} Min's. Tous droits réservés.
           </div>
         </div>
       </footer>

@@ -124,6 +124,7 @@ export const Home = () => {
                   src={getCategoryImage(cat.id)}
                   alt={`Catégorie ${cat.name}`}
                   className="category-image"
+                  onClick={() => navigate(`/category/${cat.id}`)}
                 />
               </article>
             ))}
@@ -144,16 +145,16 @@ export const Home = () => {
         <div className="new-grid">
           {newestEightProducts.map((product, index) => {
             const img = getProductImage(product.id);
-            const name = product.name || product.title || `Produit ${index + 1}`;
+            const name = product.brand + " " + product.model || product.title || `Produit ${index + 1}`;
 
             // Prix de référence
             const priceRef = Number(
               typeof product.priceTtc === 'number' ? product.priceTtc : parseFloat(product.priceTtc)
             ) || 0;
 
-            // Promo active ? (prend la 1ère)
+            // Promo PRODUIT (prend la 1ère et vérifie dates)
             const p0 = product?.promotions?.[0];
-            const hasPromo = (() => {
+            const hasProductPromo = (() => {
               if (!p0) return false;
               const pct = Number(p0.purcentage) || 0;
               if (pct <= 0) return false;
@@ -166,16 +167,30 @@ export const Home = () => {
               return true;
             })();
 
-            const discountPct = hasPromo ? Number(p0.purcentage) : 0;
+            const discountPct   = hasProductPromo ? Number(p0.purcentage) : 0;
             const computedPromo = +(priceRef * (1 - discountPct / 100)).toFixed(2);
-            const promoted = Number(
+            const promoted      = Number(
               typeof product.priceTtcPromoted === 'number'
                 ? product.priceTtcPromoted
                 : parseFloat(product.priceTtcPromoted)
             );
-            const displayPrice = hasPromo
-              ? (Number.isFinite(promoted) ? promoted : computedPromo)
-              : priceRef;
+
+            // 👉 Promo par CODE CATEGORIE : si définie, on l’utilise comme prix promo
+            const priceCat = (() => {
+              const v = typeof product.priceTtcCategoryCodePromoted === 'number'
+                ? product.priceTtcCategoryCodePromoted
+                : parseFloat(product.priceTtcCategoryCodePromoted);
+              return Number.isFinite(v) ? v : null;
+            })();
+            const hasCategoryPromo = priceCat !== null;
+
+            // Prix affiché
+            const displayPrice = hasCategoryPromo
+              ? priceCat
+              : (hasProductPromo ? (Number.isFinite(promoted) ? promoted : computedPromo) : priceRef);
+
+            // Pour l’UI (pastille + ancien prix en barré)
+            const hasAnyPromo = hasCategoryPromo || hasProductPromo;
 
             const [euros, cents] = displayPrice.toFixed(2).split('.');
 
@@ -196,7 +211,7 @@ export const Home = () => {
                     <img src={img} alt={name} />
                   </Link>
 
-                  {hasPromo && <span className="promo-pill">Promotion</span>}
+                  {hasAnyPromo && <span className="promo-pill">Promotion</span>}
 
                   <div className="thumb-overlay" aria-hidden="true" />
                   <button
@@ -219,7 +234,7 @@ export const Home = () => {
 
                 <h3 className="product-name">{name}</h3>
 
-                {/* Statut + prix (pile à droite comme sur la capture) */}
+                {/* Statut + prix (pile à droite) */}
                 <div className="new-price-row">
                   <span className={`card-stock ${stockCls}`}>
                     <span className={`card-stock-dot ${stockCls}`} />
@@ -227,12 +242,12 @@ export const Home = () => {
                   </span>
 
                   <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', lineHeight:1.1 }}>
-                    {hasPromo && (
+                    {hasAnyPromo && (
                       <span className="price-old">
                         {priceRef.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
                       </span>
                     )}
-                    <div className={`product-price ${hasPromo ? 'product-price--promo' : ''}`}>
+                    <div className={`product-price ${hasAnyPromo ? 'product-price--promo' : ''}`}>
                       <span className="euros">{euros}€</span>
                       <sup className="cents">{cents}</sup>
                     </div>

@@ -16,6 +16,8 @@ import {OrderAdmin} from './OrderAdmin';
 import {ImageAdmin} from './ImageAdmin';
 import {VideoAdmin} from './VideoAdmin';
 import {TaxesAdmin} from './TaxesAdmin';
+import {Promotion} from './Promotion';
+import {Category} from './Category';
 import {Cart} from './Cart';
 import {FeatureCategoryAdmin} from './FeatureCategoryAdmin';
 import { useDispatch } from "react-redux";
@@ -28,6 +30,8 @@ import { getVideoRequest } from "../../lib/actions/VideoActions";
 import { getFeatureCategoryRequest } from "../../lib/actions/FeatureCategoryActions";
 import {Product} from './Product';
 import { getFeaturesCategoryByProductRequest } from "../../lib/actions/FeatureCategoryActions";
+import {PromotionCodeAdmin} from './PromotionCodeAdmin';
+import { getPromotionCodesRequest } from "../../lib/actions/PromotionCodeActions";
 
 export const BaseApp = () => {
 
@@ -40,6 +44,7 @@ export const BaseApp = () => {
         dispatch(getImageRequest());
         dispatch(getVideoRequest());
         dispatch(getFeatureCategoryRequest());
+        dispatch(getPromotionCodesRequest());
     }, []);
 
     useEffect(() => {
@@ -68,6 +73,10 @@ export const BaseApp = () => {
                         <Route path="/admin/featureCategories" element={<FeatureCategoryAdmin/>} />
                         <Route path="/cart" element={<Cart/>}/>
                         <Route path="/admin/taxes" element={<TaxesAdmin/>}/>
+                        <Route path="/admin/promotionCodes" element={<PromotionCodeAdmin/>}/>
+                        <Route path="/category/:id" element={<Category/>}/>
+                        <Route path="/promotion" element={<Promotion/>}/>
+
                     </Routes>
                 </main>
                 <Footer/>

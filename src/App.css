@@ -274,8 +274,8 @@ h1 { text-align: center; }
 /* Badge superposé dans le coin haut-gauche de l’icône */
 .nav-badge {
   position: absolute;          
-  top: -11px;                   /* ajuste le placement */
-  left: -11px;
+  top: -17px;                   /* ajuste le placement */
+  left: 15px;
   z-index: 2;
   min-width: 25px;
   height: 25px;
@@ -326,6 +326,116 @@ h1 { text-align: center; }
 .card-stock-dot.in   { background:#22c55e; }
 .card-stock-dot.out  { background:#ef4444; }
 .card-stock-dot.warn { background:#f59e0b; }
+
+
+/* ===== CATEGORY PAGE (ajouts) ===== */
+.category-page { /* conteneur racine si besoin d'accroches spécifiques */ }
+
+/* Bannière catégorie */
+.category-hero {
+  position: relative;
+  min-height: 280px;
+  display: grid;
+  place-items: center;
+  background-size: cover;
+  background-position: center;
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 1.5rem;
+}
+
+/* ---- Category hero : image N&B en calque ---- */
+.category-hero::before{
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: var(--hero-url);     /* <- vient du style inline dans le composant */
+  background-size: cover;
+  background-position: center;
+  filter: grayscale(100%);               /* N&B */
+  transform: scale(1.02);                /* petit zoom optionnel */
+  z-index: 0;
+}
+
+/* Calque de gradient au-dessus de l'image (fonce la bannière) */
+.category-hero::after{
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(rgba(0,0,0,.45), rgba(0,0,0,.45));
+  z-index: 1;
+}
+
+/* Le texte reste net au-dessus des calques */
+.category-hero__title,
+.category-hero__count{
+  position: relative;
+  z-index: 2;
+}
+
+
+.category-hero__title{
+  /* police moderne + fallbacks */
+  font-family: 'Inter', 'Montserrat', 'Rajdhani', 'Orbitron', system-ui, -apple-system,
+               "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  font-weight: 900;
+  /* très grand mais responsive */
+  font-size: clamp(2.8rem, 6vw, 4.75rem);
+  line-height: 1.05;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+
+  /* effet “tech” : dégradé + léger glow */
+  background: linear-gradient(90deg, #9ae6ff, #60a5fa 35%, #1569e6 75%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+
+  text-shadow:
+    0 6px 22px rgba(96,165,250,.35),
+    0 2px  8px rgba(167,139,250,.25);
+}
+
+/* compteur sous le titre : un peu plus marqué */
+.category-hero__count{
+  font-weight: 700;
+  letter-spacing: .01em;
+  text-shadow: 0 2px 10px rgba(0,0,0,.35);
+}
+
+/* Barre d’outils : recherche + tri (centrés) */
+.category-toolbar {
+  display: flex;
+  justify-content: center;  /* centré */
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+/* Champ de recherche plus étroit */
+.category-search {
+  width: min(320px, 90%);
+  max-width: 320px;
+}
+
+/* Select de tri + placeholder grisé quand valeur = "" */
+.category-sort { width: 220px; }
+.category-sort.is-placeholder { color: #6c757d; } /* gris bootstrap-like */
+
+/* Pile de prix à droite (réutilisable) */
+.price-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.1;
+}
+.price-stack.has-promo .price-old {
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
 
 
 /* ===================== FOOTER ===================== */

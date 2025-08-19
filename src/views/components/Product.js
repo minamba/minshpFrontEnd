@@ -17,10 +17,11 @@ export const Product = () => {
   }, [id]);
 
   // Store
-  const products = useSelector((s) => s.products.products) || [];
-  const images   = useSelector((s) => s.images.images) || [];
-  const videos   = useSelector((s) => s.videos?.videos) || [];
-  const items    = useSelector((s) => s.items.items) || [];
+  const products        = useSelector((s) => s.products.products) || [];
+  const images          = useSelector((s) => s.images.images) || [];
+  const videos          = useSelector((s) => s.videos?.videos) || [];
+  const items           = useSelector((s) => s.items.items) || [];
+  const promotionCodes  = useSelector((s) => s.promotionCodes.promotionCodes) || [];
 
   // Save cart
   useEffect(() => {
@@ -31,6 +32,12 @@ export const Product = () => {
   const product = useMemo(
     () => products.find((p) => String(p.id) === String(id)) || products[0],
     [products, id]
+  );
+
+  // (optionnel) promo liée à la catégorie si tu en as besoin ailleurs
+  const promotion = useMemo(
+    () => promotionCodes.find((p) => String(p.id) === String(product?.idPromotionCode)) || null,
+    [promotionCodes, product]
   );
 
   // Images
@@ -81,11 +88,13 @@ export const Product = () => {
     return () => window.removeEventListener('keydown', onKey);
   }, [isLightboxOpen]);
 
-  // ===== PROMO =====
-  const priceRef = useMemo(() => {
-    const n = typeof product?.priceTtc === 'number' ? product.priceTtc : parseFloat(product?.priceTtc);
-    return Number.isFinite(n) ? n : 0;
-  }, [product]);
+  // ===== PROMO / PRIX =====
+  const toNum = (x) => {
+    const n = typeof x === 'number' ? x : parseFloat(x);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const priceRef = useMemo(() => toNum(product?.priceTtc) ?? 0, [product]);
 
   const parseDate = (val) => {
     if (!val) return null;
@@ -100,8 +109,8 @@ export const Product = () => {
     return `${dd}/${mm}`;
   };
 
+  // Promo PRODUIT (première active)
   const rawFirstPromo = product?.promotions?.[0] ?? null;
-
   const activePromo = useMemo(() => {
     if (!rawFirstPromo) return null;
     const now = new Date();
@@ -109,27 +118,44 @@ export const Product = () => {
     const start = parseDate(rawFirstPromo.startDate);
     const end   = parseDate(rawFirstPromo.endDate);
     const pct   = Number(rawFirstPromo.purcentage) || 0;
-
     if (pct <= 0) return null;
     if (start && start.getTime() > now.getTime()) return null;
     if (end && end.getTime() < startOfToday.getTime()) return null;
     return rawFirstPromo;
   }, [rawFirstPromo]);
 
-  const hasPromo    = !!activePromo;
-  const discountPct = hasPromo ? Number(activePromo.purcentage) : 0;
-  const promoUntil  = hasPromo && activePromo.endDate ? formatEndShort(activePromo.endDate) : null;
+  const promoUntil = activePromo?.endDate ? formatEndShort(activePromo.endDate) : null;
 
-  const discountedPrice = useMemo(() => {
-    if (!hasPromo) return priceRef;
-    const p = typeof product?.priceTtcPromoted === 'number'
-      ? product.priceTtcPromoted
-      : parseFloat(product?.priceTtcPromoted);
-    if (Number.isFinite(p)) return p;
-    return +(priceRef * (1 - discountPct / 100)).toFixed(2);
-  }, [hasPromo, product, priceRef, discountPct]);
+  // ---- RÈGLE DEMANDÉE ----
+  // 1) Si priceTtcCategoryCodePromoted est défini => on l’affiche
+  const priceFromCategoryCode = toNum(product?.priceTtcCategoryCodePromoted);
 
-  const displayPrice = discountedPrice;
+  // 2) Si purcentageCodePromoted est défini => le badge affiche ce pourcentage
+  const pctFromCategoryCode = product?.purcentageCodePromoted != null && product.purcentageCodePromoted !== ''
+    ? Number(product.purcentageCodePromoted)
+    : null;
+
+  // Fallbacks
+  const productPromoPct = activePromo ? Number(activePromo.purcentage) || 0 : 0;
+
+  // Prix si promo produit uniquement
+  const discountedPriceProduct = useMemo(() => {
+    if (!activePromo) return priceRef;
+    const p = toNum(product?.priceTtcPromoted);
+    if (p != null) return p;
+    return +(priceRef * (1 - productPromoPct / 100)).toFixed(2);
+  }, [activePromo, product, priceRef, productPromoPct]);
+
+  // Prix affiché (priorité au prix de code catégorie s’il existe)
+  const displayPrice = useMemo(() => {
+    if (priceFromCategoryCode != null) return priceFromCategoryCode;
+    return discountedPriceProduct;
+  }, [priceFromCategoryCode, discountedPriceProduct]);
+
+  // Pourcentage affiché sur le badge (priorité au % de code catégorie s’il existe)
+  const badgePct = pctFromCategoryCode ?? productPromoPct;
+  const showBadge = Number.isFinite(badgePct) && badgePct > 0;
+
   const hasPrice = Number.isFinite(displayPrice);
   const [eurosStr, centsStr] = hasPrice ? displayPrice.toFixed(2).split('.') : ['0', '00'];
   const euros = eurosStr;
@@ -184,10 +210,7 @@ export const Product = () => {
   const handleContextMenu = (e) => e.preventDefault();
 
   return (
-    <div
-      className="product-page"
-      onContextMenu={handleContextMenu}
-    >
+    <div className="product-page" onContextMenu={handleContextMenu}>
       {/* Zone haute: galerie + infos achat */}
       <div className="product-main">
         {/* Vignettes */}
@@ -227,33 +250,32 @@ export const Product = () => {
           <div className="details-stack">
             {hasPrice && (
               <>
-                {/* Prix de référence + badge promo */}
-                {hasPromo && (
+                {/* Prix de référence + badge : on affiche le badge si un pourcentage est disponible */}
+                {showBadge && (
                   <div className="refprice-wrap">
                     <div className="refprice-label">Prix de référence</div>
                     <div className="refprice-row">
                       <span className="refprice-old">
                         {priceRef.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
                       </span>
-                      <span className="refprice-badge">-{discountPct}%</span>
+                      <span className="refprice-badge">-{badgePct}%</span>
                     </div>
                   </div>
                 )}
 
-                {/* Prix affiché */}
+                {/* Prix affiché (priorité prix de code catégorie si présent) */}
                 <div className="product-price">
                   <span className="euros">{euros}€</span>
                   <sup className="cents">{cents}</sup>
                 </div>
 
-                {/* Jusqu’au … inclus */}
-                {hasPromo && promoUntil && (
+                {/* Jusqu’au … inclus : on garde l’info uniquement pour la promo produit */}
+                {activePromo && promoUntil && (
                   <div className="promo-until">
                     Jusqu'au {promoUntil} inclus
                   </div>
                 )}
 
-                {/* Ligne “dont …” */}
                 <p className="price-lead">
                   <em>{product?.taxWithoutTvaAmount}</em>
                 </p>
