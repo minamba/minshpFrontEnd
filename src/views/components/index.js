@@ -17,8 +17,12 @@ import {ImageAdmin} from './ImageAdmin';
 import {VideoAdmin} from './VideoAdmin';
 import {TaxesAdmin} from './TaxesAdmin';
 import {Promotion} from './Promotion';
+import {Account} from './Account/Account';
 import {Category} from './Category';
+import {ApplicationAdmin} from './ApplicationAdmin';
+import {DeliveryPayment} from './DeliveryPayment';
 import {Cart} from './Cart';
+import {News} from './News';
 import {FeatureCategoryAdmin} from './FeatureCategoryAdmin';
 import { useDispatch } from "react-redux";
 import { getProductUserRequest } from "../../lib/actions/ProductActions";
@@ -32,6 +36,11 @@ import {Product} from './Product';
 import { getFeaturesCategoryByProductRequest } from "../../lib/actions/FeatureCategoryActions";
 import {PromotionCodeAdmin} from './PromotionCodeAdmin';
 import { getPromotionCodesRequest } from "../../lib/actions/PromotionCodeActions";
+import { getApplicationRequest } from "../../lib/actions/ApplicationActions";
+import LoginPage from './Authentication/LoginPage';
+import RequireAuth from './Authentication/RequireAuth'; 
+import {UserInformation} from './Account/UserInformation';  
+import {Address} from './Account/Address';
 
 export const BaseApp = () => {
 
@@ -45,6 +54,8 @@ export const BaseApp = () => {
         dispatch(getVideoRequest());
         dispatch(getFeatureCategoryRequest());
         dispatch(getPromotionCodesRequest());
+        dispatch(getApplicationRequest());
+        dispatch(getApplicationRequest());
     }, []);
 
     useEffect(() => {
@@ -76,7 +87,15 @@ export const BaseApp = () => {
                         <Route path="/admin/promotionCodes" element={<PromotionCodeAdmin/>}/>
                         <Route path="/category/:id" element={<Category/>}/>
                         <Route path="/promotion" element={<Promotion/>}/>
+                        <Route path="/news" element={<News/>}/>
+                        <Route path="/admin/application" element={<ApplicationAdmin/>}/>
+                        <Route path="/login" element={<LoginPage/>}/>
+                        <Route path="/account" element={<RequireAuth><Account/></RequireAuth>}/>
+                        <Route path="/deliveryPayment" element={<RequireAuth><DeliveryPayment/></RequireAuth>}/>
+                        <Route path="/userInformation" element={<RequireAuth><UserInformation/></RequireAuth>}/>
+                        <Route path="/address" element={<RequireAuth><Address/></RequireAuth>}/>
 
+                        
                     </Routes>
                 </main>
                 <Footer/>

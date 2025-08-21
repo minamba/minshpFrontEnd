@@ -19,6 +19,8 @@ export const Home = () => {
 
   useEffect(() => { dispatch(saveCartRequest(items)); }, [items, dispatch]);
 
+  const NEW_MAX = 4; // ← Limite d’affichage des nouveautés
+
   const mainProduct = products.find((p) => p.main === true);
   const galleryProducts = products.filter((p) => p.id !== mainProduct?.id);
 
@@ -48,10 +50,11 @@ export const Home = () => {
     return Number.isNaN(d.getTime()) ? null : d;
   };
 
-  const newestEightProducts = useMemo(() => {
+  // → max 4 produits
+  const newestProducts = useMemo(() => {
     return [...galleryProducts]
       .sort((a, b) => new Date(b.creationDate) - new Date(a.creationDate))
-      .slice(0, 8);
+      .slice(0, NEW_MAX);
   }, [galleryProducts]);
 
   const closeAdded = () => setShowAdded(false);
@@ -137,13 +140,19 @@ export const Home = () => {
         <div className="new-header">
           <h2 className="new-title">Nouveautés</h2>
           <div className="new-actions">
-            <button type="button" className="icon-btn" aria-label="Précédent">‹</button>
-            <button type="button" className="icon-btn" aria-label="Voir plus">+</button>
+            <button
+              type="button"
+              className="icon-btn bg-primary text-white fw-bold"
+              aria-label="Voir plus"
+              onClick={() => navigate('/news')}
+            >
+              +
+            </button>
           </div>
         </div>
 
         <div className="new-grid">
-          {newestEightProducts.map((product, index) => {
+          {newestProducts.map((product, index) => {
             const img = getProductImage(product.id);
             const name = product.brand + " " + product.model || product.title || `Produit ${index + 1}`;
 
@@ -175,7 +184,7 @@ export const Home = () => {
                 : parseFloat(product.priceTtcPromoted)
             );
 
-            // 👉 Promo par CODE CATEGORIE : si définie, on l’utilise comme prix promo
+            // Promo par CODE CATEGORIE : si définie, on l’utilise comme prix promo
             const priceCat = (() => {
               const v = typeof product.priceTtcCategoryCodePromoted === 'number'
                 ? product.priceTtcCategoryCodePromoted

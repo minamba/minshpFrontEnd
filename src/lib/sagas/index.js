@@ -11,6 +11,8 @@ import featureCategoriesSaga from "./featureCategories";
 import cartSaga from "./carts";
 import taxesSaga from "./taxes";
 import promotionCodesSaga from "./promotionCodes";
+import applicationSaga from "./application";
+import loginSaga from "./login";
 import { all } from "redux-saga/effects";
 
 
@@ -28,6 +30,8 @@ export default function* rootSaga() {
         featureCategoriesSaga(),
         cartSaga(),
         taxesSaga(),
-        promotionCodesSaga()
+        promotionCodesSaga(),
+        applicationSaga(),
+        loginSaga()
     ]);
 }

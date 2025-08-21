@@ -244,7 +244,7 @@ export const Product = () => {
           <p className="product-brand">{product?.brand || ''}</p>
 
           <h1 className="product-title product-title--center">
-            {product?.name || product?.title || 'Produit'}
+            {product?.brand + ' ' + product?.model || product?.title || 'Produit'}
           </h1>
 
           <div className="details-stack">

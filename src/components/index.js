@@ -14,28 +14,35 @@ import { useDispatch } from 'react-redux';
 import { useMemo } from "react";
 import { Badge } from 'react-bootstrap';
 import { getPromotionCodesRequest } from '../lib/actions/PromotionCodeActions';
+import { useNavigate } from 'react-router-dom';
+import { logout } from '../lib/actions/LoginActions';
 
 // ... ton code existant ...
 
+
 export const Navbar = () => {
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+
   const [isOpen, setIsOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
   const [productsOpen, setProductsOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
 
   // Catégories
   const categories = useSelector((s) => s.categories?.categories) || [];
 
-  // 🛒 LIRE LE PANIER DEPUIS REDUX
-  // Vu ton combineReducers, le reducer "cart" est sous la clé "items"
-  const cartItems = useSelector((s) => s.items?.items) || [];
+  // Auth
+  const isAuth = useSelector((s) => s.login?.isAuth) || false; // adapte "s.login" si ta clé de reducer diffère
 
-  // Total d'articles = somme des quantités
+  // Panier
+  const cartItems = useSelector((s) => s.items?.items) || [];
   const cartCount = cartItems.reduce(
     (acc, it) => acc + Number(it.qty ?? it.quantity ?? 1),
     0
   );
 
-  // petite anim quand la valeur change
+  // petite anim badge
   const [bump, setBump] = useState(false);
   useEffect(() => {
     if (cartCount <= 0) return;
@@ -44,19 +51,23 @@ export const Navbar = () => {
     return () => clearTimeout(t);
   }, [cartCount]);
 
+  const closeAllDropdowns = () => {
+    setAdminOpen(false);
+    setProductsOpen(false);
+    setAccountOpen(false);
+  };
+
   const toggleMenu = () => {
     const next = !isOpen;
     setIsOpen(next);
-    if (!next) {
-      setAdminOpen(false);
-      setProductsOpen(false);
-    }
+    if (!next) closeAllDropdowns();
   };
 
   const toggleAdmin = () => {
     if (window.innerWidth <= 900) {
       setAdminOpen((v) => !v);
       setProductsOpen(false);
+      setAccountOpen(false);
     }
   };
 
@@ -64,14 +75,20 @@ export const Navbar = () => {
     if (window.innerWidth <= 900) {
       setProductsOpen((v) => !v);
       setAdminOpen(false);
+      setAccountOpen(false);
+    }
+  };
+
+  const toggleAccount = () => {
+    if (window.innerWidth <= 900) {
+      setAccountOpen((v) => !v);
+      setAdminOpen(false);
+      setProductsOpen(false);
     }
   };
 
   useEffect(() => {
-    const handleResize = () => {
-      setAdminOpen(false);
-      setProductsOpen(false);
-    };
+    const handleResize = () => closeAllDropdowns();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
@@ -81,9 +98,9 @@ export const Navbar = () => {
       <div className="navbar-content">
         {/* Logo */}
         <div className="navbar-logo">
-          <a href="/">
+          <Link to="/" onClick={() => setIsOpen(false)}>
             <img className="logo-img" src="../images/logo_16.png" alt="Logo" />
-          </a>
+          </Link>
         </div>
 
         {/* Liens */}
@@ -121,19 +138,69 @@ export const Navbar = () => {
             )}
           </div>
 
-          <Link to="/promotion" onClick={() => setIsOpen(false)} href="#soldes">Soldes & promos</Link>
+          <Link to="/news" onClick={() => setIsOpen(false)}>Nouveautés</Link>
+          <Link to="/promotion" onClick={() => setIsOpen(false)}>Soldes & promos</Link>
 
-          {/* Compte */}
-          <Link to="/account" onClick={() => setIsOpen(false)}>
-            <i className="bi bi-person-fill nav-icon nav-icon--blue" aria-hidden="true" />
-            <span>Compte</span>
-          </Link>
+          {/* Compte (menu dynamique) */}
+          <div
+            className="navbar-dropdown"
+            onMouseEnter={() => window.innerWidth > 900 && setAccountOpen(true)}
+            onMouseLeave={() => window.innerWidth > 900 && setAccountOpen(false)}
+          >
+            <button className="navbar-dropdown-toggle" onClick={toggleAccount}>
+              <i className="bi bi-person-fill nav-icon nav-icon--blue" aria-hidden="true" />
+              <span>Compte</span>
+              <span className={`arrow ${accountOpen ? "up" : "down"}`}>▾</span>
+            </button>
+
+            {accountOpen && (
+              <div className="navbar-dropdown-menu">
+                {!isAuth ? (
+                  <Link
+                    to="/login"
+                    onClick={() => {
+                      setIsOpen(false);
+                      setAccountOpen(false);
+                    }}
+                  >
+                    <i className="bi bi-box-arrow-in-right" style={{ marginRight: 6 }} />
+                    Se connecter
+                  </Link>
+                ) : (
+                  <>
+                    <Link
+                      to="/account"
+                      onClick={() => {
+                        setIsOpen(false);
+                        setAccountOpen(false);
+                      }}
+                    >
+                      <i className="bi bi-person-circle" style={{ marginRight: 6 }} />
+                      Mon compte
+                    </Link>
+
+                    <button
+                      className="logout-btn"
+                      onClick={() => {
+                        dispatch(logout());
+                        setIsOpen(false);
+                        setAccountOpen(false);
+                        navigate("/login");
+                      }}
+                    >
+                      <i className="bi bi-power" style={{ marginRight: 6 }} />
+                      Déconnexion
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Panier + badge */}
           <Link to="/cart" onClick={() => setIsOpen(false)} className="nav-cart-link">
             <span className="nav-cart-ico">
               <i className="bi bi-cart-fill nav-icon" aria-hidden="true" />
-              {/* Afficher le badge seulement si > 0 (ou laisse {cartCount} si tu préfères) */}
               {cartCount > 0 && (
                 <span className={`nav-badge ${bump ? "bump" : ""}`}>{cartCount}</span>
               )}
@@ -164,6 +231,7 @@ export const Navbar = () => {
                 <Link to="/admin/videos" onClick={() => setIsOpen(false)}>Vidéos</Link>
                 <Link to="/admin/taxes" onClick={() => setIsOpen(false)}>Taxes</Link>
                 <Link to="/admin/promotionCodes" onClick={() => setIsOpen(false)}>Codes promotionnels</Link>
+                <Link to="/admin/application" onClick={() => setIsOpen(false)}>Application</Link>
               </div>
             )}
           </div>
@@ -181,7 +249,7 @@ export const Navbar = () => {
 };
 
 
-//////////////////////// Product Table ////////////////////////
+// //////////////////////// Product Table ////////////////////////
 export const ProductTable = () => {
   const productsFromStore = useSelector((state) => state.products.products) || [];
   const categoriesFromStore = useSelector((state) => state.categories.categories) || [];
@@ -206,15 +274,11 @@ export const ProductTable = () => {
     main: false,
   });
 
-  useEffect(() => {
-    dispatch(getProductUserRequest());
-  }, [dispatch]);
+  useEffect(() => { dispatch(getProductUserRequest()); }, [dispatch]);
 
-  // Fermer modales avec ESC + bloquer le scroll quand l'une est ouverte
   useEffect(() => {
     const anyOpen = showModal || !!selectedProduct;
     document.body.classList.toggle('no-scroll', anyOpen);
-
     const onKey = (e) => {
       if (e.key === 'Escape') {
         if (showModal) setShowModal(false);
@@ -230,10 +294,7 @@ export const ProductTable = () => {
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value,
-    }));
+    setFormData((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
 
   const handleAddClick = () => {
@@ -314,26 +375,17 @@ export const ProductTable = () => {
     const category = prod.category || '';
     const brand = prod.brand?.toLowerCase() || '';
     const model = prod.model?.toLowerCase() || '';
-
     const matchesQuery =
-      name.includes(query) ||
-      description.includes(query) ||
-      brand.includes(query) ||
-      model.includes(query) ||
-      main.includes(query);
-
+      name.includes(query) || description.includes(query) || brand.includes(query) || model.includes(query) || main.includes(query);
     const matchesCategory = categoryFilter ? category === categoryFilter : true;
-
     return matchesQuery && matchesCategory;
   });
 
   return (
-    <div>
+    <div className="admin-products">{/* <- wrapper pour scoper le CSS des actions */}
       <div className="d-flex justify-content-between align-items-center mb-3">
         <h2>Produits</h2>
-        <button className='btn btn-success' onClick={handleAddClick}>
-          Ajouter un produit
-        </button>
+        <button className='btn btn-success' onClick={handleAddClick}>Ajouter un produit</button>
       </div>
 
       <div className="d-flex gap-3 mb-3">
@@ -344,7 +396,6 @@ export const ProductTable = () => {
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
         />
-
         <select
           className="form-select"
           value={categoryFilter}
@@ -352,9 +403,7 @@ export const ProductTable = () => {
         >
           <option value="">Toutes les catégories</option>
           {categoriesFromStore.map((cat) => (
-            <option key={cat.id} value={cat.name}>
-              {cat.name}
-            </option>
+            <option key={cat.id} value={cat.name}>{cat.name}</option>
           ))}
         </select>
       </div>
@@ -387,7 +436,7 @@ export const ProductTable = () => {
                   <td>{prod.name}</td>
                   <td>{prod.brand}</td>
                   <td>{prod.model}</td>
-                  <td>{prod.description}</td>
+                  <td className="text-truncate col-desc" style={{maxWidth: 360}}>{prod.description}</td>
                   <td>{prod.price}</td>
                   <td>{prod.priceTtc}</td>
                   <td>{prod.category}</td>
@@ -395,15 +444,31 @@ export const ProductTable = () => {
                   <td>{prod.promotions?.length > 0 ? "Oui" : "Non"}</td>
                   <td>{prod.main ? "Oui" : "Non"}</td>
                   <td>{new Date(prod.creationDate).toLocaleDateString()}</td>
-                  <td>{prod.modificationDate? new Date(prod.modificationDate).toLocaleDateString() : "NM"}</td>
-                  <td>
-                    <button className='btn btn-sm btn-warning me-2' onClick={() => handleEditClick(prod)}>
+                  <td>{prod.modificationDate ? new Date(prod.modificationDate).toLocaleDateString() : "NM"}</td>
+
+                  {/* ---- Actions : styles uniformisés via .admin-products .table-actions .btn ---- */}
+                  <td className="table-actions">
+                    <button
+                      className='btn btn-warning me-2'
+                      title="Modifier"
+                      onClick={() => handleEditClick(prod)}
+                    >
                       <i className="bi bi-pencil"></i>
                     </button>
-                    <button className='btn btn-sm btn-danger me-2' onClick={() => handleDeleteClick(prod.id)}>
+
+                    <button
+                      className='btn btn-danger me-2'
+                      title="Supprimer"
+                      onClick={() => handleDeleteClick(prod.id)}
+                    >
                       <i className="bi bi-trash"></i>
                     </button>
-                    <button className='btn btn-sm btn-primary' onClick={() => setSelectedProduct(prod)}>
+
+                    <button
+                      className='btn btn-primary'
+                      title="Caractéristiques"
+                      onClick={() => setSelectedProduct(prod)}
+                    >
                       <i className="bi bi-card-checklist"></i>
                     </button>
                   </td>
@@ -411,66 +476,39 @@ export const ProductTable = () => {
               ))
             ) : (
               <tr>
-                <td colSpan="9" className="text-center">Aucun produit trouvé.</td>
+                <td colSpan="14" className="text-center">Aucun produit trouvé.</td>
               </tr>
             )}
           </tbody>
         </table>
       </div>
 
-      {/* Modal pour détails produit (classes admin-modal-*) */}
+      {/* Modal Caractéristiques */}
       {selectedProduct && (
-        <div
-          className="admin-modal-backdrop"
-          role="presentation"
-          onClick={() => setSelectedProduct(null)}
-        >
-          <div
-            className="admin-modal-panel"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="prod-detail-title"
-            onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: '600px', wordWrap: 'break-word' }}
-          >
+        <div className="admin-modal-backdrop" role="presentation" onClick={() => setSelectedProduct(null)}>
+          <div className="admin-modal-panel" role="dialog" aria-modal="true" aria-labelledby="prod-detail-title" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px', wordWrap: 'break-word' }}>
             <h3 id="prod-detail-title" className="mb-3">{selectedProduct.name}</h3>
             <hr />
             <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-              {selectedProduct.features && selectedProduct.features.length > 0 ? (
+              {selectedProduct.features?.length ? (
                 <ul>
                   {selectedProduct.features.map((feat) => (
-                    <li key={feat.id} style={{ marginBottom: '8px', textAlign: 'justify' }}>
-                      {feat.description}
-                    </li>
+                    <li key={feat.id} style={{ marginBottom: '8px', textAlign: 'justify' }}>{feat.description}</li>
                   ))}
                 </ul>
-              ) : (
-                <p>Aucune caractéristique disponible.</p>
-              )}
+              ) : <p>Aucune caractéristique disponible.</p>}
             </div>
             <div className="d-flex justify-content-end mt-3">
-              <button className="btn btn-secondary" onClick={() => setSelectedProduct(null)}>
-                Fermer
-              </button>
+              <button className="btn btn-secondary" onClick={() => setSelectedProduct(null)}>Fermer</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal ajout/modif produit (classes admin-modal-*) */}
+      {/* Modal Ajout / Modif */}
       {showModal && (
-        <div
-          className="admin-modal-backdrop"
-          role="presentation"
-          onClick={() => setShowModal(false)}
-        >
-          <div
-            className="admin-modal-panel"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="prod-edit-title"
-            onClick={(e) => e.stopPropagation()}
-          >
+        <div className="admin-modal-backdrop" role="presentation" onClick={() => setShowModal(false)}>
+          <div className="admin-modal-panel" role="dialog" aria-modal="true" aria-labelledby="prod-edit-title" onClick={(e) => e.stopPropagation()}>
             <h2 id="prod-edit-title" className="mb-3">{isEditing ? 'Modifier le produit' : 'Ajouter un produit'}</h2>
             <form onSubmit={handleSubmit}>
               <div className="mb-3">
@@ -495,18 +533,10 @@ export const ProductTable = () => {
               </div>
               <div className="mb-3">
                 <label>Catégorie</label>
-                <select
-                  name="category"
-                  className="form-select"
-                  value={formData.category}
-                  onChange={handleInputChange}
-                  required
-                >
+                <select name="category" className="form-select" value={formData.category} onChange={handleInputChange} required>
                   <option value="">Sélectionnez une catégorie</option>
                   {categoriesFromStore.map((cat) => (
-                    <option key={cat.id} value={cat.name}>
-                      {cat.name}
-                    </option>
+                    <option key={cat.id} value={cat.name}>{cat.name}</option>
                   ))}
                 </select>
               </div>
@@ -529,6 +559,7 @@ export const ProductTable = () => {
     </div>
   );
 };
+
 
 //////////////////////// Caracteristiques ////////////////////////
 export const ProductSpecs = (pid) => {
