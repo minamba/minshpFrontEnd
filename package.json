@@ -10,6 +10,7 @@
     "aos": "^2.3.4",
     "axios": "^1.10.0",
     "bootstrap-icons": "^1.13.1",
+    "i18n-iso-countries": "^7.14.0",
     "react": "^19.1.0",
     "react-bootstrap": "^2.10.10",
     "react-dom": "^19.1.0",

@@ -1023,6 +1023,76 @@ h1 { text-align: center; }
 }
 
 
+/* ===== Success Modal (icone verte) ===== */
+.modal-title-row{
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.modal-icon{
+  font-size: 22px;
+  line-height: 1;
+  color: #16a34a;           /* vert succès */
+  /* optionnel : cercle léger autour de l’icône */
+  background: #ecfdf5;      /* vert très pâle */
+  border-radius: 999px;
+  padding: 4px;
+  box-shadow: 0 0 0 2px #d1fae5 inset;
+}
+
+/* Variante sombre si besoin (pas obligatoire) */
+@media (prefers-color-scheme: dark){
+  .modal-icon{
+    background: rgba(22,163,74,.12);
+    box-shadow: 0 0 0 2px rgba(22,163,74,.18) inset;
+  }
+}
+
+
+/* ===================== FORM ADRESSE FOR MES ADRESSES PAGE ===================== */
+
+.form-vertical {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;            /* espace vertical régulier */
+}
+
+.form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-label {
+  font-weight: 600;
+}
+
+.radio-row {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.checkbox-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+.form-actions .btn {
+  width: 160px;
+}
+
+
+
+
 /* ===================== RESPONSIVE ===================== */
 @media (max-width: 1200px){
   .product-main{

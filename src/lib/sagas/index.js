@@ -12,7 +12,10 @@ import cartSaga from "./carts";
 import taxesSaga from "./taxes";
 import promotionCodesSaga from "./promotionCodes";
 import applicationSaga from "./application";
-import loginSaga from "./login";
+import accountSaga from "./account";
+import customersSaga from "./customers";
+import billingAddressesSaga from "./billingAddress";
+import deliveryAddressesSaga from "./deliveryAddress";
 import { all } from "redux-saga/effects";
 
 
@@ -32,6 +35,9 @@ export default function* rootSaga() {
         taxesSaga(),
         promotionCodesSaga(),
         applicationSaga(),
-        loginSaga()
+        accountSaga(),
+        customersSaga(),
+        billingAddressesSaga(),
+        deliveryAddressesSaga()
     ]);
 }

@@ -15,7 +15,9 @@ import cartReducer from "./CartReducers";
 import taxeReducer from "./TaxeReducers";
 import promotionCodeReducer from "./PromotionCodeReducers";
 import applicationReducer from "./ApplicationReducers";
-import LoginReducer from "./LoginReducers";
+import AccountReducer from "./AccountReducers";
+import billingAddressReducer from "./BillingAddressReducers";
+import deliveryAddressReducer from "./DeliveryAddressReducers";
 
 export default combineReducers({
     products : productReducer,
@@ -34,5 +36,7 @@ export default combineReducers({
     taxes : taxeReducer,
     promotionCodes : promotionCodeReducer,
     applications : applicationReducer,
-    login : LoginReducer
+    account : AccountReducer,
+    billingAddresses : billingAddressReducer,
+    deliveryAddresses : deliveryAddressReducer
 })

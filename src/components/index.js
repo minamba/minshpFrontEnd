@@ -15,7 +15,7 @@ import { useMemo } from "react";
 import { Badge } from 'react-bootstrap';
 import { getPromotionCodesRequest } from '../lib/actions/PromotionCodeActions';
 import { useNavigate } from 'react-router-dom';
-import { logout } from '../lib/actions/LoginActions';
+import { logout } from '../lib/actions/AccountActions';
 
 // ... ton code existant ...
 
@@ -29,11 +29,14 @@ export const Navbar = () => {
   const [productsOpen, setProductsOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
 
+
   // Catégories
   const categories = useSelector((s) => s.categories?.categories) || [];
 
   // Auth
-  const isAuth = useSelector((s) => s.login?.isAuth) || false; // adapte "s.login" si ta clé de reducer diffère
+// ✅ récupère tout le slice, puis déstructure
+const { isAuth, user } = useSelector((s) => s.account) || { isAuth: false, user: null };
+  const userId = user?.id;
 
   // Panier
   const cartItems = useSelector((s) => s.items?.items) || [];
@@ -168,16 +171,13 @@ export const Navbar = () => {
                   </Link>
                 ) : (
                   <>
-                    <Link
+                  <Link
                       to="/account"
-                      onClick={() => {
-                        setIsOpen(false);
-                        setAccountOpen(false);
-                      }}
+                      onClick={() => { setIsOpen(false); setAccountOpen(false); }}
                     >
                       <i className="bi bi-person-circle" style={{ marginRight: 6 }} />
                       Mon compte
-                    </Link>
+                  </Link>
 
                     <button
                       className="logout-btn"
@@ -232,6 +232,8 @@ export const Navbar = () => {
                 <Link to="/admin/taxes" onClick={() => setIsOpen(false)}>Taxes</Link>
                 <Link to="/admin/promotionCodes" onClick={() => setIsOpen(false)}>Codes promotionnels</Link>
                 <Link to="/admin/application" onClick={() => setIsOpen(false)}>Application</Link>
+                <Link to="/admin/billingAddress" onClick={() => setIsOpen(false)}>Adresses de facturation</Link>
+                <Link to="/admin/deliveryAddress" onClick={() => setIsOpen(false)}>Adresses de livraison</Link>
               </div>
             )}
           </div>

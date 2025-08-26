@@ -19,6 +19,8 @@ import {TaxesAdmin} from './TaxesAdmin';
 import {Promotion} from './Promotion';
 import {Account} from './Account/Account';
 import {Category} from './Category';
+import {BillingAddressAdmin} from './BillingAddressAdmin';
+import {DeliveryAddressAdmin} from './DeliveryAddressAdmin';
 import {ApplicationAdmin} from './ApplicationAdmin';
 import {DeliveryPayment} from './DeliveryPayment';
 import {Cart} from './Cart';
@@ -32,6 +34,7 @@ import { getFeatureProductRequest } from "../../lib/actions/FeatureProductAction
 import { getImageRequest } from "../../lib/actions/ImageActions";
 import { getVideoRequest } from "../../lib/actions/VideoActions";
 import { getFeatureCategoryRequest } from "../../lib/actions/FeatureCategoryActions";
+import { getCustomerRequest } from "../../lib/actions/CustomerActions";
 import {Product} from './Product';
 import { getFeaturesCategoryByProductRequest } from "../../lib/actions/FeatureCategoryActions";
 import {PromotionCodeAdmin} from './PromotionCodeAdmin';
@@ -41,6 +44,7 @@ import LoginPage from './Authentication/LoginPage';
 import RequireAuth from './Authentication/RequireAuth'; 
 import {UserInformation} from './Account/UserInformation';  
 import {Address} from './Account/Address';
+import {Register} from './Account/Register';
 
 export const BaseApp = () => {
 
@@ -56,6 +60,7 @@ export const BaseApp = () => {
         dispatch(getPromotionCodesRequest());
         dispatch(getApplicationRequest());
         dispatch(getApplicationRequest());
+        dispatch(getCustomerRequest());
     }, []);
 
     useEffect(() => {
@@ -90,12 +95,14 @@ export const BaseApp = () => {
                         <Route path="/news" element={<News/>}/>
                         <Route path="/admin/application" element={<ApplicationAdmin/>}/>
                         <Route path="/login" element={<LoginPage/>}/>
-                        <Route path="/account" element={<RequireAuth><Account/></RequireAuth>}/>
                         <Route path="/deliveryPayment" element={<RequireAuth><DeliveryPayment/></RequireAuth>}/>
                         <Route path="/userInformation" element={<RequireAuth><UserInformation/></RequireAuth>}/>
                         <Route path="/address" element={<RequireAuth><Address/></RequireAuth>}/>
-
-                        
+                        <Route path="/register" element={<Register/>}/>
+                        {/* <Route path="/account/:id" element={<RequireAuth><Account/></RequireAuth>}/> */}
+                        <Route path="/account" element={ <RequireAuth><Account /></RequireAuth> } /> fallback si pas d'id
+                        <Route path="/admin/billingAddress" element={<RequireAuth><BillingAddressAdmin/></RequireAuth>}/>
+                        <Route path="/admin/deliveryAddress" element={<RequireAuth><DeliveryAddressAdmin/></RequireAuth>}/>
                     </Routes>
                 </main>
                 <Footer/>

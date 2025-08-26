@@ -1,42 +1,92 @@
 // src/pages/account/UserInformation.jsx
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import "bootstrap-icons/font/bootstrap-icons.css";
+import { useSelector, useDispatch } from "react-redux";
+import {
+  updateUserRequest,
+  updateUserPasswordRequest,
+  updateUserReset,
+  updateUserPasswordReset,
+} from "../../../lib/actions/AccountActions";
 
-/**
- * Affiche et édite les informations personnelles + changement de mot de passe.
- * Props:
- *  - user: { civility: 'M'|'Mme', firstName, lastName, email, birthdate (YYYY-MM-DD), pseudo }
- *  - onSaveProfile: (payload) => void | Promise<void>
- *  - onChangePassword: ({ currentPassword, newPassword }) => void | Promise<void>
- */
-export const UserInformation = ({
-  user = {},
-  onSaveProfile,
-  onChangePassword,
-}) => {
-  // --- FORM "infos perso" ---
-  const [civility, setCivility] = useState(user.civility ?? "M");
-  const [firstName, setFirstName] = useState(user.firstName ?? "");
-  const [lastName, setLastName] = useState(user.lastName ?? "");
-  const [email] = useState(user.email ?? ""); // souvent non modifiable
-  const [birthdate, setBirthdate] = useState(user.birthdate ?? "");
-  const [pseudo, setPseudo] = useState(user.pseudo ?? "");
+/** Modal succès basée sur tes classes .gmodal-* (backdrop + carte centrée) */
+function Modal({ open, title, children, onClose }) {
+  if (!open) return null;
+  return (
+    <div className="gmodal-backdrop" role="dialog" aria-modal="true" onClick={onClose}>
+      <div className="gmodal-panel is-success" onClick={(e) => e.stopPropagation()}>
+        <div className="gmodal-icon">
+          <i className="bi bi-check-circle gmodal-icon--success" aria-hidden="true" />
+        </div>
+        <h4 className="gmodal-title">{title}</h4>
+        <div className="gmodal-message">{children}</div>
+        <div className="gmodal-actions">
+          <button className="gbtn gbtn--primary" onClick={onClose}>OK</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export const UserInformation = ({ user = {} }) => {
+  const dispatch = useDispatch();
+
+  // ---- Redux: flags de succès/erreur pour afficher popups + messages
+  const {
+    successUpdate,
+    successUpdatePassword,
+    errorUpdate,
+    errorUpdatePassword,
+  } = useSelector((s) => s.account);
+
+  // ---- Client courant
+  const customers = useSelector((s) => s?.customers?.customers) || [];
+  const currentCustomer = customers.find((c) => c.idAspNetUser === user.id);
+
+  // ---- États du formulaire "infos perso"
+  const rawBirthDate = currentCustomer?.birthDate ?? null;
+  const initialBirth = rawBirthDate ? rawBirthDate.slice(0, 10) : "";
+
+  const [civility, setCivility] = useState(currentCustomer?.civilite ?? "Mme");
+  const [firstName, setFirstName] = useState(currentCustomer?.firstName ?? "");
+  const [lastName, setLastName] = useState(currentCustomer?.lastName ?? "");
+  const [email] = useState(currentCustomer?.email ?? "");
+  const [birthdate, setBirthdate] = useState(initialBirth);
+  const [pseudo, setPseudo] = useState(currentCustomer?.pseudo ?? "");
+  const [phone, setPhone] = useState(currentCustomer?.phoneNumber ?? "");
   const [saving, setSaving] = useState(false);
 
-  // --- FORM "changement de mot de passe" ---
+  // ---- États du formulaire "mot de passe"
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [showCur, setShowCur] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [changing, setChanging] = useState(false);
 
+  // ---- Popups
+  const [openProfileModal, setOpenProfileModal] = useState(false);
+  const [openPasswordModal, setOpenPasswordModal] = useState(false);
+
+  // Si currentCustomer arrive après le premier rendu, re-synchroniser les champs
+  useEffect(() => {
+    const d = currentCustomer?.birthDate;
+    setBirthdate(d ? d.slice(0, 10) : "");
+    if (currentCustomer?.phoneNumber != null) setPhone(currentCustomer.phoneNumber);
+    if (currentCustomer?.firstName != null) setFirstName(currentCustomer.firstName);
+    if (currentCustomer?.lastName != null) setLastName(currentCustomer.lastName);
+    if (currentCustomer?.pseudo != null) setPseudo(currentCustomer.pseudo);
+    if (currentCustomer?.civilite != null) setCivility(currentCustomer.civilite);
+  }, [currentCustomer]);
+
+  // Validations
   const profileValid = useMemo(
     () =>
       firstName.trim().length > 0 &&
       lastName.trim().length > 0 &&
       pseudo.trim().length > 0 &&
-      (birthdate ? !Number.isNaN(new Date(birthdate).getTime()) : true),
-    [firstName, lastName, pseudo, birthdate]
+      (birthdate ? !Number.isNaN(new Date(birthdate).getTime()) : true) &&
+      phone.trim().length > 0,
+    [firstName, lastName, pseudo, birthdate, phone]
   );
 
   const passwordValid = useMemo(
@@ -44,43 +94,70 @@ export const UserInformation = ({
     [currentPassword, newPassword]
   );
 
+  // Ouvrir les popups dès qu'un succès est détecté
+  useEffect(() => {
+    if (successUpdate) {
+      setOpenProfileModal(true);
+      setSaving(false);
+    }
+  }, [successUpdate]);
+
+  useEffect(() => {
+    if (successUpdatePassword) {
+      setOpenPasswordModal(true);
+      setChanging(false);
+    }
+  }, [successUpdatePassword]);
+
+  // Fermer + reset flags
+  const closeProfileModal = () => {
+    setOpenProfileModal(false);
+    dispatch(updateUserReset());
+  };
+  const closePasswordModal = () => {
+    setOpenPasswordModal(false);
+    dispatch(updateUserPasswordReset());
+  };
+
+  // Submit "infos perso"
   const saveProfile = async (e) => {
     e.preventDefault();
     if (!profileValid) return;
     const payload = {
-      civility,
-      firstName: firstName.trim(),
-      lastName: lastName.trim(),
-      email, // gardé pour info
-      birthdate: birthdate || null,
-      pseudo: pseudo.trim(),
+      Id: currentCustomer?.idAspNetUser ?? user.id, // fallback par sécurité
+      Civility: civility,
+      FirstName: firstName.trim(),
+      LastName: lastName.trim(),
+      Email: email,
+      BirthDate: birthdate || null,
+      Pseudo: pseudo.trim(),
+      Actif: true,
+      Phone: phone.trim(),
     };
-    try {
-      setSaving(true);
-      if (onSaveProfile) await onSaveProfile(payload);
-      else alert("Profil enregistré (démo).");
-    } finally {
-      setSaving(false);
-    }
+    setSaving(true);
+    await dispatch(updateUserRequest(payload));
   };
 
+  // Submit "mot de passe"
   const changePassword = async (e) => {
     e.preventDefault();
     if (!passwordValid) return;
-    try {
-      setChanging(true);
-      if (onChangePassword)
-        await onChangePassword({ currentPassword, newPassword });
-      else alert("Mot de passe changé (démo).");
-      setCurrentPassword("");
-      setNewPassword("");
-    } finally {
-      setChanging(false);
-    }
+    const payload = {
+      Id: currentCustomer?.idAspNetUser ?? user.id,
+      CurrentPassword: currentPassword,
+      NewPassword: newPassword,
+    };
+    setChanging(true);
+    await dispatch(updateUserPasswordRequest(payload));
+    setCurrentPassword("");
+    setNewPassword("");
   };
 
   return (
-    <div className="account-placeholder" style={{ padding: 0, background: "transparent", boxShadow: "none" }}>
+    <div
+      className="account-placeholder"
+      style={{ padding: 0, background: "transparent", boxShadow: "none" }}
+    >
       {/* ====== Informations personnelles ====== */}
       <h2 className="orders-title" style={{ marginBottom: 6 }}>
         Informations personnelles
@@ -89,7 +166,11 @@ export const UserInformation = ({
         <span style={{ color: "#ef4444" }}>*</span> Champs obligatoires
       </small>
 
-      <form onSubmit={saveProfile} className="grid-2 gap-12" aria-label="Formulaire informations personnelles">
+      <form
+        onSubmit={saveProfile}
+        className="grid-2 gap-12"
+        aria-label="Formulaire informations personnelles"
+      >
         {/* Colonne gauche */}
         <div className="form-col">
           <span>Civilité</span>
@@ -116,7 +197,9 @@ export const UserInformation = ({
             </label>
           </div>
 
-          <span>Prénom <span style={{ color: "#ef4444" }}>*</span></span>
+          <span>
+            Prénom <span style={{ color: "#ef4444" }}>*</span>
+          </span>
           <input
             className="form-control"
             value={firstName}
@@ -125,7 +208,9 @@ export const UserInformation = ({
             required
           />
 
-          <span>Nom <span style={{ color: "#ef4444" }}>*</span></span>
+          <span>
+            Nom <span style={{ color: "#ef4444" }}>*</span>
+          </span>
           <input
             className="form-control"
             value={lastName}
@@ -133,19 +218,30 @@ export const UserInformation = ({
             placeholder="Votre nom"
             required
           />
+
+          <span>
+            Téléphone <span style={{ color: "#ef4444" }}>*</span>
+          </span>
+          <input
+            className="form-control"
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="Votre numéro de téléphone"
+            required
+          />
         </div>
 
         {/* Colonne droite */}
         <div className="form-col">
-          <span>Email <span style={{ color: "#ef4444" }}>*</span></span>
-          <input
-            className="form-control"
-            value={email}
-            readOnly
-            aria-readonly="true"
-          />
+          <span>
+            Email <span style={{ color: "#ef4444" }}>*</span>
+          </span>
+          <input className="form-control" value={email} readOnly aria-readonly="true" />
 
-          <span>Date de naissance <span style={{ color: "#ef4444" }}>*</span></span>
+          <span>
+            Date de naissance <span style={{ color: "#ef4444" }}>*</span>
+          </span>
           <input
             type="date"
             className="form-control"
@@ -154,13 +250,12 @@ export const UserInformation = ({
             required
           />
 
-          <span>Pseudo <span style={{ color: "#ef4444" }}>*</span></span>
+          <span>Pseudo</span>
           <input
             className="form-control"
             value={pseudo}
             onChange={(e) => setPseudo(e.target.value)}
             placeholder="Votre pseudo"
-            required
           />
         </div>
 
@@ -168,13 +263,19 @@ export const UserInformation = ({
           <button type="submit" className="gbtn gbtn--primary" disabled={!profileValid || saving}>
             {saving ? "Enregistrement…" : "Valider"}
           </button>
+          {/* Erreur MAJ profil */}
+          {errorUpdate && (
+            <p style={{ color: "#dc2626", fontWeight: 600, marginTop: 8 }}>
+              ⚠️ {typeof errorUpdate === "string" ? errorUpdate : "Les informations n’ont pas pu être mises à jour."}
+            </p>
+          )}
         </div>
       </form>
 
       <p style={{ color: "#6b7280", fontSize: ".9rem", marginTop: 10 }}>
         Les informations recueillies servent à la gestion de votre compte client et peuvent être utilisées
-        pour la relation client-prospect. <a href="#" className="auth-link">En savoir plus sur la gestion
-        des vos données et vos droits</a>.
+        pour la relation client-prospect.{" "}
+        <a href="#" className="auth-link">En savoir plus sur la gestion des vos données et vos droits</a>.
       </p>
 
       {/* ====== Changer de mot de passe ====== */}
@@ -184,7 +285,9 @@ export const UserInformation = ({
 
       <form onSubmit={changePassword} className="grid-2 gap-12" aria-label="Formulaire changement mot de passe">
         <div className="form-col">
-          <span>Mot de passe actuel <span style={{ color: "#ef4444" }}>*</span></span>
+          <span>
+            Mot de passe actuel <span style={{ color: "#ef4444" }}>*</span>
+          </span>
           <div style={{ position: "relative" }}>
             <input
               className="form-control"
@@ -207,7 +310,9 @@ export const UserInformation = ({
         </div>
 
         <div className="form-col">
-          <span>Nouveau mot de passe <span style={{ color: "#ef4444" }}>*</span></span>
+          <span>
+            Nouveau mot de passe <span style={{ color: "#ef4444" }}>*</span>
+          </span>
           <div style={{ position: "relative" }}>
             <input
               className="form-control"
@@ -233,8 +338,25 @@ export const UserInformation = ({
           <button type="submit" className="gbtn gbtn--primary" disabled={!passwordValid || changing}>
             {changing ? "Validation…" : "Valider"}
           </button>
+          {/* Erreur MAJ mot de passe */}
+          {errorUpdatePassword && (
+            <p style={{ color: "#dc2626", fontWeight: 600, marginTop: 8 }}>
+              ⚠️ {typeof errorUpdatePassword === "string"
+                ? errorUpdatePassword
+                : "Le mot de passe n’a pas pu être mis à jour."}
+            </p>
+          )}
         </div>
       </form>
+
+      {/* ======= POPUPS ======= */}
+      <Modal open={openProfileModal} title="Informations mises à jour" onClose={closeProfileModal}>
+        Vos informations personnelles ont été mises à jour avec succès.
+      </Modal>
+
+      <Modal open={openPasswordModal} title="Mot de passe mis à jour" onClose={closePasswordModal}>
+        Votre mot de passe a été mis à jour avec succès.
+      </Modal>
     </div>
   );
 };

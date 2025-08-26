@@ -1,0 +1,124 @@
+// src/lib/reducers/AccountReducers.js
+import { actionsAccount } from "../actions/AccountActions";
+
+// Petit helper sûr pour décoder un JWT sans dépendance externe
+function decodeJwt(t) {
+  try {
+    const [, p] = t.split(".");
+    return JSON.parse(atob(p.replace(/-/g, "+").replace(/_/g, "/")));
+  } catch {
+    return null;
+  }
+}
+
+// ----- Boot auth: on lit le token AVANT de construire initialState
+function bootAuth() {
+  try {
+    const t = localStorage.getItem("access_token");
+    if (!t) return { isAuth: false, user: null };
+    const c = decodeJwt(t) || {};
+    return {
+      isAuth: true,
+      user: {
+        id: c.sub ?? null,
+        name: c.name ?? "",
+        email: c.email ?? "",
+        roles: Array.isArray(c.role) ? c.role : c.role ? [c.role] : [],
+      },
+    };
+  } catch {
+    return { isAuth: false, user: null };
+  }
+}
+
+const boot = bootAuth();
+
+const initialState = {
+  // --- auth ---
+  isAuth: boot.isAuth,
+  user: boot.user,
+  loading: false,
+  error: null,
+
+  // --- register ---
+  loadingRegister: false,
+  errorRegister: null,
+  successRegister: false,
+  registerData: null,
+
+  // --- update ---
+  loadingUpdate: false,
+  errorUpdate: null,
+  successUpdate: false,
+
+  // --- delete ---
+  loadingDelete: false,
+  errorDelete: null,
+  successDelete: false,
+
+  // --- update password ---
+  loadingUpdatePassword: false,
+  errorUpdatePassword: null,
+  successUpdatePassword: false,
+};
+
+export default function AccountReducer(state = initialState, action) {
+  switch (action.type) {
+    case actionsAccount.LOGIN_SUCCESS:
+      return { ...state, isAuth: true, user: action.payload.user, error: null };
+
+    case actionsAccount.LOGIN_FAILURE:
+      return { ...state, loading: false, error: action.payload.error || "Échec de connexion" };
+
+    case actionsAccount.LOGOUT:
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("remember_email");
+      return { ...state, isAuth: false, user: null };
+
+    case actionsAccount.REGISTER_REQUEST:
+      return { ...state, loadingRegister: true, errorRegister: null, successRegister: false };
+    case actionsAccount.REGISTER_SUCCESS:
+      return { ...state, loadingRegister: false, successRegister: true, registerData: action.payload };
+    case actionsAccount.REGISTER_FAILURE:
+      return { ...state, loadingRegister: false, errorRegister: action.payload.error || "Échec de l'inscription" };
+
+    case actionsAccount.UPDATE_USER_REQUEST:
+      return { ...state, loadingUpdate: true, errorUpdate: null, successUpdate: false };
+    case actionsAccount.UPDATE_USER_SUCCESS:
+      return { ...state, loadingUpdate: false, successUpdate: true };
+    case actionsAccount.UPDATE_USER_FAILURE:
+      return { ...state, loadingUpdate: false, errorUpdate: action.payload.error || "Échec de la mise à jour" };
+
+      case actionsAccount.UPDATE_USER_RESET:
+        return { 
+          ...state, 
+          successUpdate: false, 
+          errorUpdate: null, 
+          loadingUpdate: false 
+        };
+
+
+    case actionsAccount.DELETE_USER_SUCCESS:
+      return { ...state, loadingDelete: false, successDelete: true };
+    case actionsAccount.DELETE_USER_FAILURE:
+      return { ...state, loadingDelete: false, errorDelete: action.payload.error || "Échec de la suppression" };
+
+    case actionsAccount.UPDATE_USER_PASSWORD_REQUEST:
+      return { ...state, loadingUpdatePassword: true, errorUpdatePassword: null, successUpdatePassword: false };
+    case actionsAccount.UPDATE_USER_PASSWORD_SUCCESS:
+      return { ...state, loadingUpdatePassword: false, successUpdatePassword: true };
+    case actionsAccount.UPDATE_USER_PASSWORD_FAILURE:
+      return { ...state, loadingUpdatePassword: false, errorUpdatePassword: action.payload.error || "Échec de la mise à jour" };
+
+      case actionsAccount.UPDATE_USER_PASSWORD_RESET:
+        return { 
+          ...state, 
+          successUpdatePassword: false, 
+          errorUpdatePassword: null, 
+          loadingUpdatePassword: false 
+        };
+
+    default:
+      return state;
+  }
+}

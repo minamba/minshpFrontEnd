@@ -5,22 +5,30 @@ import "../../../App.css";
 
 import { UserInformation } from "./UserInformation"; // <- déjà créé
 import { Address } from "./Address";                 // <- NOUVEAU
-
+import { useParams } from "react-router-dom";
+import { useSelector } from "react-redux";
+import { useDispatch } from "react-redux";
+import { logout } from "../../../lib/actions/AccountActions";
+import { useNavigate } from "react-router-dom";
 // (tes mocks éventuels)
-const mockUser = {
-  fullName: "Minamba Camara",
-  customerNo: "MI00000852211",
-  avatarUrl: "/Images/avatar.png",
-};
+
 const mockOrders = [
-  { id: "50604210338195V", soldBy: "Materiel.Net", priceTtc: 2348.3, date: "2025-06-04", status: "Retirée en boutique", items: [{ name: "PC Portable Pro 15", qty: 1 }] },
+  { id: "50604210338195V", priceTtc: 2348.3, date: "2025-06-04", status: "Retirée en boutique", items: [{ name: "PC Portable Pro 15", qty: 1 }] },
 ];
 
 const fmtPrice = (n) => new Intl.NumberFormat("fr-FR",{style:"currency",currency:"EUR"}).format(n);
 
 export const Account = () => {
-  const user = mockUser;
+  const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const { user } = useSelector(s => s.account);
+  const customers = useSelector((s) => s?.customers?.customers) || [];
+  const uid = user?.id || null;
+  const currentCustomer = customers.find((c) => c.idAspNetUser === uid);
   const orders = mockOrders;
+
+  // console.log("customers",customers);
+  // console.log("current user",currentCustomer);
 
   const [activeMenu, setActiveMenu] = useState("orders"); // "profile" | "orders" | "addresses" | ...
   const [period, setPeriod] = useState("6m");
@@ -37,25 +45,31 @@ export const Account = () => {
     return (orders || []).filter((o) => new Date(o.date) >= minDate);
   }, [orders, period]);
 
-  const logout = () => alert("Déconnexion");
+
+  const deconnect = () => {
+    dispatch(logout());
+    navigate("/");   // <-- redirection vers la home
+  };
+
 
   return (
     <div className="account-page">
       {/* -------- SIDEBAR -------- */}
       <aside className="account-sidebar">
         <div className="account-user">
-          {user?.avatarUrl ? (
-            <img className="account-avatar" src={user.avatarUrl} alt={user.fullName} />
+          {currentCustomer? (
+
+            <img className="account-avatar" src={currentCustomer.civilite == "M" ? "/Images/man_avatar.png" : "/Images/women_avatar.png"} alt={user.fullName} />
           ) : (
             <div className="account-avatar account-avatar--emoji" aria-hidden>👨‍💻</div>
           )}
           <div className="account-identity">
-            <div className="account-name">{user?.fullName || "Mon compte"}</div>
-            {user?.customerNo && (
-              <div className="account-ref">N° de client : <strong>{user.customerNo}</strong></div>
+            <div className="account-name">{currentCustomer?.pseudo ? currentCustomer.pseudo : currentCustomer?.firstName ? currentCustomer.firstName : "Mon compte"}</div>
+            {currentCustomer?.clientNumber && (
+              <div className="account-ref">N° de client : <strong>{currentCustomer.clientNumber}</strong></div>
             )}
           </div>
-          <button className="account-logout" onClick={logout}>
+          <button className="account-logout" onClick={deconnect}>
             <i className="bi bi-power" /> Se déconnecter
           </button>
         </div>
@@ -90,7 +104,9 @@ export const Account = () => {
             <div className="account-counter__num">{currentCount}</div>
             <div className="account-counter__label">Commande en cours</div>
           </div>
-          <img className="account-hero__img" src="/Images/account-empty.png" alt="" onError={(e)=> (e.currentTarget.style.display="none")} />
+          {currentCustomer &&
+          <img className="account-hero__img" src={currentCustomer.civilite == "M" ? "/Images/account-empty.png" : "/Images/account-empty.png"} alt="" onError={(e)=> (e.currentTarget.style.display="none")} />
+          }
         </div>
 
         {/* === ROUTAGE SECTIONS === */}
@@ -110,7 +126,7 @@ export const Account = () => {
 
             <div className="orders-table">
               <div className="orders-head">
-                <span>N° commande</span><span>Vendue par</span><span>Prix</span>
+                <span>N° commande</span><span>Prix</span>
                 <span>Date</span><span>Statut</span><span className="col-actions">Détails</span>
               </div>
 
@@ -124,7 +140,6 @@ export const Account = () => {
                   <div key={o.id} className="order-row">
                     <div className="order-grid">
                       <span className="order-id">N° {o.id}</span>
-                      <span>{o.soldBy}</span>
                       <span className="order-price">{fmtPrice(o.priceTtc)} TTC</span>
                       <span>{new Date(o.date).toLocaleDateString("fr-FR")}</span>
                       <span className="order-status">{o.status}</span>
