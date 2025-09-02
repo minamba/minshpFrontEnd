@@ -16,21 +16,24 @@ export const CategoryAdmin = () => {
   const imagesFromStore     = useSelector((s) => s.images.images) || [];
   const productsFromStore   = useSelector((s) => s.products.products) || [];
   const taxesFromStore      = useSelector((s) => s.taxes?.taxes) || [];
+  const packageProfils      = useSelector((s) => s.packageProfils?.packageProfils) || [];
   const dispatch = useDispatch();
 
-  const [showModal, setShowModal]                 = useState(false);
-  const [isEditing, setIsEditing]                 = useState(false);
-  const [currentId, setCurrentId]                 = useState(null);
-  const [formData, setFormData]                   = useState({ name: '' });
-  const [idImage, setIdImage]                     = useState('');
-  const [selectedProductId, setSelectedProductId] = useState('');
-  const [selectedTaxIds, setSelectedTaxIds]       = useState([]); // IDs cochés (string[])
+  const [showModal, setShowModal]                   = useState(false);
+  const [isEditing, setIsEditing]                   = useState(false);
+  const [currentId, setCurrentId]                   = useState(null);
+  const [formData, setFormData]                     = useState({ name: '' });
+  const [idImage, setIdImage]                       = useState('');
+  const [selectedProductId, setSelectedProductId]   = useState('');
+  const [selectedTaxIds, setSelectedTaxIds]         = useState([]); // string[]
+  const [selectedPackageProfilId, setSelectedPackageProfilId] = useState(''); // string
 
   useEffect(() => {
     dispatch(getCategoryRequest());
     dispatch(getImageRequest());
     dispatch(getProductUserRequest());
     dispatch(getTaxeRequest());
+    // Si besoin: dispatch(getPackageProfilRequest());  // seulement si tu as l'action
   }, [dispatch]);
 
   // bloque scroll + ESC quand la modale est ouverte
@@ -44,12 +47,7 @@ export const CategoryAdmin = () => {
     };
   }, [showModal]);
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  // Helpers de normalisation (pour matcher les noms avec/sans accents, casse)
+  /* ───────── Helpers ───────── */
   const normalize = (s) =>
     String(s ?? '')
       .normalize('NFD')
@@ -63,26 +61,53 @@ export const CategoryAdmin = () => {
       .map((t) => t.trim())
       .filter(Boolean);
 
-  // Lit les IDs de taxes depuis la catégorie (quand le backend stocke une chaîne de NOMS)
+  // id du package profil dans une catégorie (multi variantes possibles)
+  const getPkgIdFromCategory = (cat) =>
+    cat?.idPackageProfil ??
+    cat?.IdPackageProfil ??
+    cat?.packageProfilId ??
+    cat?.PackageProfilId ??
+    cat?.idPackageProfile ??
+    null;
+
+  const packageProfilsById = useMemo(() => {
+    const m = new Map();
+    for (const p of packageProfils) {
+      const id = p?.id ?? p?.Id;
+      if (id != null) m.set(String(id), p);
+    }
+    return m;
+  }, [packageProfils]);
+
+  const getPackageProfilName = (cat) => {
+    const pid = getPkgIdFromCategory(cat);
+    if (pid == null) return '—';
+    const pp = packageProfilsById.get(String(pid));
+    return pp?.name ?? pp?.Name ?? `#${pid}`;
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  // Taxes ↔ IDs (depuis noms CSV potentiels en base)
   const extractTaxIdsFromCategory = (cat, taxesList) => {
     if (!cat) return [];
-    // priorités : "taxes" (CSV de noms) puis "taxeName"
     const rawNames = String(cat.taxes ?? cat.taxeName ?? '').trim();
     if (!rawNames) return [];
-
     const tokens = csvToArray(rawNames);
     const ids = tokens
       .map((tok) => {
-        // Si quelqu’un a mis des IDs par erreur, on accepte aussi
-        if (/^\d+$/.test(tok)) return tok;
+        if (/^\d+$/.test(tok)) return tok; // déjà un id
         const t = taxesList.find((x) => normalize(x.name) === normalize(tok));
         return t ? String(t.id) : '';
       })
       .filter(Boolean);
-
-    return Array.from(new Set(ids)); // unique
+    return Array.from(new Set(ids));
   };
 
+  /* ───────── Actions UI ───────── */
   const handleAddClick = () => {
     setIsEditing(false);
     setCurrentId(null);
@@ -90,6 +115,7 @@ export const CategoryAdmin = () => {
     setIdImage('');
     setSelectedProductId('');
     setSelectedTaxIds([]);
+    setSelectedPackageProfilId('');
     setShowModal(true);
   };
 
@@ -97,6 +123,10 @@ export const CategoryAdmin = () => {
     setIsEditing(true);
     setCurrentId(category.id);
     setFormData({ id: category.id, name: category.name });
+
+    // Pré-sélection du package profil
+    const pkgId = getPkgIdFromCategory(category);
+    setSelectedPackageProfilId(pkgId != null ? String(pkgId) : '');
 
     // Image liée
     const img = imagesFromStore.find((i) => Number(i.idCategory) === Number(category.id));
@@ -108,13 +138,12 @@ export const CategoryAdmin = () => {
     else if (productsInCat.length > 0) setSelectedProductId(String(productsInCat[0].id));
     else setSelectedProductId('');
 
-    // Taxes pré-cochées à partir des NOMS dans category.taxes / taxeName
+    // Taxes pré-cochées
     setSelectedTaxIds(extractTaxIdsFromCategory(category, taxesFromStore));
 
     setShowModal(true);
   };
 
-  // Si les taxes arrivent après ouverture (édition), on refait un seul précochage si vide
   useEffect(() => {
     if (!showModal || !isEditing || !currentId) return;
     if (selectedTaxIds.length > 0) return;
@@ -122,7 +151,8 @@ export const CategoryAdmin = () => {
     if (cat && taxesFromStore.length) {
       setSelectedTaxIds(extractTaxIdsFromCategory(cat, taxesFromStore));
     }
-  }, [taxesFromStore]); // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taxesFromStore]);
 
   const handleDeleteClick = async (id) => {
     if (window.confirm('Supprimer cette catégorie ?')) {
@@ -131,33 +161,46 @@ export const CategoryAdmin = () => {
     }
   };
 
+  const toggleTax = (id) => {
+    const key = String(id);
+    setSelectedTaxIds((prev) =>
+      prev.includes(key) ? prev.filter((x) => x !== key) : [...prev, key]
+    );
+  };
+
+  /* ───────── Soumission ───────── */
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // On envoie une CSV d’IDs comme demandé : "1,2,3"
     const idsTaxesCsv = selectedTaxIds.join(',');
+    const pkgIdNum =
+      selectedPackageProfilId !== '' ? Number(selectedPackageProfilId) : null;
 
     if (isEditing) {
       await dispatch(updateCategoryRequest({
         id: currentId,
         name: formData.name,
-        idTaxe: idsTaxesCsv, // <-- adapte le nom si ton API attend "taxesIds" ou autre
+        idTaxe: idsTaxesCsv,             // adapte si besoin côté API
+        idPackageProfil: pkgIdNum,       // ✅ envoi de l’id package profil
+        IdPackageProfil: pkgIdNum,       // (fallback si casse différente)
       }));
       if (idImage) {
         await dispatch(updateImageRequest({ id: Number(idImage), idCategory: Number(currentId) }));
       }
     } else {
-      await dispatch(addCategoryRequest({
+      const addPayload = {
         name: formData.name,
         idsTaxes: idsTaxesCsv,
-      }));
+        idPackageProfil: pkgIdNum,
+        IdPackageProfil: pkgIdNum,
+      };
+      await dispatch(addCategoryRequest(addPayload));
       await dispatch(getCategoryRequest());
 
-      // retrouve l'id créé si nécessaire
-      const createdList = await new Promise((r) => setTimeout(() => r(categoriesFromStore), 150));
-      const created = createdList.find((c) => c.name === formData.name)
-        || categoriesFromStore.find((c) => c.name === formData.name);
-
+      // retrouve l'id créé si nécessaire, puis lie l'image choisie
+      const created = [...categoriesFromStore]
+        .reverse()
+        .find((c) => c.name === formData.name);
       if (idImage && created?.id) {
         await dispatch(updateImageRequest({ id: Number(idImage), idCategory: Number(created.id) }));
       }
@@ -168,6 +211,7 @@ export const CategoryAdmin = () => {
     setShowModal(false);
   };
 
+  /* ───────── Sélecteurs dérivés ───────── */
   const sortedCategories = useMemo(
     () => [...categoriesFromStore].sort((a, b) =>
       (a.name || '').toLowerCase().localeCompare((b.name || '').toLowerCase())
@@ -186,11 +230,8 @@ export const CategoryAdmin = () => {
   };
 
   const getCategoryTaxNames = (cat) => {
-    // Si le backend stocke déjà la chaîne de noms, on l’affiche telle quelle
     if (cat?.taxes) return cat.taxes;
     if (cat?.taxeName) return cat.taxeName;
-
-    // Sinon, on reconstruit depuis des IDs si on les a
     const ids = extractTaxIdsFromCategory(cat, taxesFromStore);
     if (ids.length) {
       const names = ids.map((id) => taxesFromStore.find((t) => String(t.id) === String(id))?.name || `#${id}`);
@@ -216,13 +257,7 @@ export const CategoryAdmin = () => {
     return imagesFromStore.filter((i) => !i.idCategory);
   }, [isEditing, imagesFromStore]);
 
-  const toggleTax = (id) => {
-    const key = String(id);
-    setSelectedTaxIds((prev) =>
-      prev.includes(key) ? prev.filter((x) => x !== key) : [...prev, key]
-    );
-  };
-
+  /* ───────── UI ───────── */
   return (
     <div className='container py-5'>
       <h1 className="text-center mb-4">Gestion des catégories</h1>
@@ -240,6 +275,7 @@ export const CategoryAdmin = () => {
               <th>Image</th>
               <th>Nom</th>
               <th>Taxes</th>
+              <th>Package profil</th>{/* ✅ nouvelle colonne */}
               <th>Actions</th>
             </tr>
           </thead>
@@ -249,6 +285,7 @@ export const CategoryAdmin = () => {
                 <td><img src={getCategoryImage(cat.id)} width={100} alt={cat.name} /></td>
                 <td>{cat.name}</td>
                 <td>{getCategoryTaxNames(cat)}</td>
+                <td>{getPackageProfilName(cat)}</td>{/* ✅ affichage du nom */}
                 <td>
                   <button
                     className='btn btn-sm btn-warning me-2'
@@ -299,6 +336,23 @@ export const CategoryAdmin = () => {
                 />
               </div>
 
+              {/* ✅ Sélecteur Package profil (toujours AVANT les images) */}
+              <div className="mb-3">
+                <label>Package profil</label>
+                <select
+                  className="form-select mt-2"
+                  value={selectedPackageProfilId}
+                  onChange={(e) => setSelectedPackageProfilId(e.target.value)}
+                >
+                  <option value="">— Sélectionner —</option>
+                  {packageProfils.map((pp) => (
+                    <option key={pp.id ?? pp.Id} value={String(pp.id ?? pp.Id)}>
+                      {pp.name ?? pp.Name ?? `Profil #${pp.id ?? pp.Id}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               {/* Taxes associées (checkbox) */}
               <div className="mb-3">
                 <label>Taxes associées</label>
@@ -331,6 +385,7 @@ export const CategoryAdmin = () => {
                 </div>
               </div>
 
+              {/* Sélection d'images (inchangé, juste déplacé après le package profil) */}
               {isEditing ? (
                 <>
                   <div className="mb-3">

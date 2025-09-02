@@ -1,5 +1,24 @@
 // src/pages/checkout/DeliveryPayment.jsx
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { useDispatch, useSelector, useStore } from "react-redux";
+import { useLocation } from "react-router-dom";
+import "bootstrap-icons/font/bootstrap-icons.css";
+import "../../App.css";
+
+import { getOrderRequest, addOrderRequest } from "../../lib/actions/OrderActions";
+import {
+  addOrderCustomerProductRequest,
+  getOrderCustomerProductRequest,
+} from "../../lib/actions/OrderCustomerProductActions";
+import { saveCartRequest } from "../../lib/actions/CartActions";
+
+// 👇 Actions Redux/Saga pour Boxtal
+import {
+  getShippingRatesRequest,
+  getRelaysRequest,              // (par ZIP) — conservé si tu veux garder l’ancien bouton
+  getRelaysByAddressRequest,     // (par adresse) — NOUVEAU
+  createShipmentRequest,
+} from "../../lib/actions/ShippingActions";
 
 /* ------------------------------------------------------------------ */
 /* --------------------------- Mini Modales -------------------------- */
@@ -61,10 +80,6 @@ function SimpleModal({ open, title, children, onClose, footer }) {
   );
 }
 
-/** Formulaire d’adresse (création / modification).
- *  - initial: valeurs pré-remplies (null -> ajout, sinon modif)
- *  - onSave(payload) + onCancel()
- */
 function AddressFormModal({ open, initial, onSave, onCancel, title = "Adresse" }) {
   const [form, setForm] = useState(() => ({
     civility: initial?.civility ?? "M.",
@@ -83,7 +98,6 @@ function AddressFormModal({ open, initial, onSave, onCancel, title = "Adresse" }
   const change = (k, v) => setForm((s) => ({ ...s, [k]: v }));
 
   const save = () => {
-    // validations minimales
     if (!String(form.firstName).trim() || !String(form.lastName).trim()) return;
     onSave(form);
   };
@@ -108,12 +122,7 @@ function AddressFormModal({ open, initial, onSave, onCancel, title = "Adresse" }
           <div style={{ display: "flex", gap: 16 }}>
             {["M.", "Mme"].map((c) => (
               <label key={c} style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
-                <input
-                  type="radio"
-                  name="civ"
-                  checked={form.civility === c}
-                  onChange={() => change("civility", c)}
-                />
+                <input type="radio" name="civ" checked={form.civility === c} onChange={() => change("civility", c)} />
                 <span>{c}</span>
               </label>
             ))}
@@ -123,27 +132,15 @@ function AddressFormModal({ open, initial, onSave, onCancel, title = "Adresse" }
         <div />
 
         <Field label="Prénom *">
-          <input
-            className="form-control"
-            value={form.firstName}
-            onChange={(e) => change("firstName", e.target.value)}
-          />
+          <input className="form-control" value={form.firstName} onChange={(e) => change("firstName", e.target.value)} />
         </Field>
 
         <Field label="Nom *">
-          <input
-            className="form-control"
-            value={form.lastName}
-            onChange={(e) => change("lastName", e.target.value)}
-          />
+          <input className="form-control" value={form.lastName} onChange={(e) => change("lastName", e.target.value)} />
         </Field>
 
         <Field label="Nom de la société">
-          <input
-            className="form-control"
-            value={form.company}
-            onChange={(e) => change("company", e.target.value)}
-          />
+          <input className="form-control" value={form.company} onChange={(e) => change("company", e.target.value)} />
         </Field>
 
         <div />
@@ -167,27 +164,15 @@ function AddressFormModal({ open, initial, onSave, onCancel, title = "Adresse" }
         </Field>
 
         <Field label="Code postal *">
-          <input
-            className="form-control"
-            value={form.zip}
-            onChange={(e) => change("zip", e.target.value)}
-          />
+          <input className="form-control" value={form.zip} onChange={(e) => change("zip", e.target.value)} />
         </Field>
 
         <Field label="Ville *">
-          <input
-            className="form-control"
-            value={form.city}
-            onChange={(e) => change("city", e.target.value)}
-          />
+          <input className="form-control" value={form.city} onChange={(e) => change("city", e.target.value)} />
         </Field>
 
         <Field label="Pays *">
-          <select
-            className="form-control"
-            value={form.country}
-            onChange={(e) => change("country", e.target.value)}
-          >
+          <select className="form-control" value={form.country} onChange={(e) => change("country", e.target.value)}>
             <option>France (métropolitaine)</option>
             <option>Belgique</option>
             <option>Suisse</option>
@@ -197,32 +182,21 @@ function AddressFormModal({ open, initial, onSave, onCancel, title = "Adresse" }
         <div />
 
         <Field label="Téléphone portable">
-          <input
-            className="form-control"
-            value={form.phone}
-            onChange={(e) => change("phone", e.target.value)}
-          />
+          <input className="form-control" value={form.phone} onChange={(e) => change("phone", e.target.value)} />
         </Field>
 
         <Field label="Téléphone fixe">
-          <input
-            className="form-control"
-            value={form.phoneFix}
-            onChange={(e) => change("phoneFix", e.target.value)}
-          />
+          <input className="form-control" value={form.phoneFix} onChange={(e) => change("phoneFix", e.target.value)} />
         </Field>
       </div>
     </SimpleModal>
   );
 }
 
-/** Carnet d’adresses (liste + choisir / modifier) */
 function AddressBookModal({ open, addresses, onChoose, onEdit, onClose }) {
   return (
     <SimpleModal open={open} onClose={onClose} title="Carnet d’adresses">
-      {addresses.length === 0 && (
-        <div style={{ color: "#6b7280" }}>Aucune adresse enregistrée.</div>
-      )}
+      {addresses.length === 0 && <div style={{ color: "#6b7280" }}>Aucune adresse enregistrée.</div>}
       <div style={{ display: "grid", gap: 12 }}>
         {addresses.map((a, idx) => (
           <div key={idx} style={addressCard}>
@@ -270,76 +244,229 @@ function Field({ label, children }) {
 }
 
 /* ------------------------------------------------------------------ */
+/* --------------------------- Helpers divers ------------------------ */
+/* ------------------------------------------------------------------ */
+
+const fmt = (n) => new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(Number(n) || 0);
+
+const readLsItems = () => {
+  try {
+    return JSON.parse(localStorage.getItem("items") || "[]");
+  } catch {
+    return [];
+  }
+};
+const getPid = (it) => it?.productId ?? it?.id ?? it?.Id ?? null;
+const getQty = (it) => Number(it?.qty ?? it?.quantity ?? 1);
+const getProductUnitPrice = (it, productsFromStore) => {
+  let price = 0;
+  var product = productsFromStore.find((p) => String(p.id) === String(it.id));
+  if (product?.priceTtcCategoryCodePromoted != null) return (price = product.priceTtcCategoryCodePromoted);
+  if (product?.priceTtcPromoted != null && product?.priceTtcCategoryCodePromoted == null) return (price = product.priceTtcPromoted);
+  if (product?.priceTtc != null && product?.priceTtcPromoted == null && product?.priceTtcCategoryCodePromoted == null) return (price = product.priceTtc);
+  return price;
+};
+
+// util orders
+const getOrderEntityId = (o) => o?.id ?? o?.Id ?? o?.orderId ?? null;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const waitForNewOrderId = async (dispatch, store, customerId, beforeIds, { attempts = 25, delay = 200 } = {}) => {
+  const beforeSet = new Set((beforeIds || []).map(String));
+  for (let i = 0; i < attempts; i++) {
+    await dispatch(getOrderRequest?.());
+    await sleep(delay);
+    const state = store.getState();
+    const allOrders = state?.orders?.orders || [];
+    const forCustomer = allOrders.filter(
+      (o) => String(o?.idCustomer ?? o?.customerId ?? o?.CustomerId ?? o?.customer?.id ?? "") === String(customerId)
+    );
+    const ids = forCustomer.map(getOrderEntityId).filter(Boolean).map(String);
+    const newId = ids.find((id) => !beforeSet.has(id));
+    if (newId) return newId;
+  }
+  return null;
+};
+
+
+const relayCode = {
+  MondialRelay: "MONR",
+  Ups: "UPSE",
+  Chronopost: "CHRP"
+};
+
+const getRelayLogo = (relay) => {
+switch(relay.network){
+  case relayCode.MondialRelay: return "../images/mondialrelay.png";
+  case relayCode.Ups: return "../images/ups.png";
+  case relayCode.Chronopost: return "../images/chronopost.png";
+}
+
+  const logo = relay.logo;
+  return logo ? logo : "https://via.placeholder.com/150";
+};
+
+
+/* ------------------------------------------------------------------ */
 /* ------------------------ Page principale -------------------------- */
 /* ------------------------------------------------------------------ */
 
-const fmt = (n) =>
-  new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(
-    Number(n) || 0
-  );
-
 export const DeliveryPayment = () => {
-  /* ---- Adresses mock (remplace par ton store/APIs) ---- */
-  const [addresses, setAddresses] = useState([
-    {
-      civility: "M.",
-      firstName: "Minamba",
-      lastName: "Camara",
-      street: "rue andre lalande",
-      extra: "8,",
-      zip: "91000",
-      city: "Evry",
-      country: "France (métropolitaine)",
-      phone: "0624957558",
-      phoneFix: "0160784679",
-    },
-  ]);
-  const [shippingIndex, setShippingIndex] = useState(0); // adresse de livraison choisie
-  const [billing, setBilling] = useState(addresses[0]); // adresse de facturation
+  const dispatch = useDispatch();
+  const store = useStore();
 
-  /* ---- Popups ---- */
+  const { state } = useLocation();
+  const totalCents = state?.totalCents ?? 0;
+  const totalFromState = totalCents / 100;
+
+  const productsFromStore = useSelector((s) => s?.products?.products) || [];
+
+  const { user } = useSelector((s) => s.account);
+  const customers = useSelector((s) => s?.customers?.customers) || [];
+  const uid = user?.id || null;
+  const currentCustomer = customers.find((c) => c.idAspNetUser === uid);
+
+  const billingAddresses = useSelector((s) => s?.billingAddresses?.billingAddresses || []);
+  const deliveryAddresses = useSelector((s) => s?.deliveryAddresses?.deliveryAddresses || []);
+
+  const billingLst = billingAddresses.filter((a) => a?.idCustomer === currentCustomer?.id);
+  const deliveryLst = deliveryAddresses.filter((a) => a?.idCustomer === currentCustomer?.id);
+  const deliveryFavoriteAddress = deliveryAddresses.find(
+    (a) => a?.idCustomer === currentCustomer?.id && a?.favorite
+  );
+  const billingAddress = billingAddresses.find((a) => a?.idCustomer === currentCustomer?.id);
+
+  const orders = useSelector((s) => s?.orders?.orders) || [];
+  useEffect(() => {
+    dispatch(getOrderRequest?.());
+  }, [dispatch]);
+
+  // 👉 état Shipping depuis Redux
+  const {
+    rates = [],
+    ratesLoading,
+    relays = [],
+    relaysLoading,
+    relaysByAddress = [],
+    relaysByAddressLoading,
+  } = useSelector((s) => s?.shipping || {});
+
+  const [addresses, setAddresses] = useState([...billingLst, ...deliveryLst]);
+  const [shippingIndex, setShippingIndex] = useState(0);
+  const [billing, setBilling] = useState(addresses[0]);
+
   const [showBook, setShowBook] = useState(false);
   const [showAddShip, setShowAddShip] = useState(false);
   const [editShipIdx, setEditShipIdx] = useState(null);
-
   const [showEditBilling, setShowEditBilling] = useState(false);
 
-  /* ---- Livraison ---- */
   const [deliveryMode, setDeliveryMode] = useState("home"); // "home" | "relay"
-  const [relayZip, setRelayZip] = useState("91000");
-  const [shipOption, setShipOption] = useState("std");
+  const [selectedRelay, setSelectedRelay] = useState(null);
 
-  /* ---- Paiement ---- */
-  const [payMethod, setPayMethod] = useState("card"); // "card" | "paypal"
+  // ---- Champs de recherche relais par adresse (Boxtal v3.1) ----
+  const [relayNumber, setRelayNumber] = useState("");       // ex: "4"
+  const [relayStreet, setRelayStreet] = useState("");       // ex: "boulevard des capucines"
+  const [relayCity, setRelayCity] = useState("");           // ex: "Paris"
+  const [relayZip, setRelayZip] = useState("75001");        // postalCode
+  const [relayState, setRelayState] = useState("");         // optionnel
+  const [relayCountryIso, setRelayCountryIso] = useState("FR");
+
+  // Tarifs sélectionnés
+  const [selectedRateCode, setSelectedRateCode] = useState(null);
+
+  // Paiement
+  const [payMethod, setPayMethod] = useState("card");
   const [acceptTosCard, setAcceptTosCard] = useState(false);
   const [acceptTosPaypal, setAcceptTosPaypal] = useState(false);
 
-  /* ---- Totaux mock ---- */
-  const itemsTotal = 24.95;
+  // Totaux
+  const lsItemsAmount = useMemo(
+    () => readLsItems().reduce((s, it) => s + Number(it?.price ?? it?.priceTtc ?? 0) * getQty(it), 0),
+    []
+  );
+  const baseTotal = totalFromState > 0 ? totalFromState : lsItemsAmount;
+
+  // Poids panier (fallback 0.25 kg / article)
+  const cartWeightKg = useMemo(() => {
+    const items = readLsItems();
+    return items.reduce((s, it) => s + (it.weightKg ?? 0.25) * getQty(it), 0);
+  }, []);
+
+  const declaredValue = baseTotal;
+
+  // === 1) Charger les tarifs (à domicile) selon l'adresse de livraison ===
+  useEffect(() => {
+    const zip = deliveryFavoriteAddress?.postalCode || billingAddress?.postalCode;
+    const country = (deliveryFavoriteAddress?.country || "FR").slice(0, 2).toUpperCase();
+    if (!zip) return;
+
+    dispatch(
+      getShippingRatesRequest({
+        toZip: zip,
+        country,
+        weightKg: cartWeightKg,
+        value: declaredValue,
+      })
+    );
+  }, [deliveryFavoriteAddress, billingAddress, cartWeightKg, declaredValue, dispatch]);
+
+  // === 2) Recharger les tarifs si on choisit un relais ===
+  useEffect(() => {
+    if (deliveryMode !== "relay" || !selectedRelay) return;
+    dispatch(
+      getShippingRatesRequest({
+        toZip: selectedRelay.zip,
+        country: "FR",
+        weightKg: cartWeightKg,
+        value: declaredValue,
+      })
+    );
+  }, [deliveryMode, selectedRelay, cartWeightKg, declaredValue, dispatch]);
+
+  // === 3) Recherche des relais ===
+
+  // a) Recherche par adresse (NOUVEAU)
+  const fetchRelaysByAddress = () => {
+    dispatch(
+      getRelaysByAddressRequest({
+        number: relayNumber || undefined,
+        street: relayStreet || undefined,
+        city: relayCity || undefined,
+        postalCode: relayZip || undefined,
+        state: relayState || undefined,
+        countryIsoCode: relayCountryIso || "FR",
+        // searchNetworks: ["MONR","CHRP"], // si tu veux filtrer par transporteurs
+        limit: 30,
+      })
+    );
+    setDeliveryMode("relay");
+  };
+
+  // b) Ancienne recherche par ZIP (si tu veux la garder)
+  const fetchRelaysByZip = () => {
+    dispatch(getRelaysRequest({ zip: relayZip, country: "FR" }));
+    setDeliveryMode("relay");
+  };
+
+  // Liste à afficher : priorité aux résultats “par adresse”
+  const displayedRelays = (relaysByAddress && relaysByAddress.length > 0) ? relaysByAddress : relays;
+  const displayedRelaysLoading = relaysByAddressLoading || relaysLoading;
+
+  // Prix en fonction de la sélection
   const shippingPrice = useMemo(() => {
-    if (deliveryMode === "relay") return 1.95;
-    switch (shipOption) {
-      case "std":
-        return 1.95;
-      case "chrono-ex":
-        return 8.95;
-      case "chrono-rdv":
-        return 12.95;
-      case "chronopost":
-        return 7.95;
-      default:
-        return 1.95;
+    if (deliveryMode === "relay") {
+      const relayOffer = rates.find((r) => r.isRelay) || rates[0];
+      return relayOffer ? Number(relayOffer.priceTtc) : 0;
     }
-  }, [deliveryMode, shipOption]);
+    const o = rates.find((r) => r.code === selectedRateCode);
+    return o ? Number(o.priceTtc) : 0;
+  }, [deliveryMode, rates, selectedRateCode]);
 
-  const grandTotal = +(itemsTotal + shippingPrice).toFixed(2);
+  const grandTotal = +(baseTotal + shippingPrice).toFixed(2);
 
-  /* ---- Handlers popups ---- */
   const chooseFromBook = (idx) => {
     setShippingIndex(idx);
     setShowBook(false);
   };
-
   const addShippingAddress = (payload) => {
     setAddresses((arr) => {
       const next = [...arr, payload];
@@ -348,25 +475,126 @@ export const DeliveryPayment = () => {
     });
     setShowAddShip(false);
   };
-
-  const startEditShipping = (idx) => {
-    setEditShipIdx(idx);
-  };
+  const startEditShipping = (idx) => setEditShipIdx(idx);
   const saveEditShipping = (payload) => {
     setAddresses((arr) => arr.map((a, i) => (i === editShipIdx ? payload : a)));
     setEditShipIdx(null);
   };
 
-  /* ---- Paiement actions ---- */
-  const handleStripePay = () => {
-    if (!acceptTosCard) return;
-    // TODO: intégrer Stripe (Checkout / Payment Element)
-    alert("[Stripe] Paiement déclenché (mock)");
+  /* ---- Création de la commande + lignes depuis LS + (ex) création d'envoi Boxtal ---- */
+  const createOrderFromCart = async (paymentMethodLabel) => {
+    if (!currentCustomer?.id) {
+      alert("Veuillez vous connecter pour finaliser votre commande.");
+      return;
+    }
+
+    if (deliveryMode === "relay" && !selectedRelay) {
+      alert("Choisissez un point relais avant de continuer.");
+      return;
+    }
+
+    const beforeIds = (orders || [])
+      .filter(
+        (o) =>
+          String(o?.idCustomer ?? o?.customerId ?? o?.CustomerId ?? o?.customer?.id ?? "") ===
+          String(currentCustomer.id)
+      )
+      .map(getOrderEntityId)
+      .filter(Boolean);
+
+    const chosenRate =
+      deliveryMode === "relay"
+        ? rates.find((r) => r.isRelay) || rates.find((r) => r.code === selectedRateCode)
+        : rates.find((r) => r.code === selectedRateCode);
+
+    // 1) créer la commande
+    await dispatch(
+      addOrderRequest({
+        CustomerId: Number(currentCustomer.id),
+        PaymentMethod: paymentMethodLabel, // "Carte" | "PayPal"
+        Status: "En attente",
+        Amount: Number(grandTotal),
+        DeliveryAmount: Number(shippingPrice),
+
+        // 👉 Infos transport
+        DeliveryMode: deliveryMode,
+        DeliveryCarrier: chosenRate?.carrier || "Boxtal",
+        DeliveryMethodCode: chosenRate?.code || "",
+        DeliveryPointId: deliveryMode === "relay" ? selectedRelay?.id ?? null : null,
+        DeliveryPointLabel: deliveryMode === "relay" ? selectedRelay?.name ?? null : null,
+      })
+    );
+
+    // 2) récupérer l'ID créé
+    const newOrderId = await waitForNewOrderId(dispatch, store, currentCustomer.id, beforeIds);
+    if (!newOrderId) {
+      alert("Commande créée mais identifiant introuvable pour l’instant. Réessayez ou actualisez.");
+      return;
+    }
+
+    // 3) ajouter les lignes depuis le localStorage
+    const items = readLsItems();
+    for (const it of items) {
+      const pid = getPid(it);
+      const qty = getQty(it);
+      const unitPriceWhenOrder = getProductUnitPrice(it, productsFromStore);
+      if (!pid || qty <= 0) continue;
+
+      await dispatch(
+        addOrderCustomerProductRequest({
+          OrderId: Number(newOrderId),
+          CustomerId: Number(currentCustomer.id),
+          ProductId: Number(pid),
+          Quantity: Number(qty),
+          IdOrder: Number(newOrderId),
+          IdProduct: Number(pid),
+          ProductUnitPrice: unitPriceWhenOrder,
+        })
+      );
+    }
+
+    // 4) (exemple) créer l'expédition Boxtal côté backend via Saga
+    try {
+      const body = {
+        serviceCode: chosenRate?.code || "",
+        isRelay: deliveryMode === "relay",
+        relayId: deliveryMode === "relay" ? selectedRelay?.id ?? null : null,
+        toFirstName: currentCustomer?.firstName ?? "",
+        toLastName: currentCustomer?.lastName ?? "",
+        toStreet: deliveryFavoriteAddress?.address ?? "",
+        toExtra: deliveryFavoriteAddress?.complementaryAddress ?? "",
+        toZip:
+          deliveryMode === "relay" ? selectedRelay?.zip ?? "" : deliveryFavoriteAddress?.postalCode ?? "",
+        toCity:
+          deliveryMode === "relay" ? selectedRelay?.city ?? "" : deliveryFavoriteAddress?.city ?? "",
+        toCountry: "FR",
+        weightKg: cartWeightKg,
+        declaredValue: baseTotal,
+      };
+      // ⚠️ En prod, lance plutôt après succès du paiement
+      dispatch(createShipmentRequest(newOrderId, body));
+    } catch (e) {
+      console.error("Create shipment error:", e);
+    }
+
+    // 5) refresh
+    await Promise.all([dispatch(getOrderRequest?.()), dispatch(getOrderCustomerProductRequest?.())]);
+
+    // 6) vider le panier (Redux + LS)
+    await dispatch(saveCartRequest([]));
+    localStorage.setItem("items", "[]");
+
+    alert("Votre commande a été enregistrée.");
   };
-  const handlePayPal = () => {
+
+  const handleStripePay = async () => {
+    if (!acceptTosCard) return;
+    await createOrderFromCart("Carte");
+  };
+
+  const handlePayPal = async () => {
     if (!acceptTosPaypal) return;
-    // TODO: intégrer le flow PayPal
-    alert("[PayPal] Paiement déclenché (mock)");
+    await createOrderFromCart("PayPal");
   };
 
   const shipAddr = addresses[shippingIndex];
@@ -390,34 +618,33 @@ export const DeliveryPayment = () => {
         {/* ----- À domicile ----- */}
         <section className="category-card" style={{ padding: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-            <input
-              type="radio"
-              name="deliv"
-              checked={deliveryMode === "home"}
-              onChange={() => setDeliveryMode("home")}
-            />
+            <input type="radio" name="deliv" checked={deliveryMode === "home"} onChange={() => setDeliveryMode("home")} />
             <h3 style={{ margin: 0 }}>À domicile</h3>
-            <span style={chipMuted}>À partir de 1€95</span>
+            <span style={chipMuted}>Tarifs en direct</span>
           </div>
 
           <div style={smallTitle}>Votre adresse de livraison</div>
           <div style={addressWrap}>
             <div style={{ flex: 1 }}>
               <div style={{ fontWeight: 800 }}>
-                {shipAddr.firstName} {shipAddr.lastName}
+                {currentCustomer?.firstName} {currentCustomer?.lastName}
               </div>
-              <div>{shipAddr.street}</div>
-              {shipAddr.extra && <div>{shipAddr.extra}</div>}
-              <div>
-                {shipAddr.zip} {shipAddr.city}
-              </div>
-              <div>{shipAddr.country}</div>
-              {(shipAddr.phone || shipAddr.phoneFix) && (
-                <div style={{ color: "#6b7280" }}>
-                  {shipAddr.phone || shipAddr.phoneFix}
-                  {shipAddr.phone && shipAddr.phoneFix ? " • " : ""}
-                  {shipAddr.phoneFix}
-                </div>
+              {deliveryFavoriteAddress ? (
+                <>
+                  <div>{deliveryFavoriteAddress.address}</div>
+                  {deliveryFavoriteAddress.complementaryAddress && (
+                    <div>{deliveryFavoriteAddress.complementaryAddress}</div>
+                  )}
+                  <div>
+                    {deliveryFavoriteAddress.postalCode} {deliveryFavoriteAddress.city}
+                  </div>
+                  <div>{deliveryFavoriteAddress.country}</div>
+                  {deliveryFavoriteAddress.phone && (
+                    <div style={{ color: "#6b7280" }}>{deliveryFavoriteAddress.phone}</div>
+                  )}
+                </>
+              ) : (
+                <div style={{ color: "#6b7280" }}>Aucune adresse de livraison favorite.</div>
               )}
             </div>
 
@@ -431,81 +658,107 @@ export const DeliveryPayment = () => {
             </div>
           </div>
 
+          {/* Offres Boxtal */}
           <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
-            <ShipOption
-              value="std"
-              price="1€95"
-              label="Livraison standard"
-              checked={shipOption === "std"}
-              onChange={() => setShipOption("std")}
-            />
-            <ShipOption
-              value="chrono-ex"
-              price="8€95"
-              label="Livraison Chronopost Express (avant 10h)"
-              sub="Livré demain avant 10h"
-              checked={shipOption === "chrono-ex"}
-              onChange={() => setShipOption("chrono-ex")}
-            />
-            <ShipOption
-              value="chrono-rdv"
-              price="12€95"
-              label="Livraison Chronopost Rendez-Vous"
-              sub="Livré dans la journée"
-              checked={shipOption === "chrono-rdv"}
-              onChange={() => setShipOption("chrono-rdv")}
-            />
-            <ShipOption
-              value="chronopost"
-              price="7€95"
-              label="Livraison Chronopost"
-              checked={shipOption === "chronopost"}
-              onChange={() => setShipOption("chronopost")}
-            />
+            {ratesLoading && <div style={{ color: "#6b7280" }}>Chargement des offres…</div>}
+            {!ratesLoading &&
+              rates.map((o) => (
+                <ShipOption
+                  key={o.code}
+                  value={o.code}
+                  price={fmt(o.priceTtc)}
+                  label={`${o.carrier} — ${o.label}`}
+                  checked={selectedRateCode === o.code && deliveryMode === "home"}
+                  onChange={() => {
+                    setSelectedRateCode(o.code);
+                    setDeliveryMode("home");
+                  }}
+                />
+              ))}
           </div>
         </section>
 
         {/* ----- En point relais ----- */}
         <section className="category-card" style={{ padding: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-            <input
-              type="radio"
-              name="deliv"
-              checked={deliveryMode === "relay"}
-              onChange={() => setDeliveryMode("relay")}
-            />
+            <input type="radio" name="deliv" checked={deliveryMode === "relay"} onChange={() => setDeliveryMode("relay")} />
             <h3 style={{ margin: 0 }}>En point relais</h3>
-            <span style={chipMuted}>1€95</span>
+            <span style={chipMuted}>Choisissez un relais</span>
           </div>
 
-          <div style={{ color: "#2563eb", fontWeight: 800, fontSize: 12, marginBottom: 6 }}>
-            Nouveau
+          <div style={{ color: "#2563eb", fontWeight: 800, fontSize: 12, marginBottom: 6 }}>Recherche par adresse</div>
+
+          {/* Formulaire adresse Boxtal v3.1 */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr 1fr 1fr 100px", gap: 8, alignItems: "end" }}>
+            <Field label="N°">
+              <input className="form-control" value={relayNumber} onChange={(e) => setRelayNumber(e.target.value)} />
+            </Field>
+            <Field label="Rue">
+              <input className="form-control" value={relayStreet} onChange={(e) => setRelayStreet(e.target.value)} />
+            </Field>
+            <Field label="Ville">
+              <input className="form-control" value={relayCity} onChange={(e) => setRelayCity(e.target.value)} />
+            </Field>
+            <Field label="Code postal">
+              <input className="form-control" value={relayZip} onChange={(e) => setRelayZip(e.target.value)} />
+            </Field>
+            <div>
+              <button style={lightBtn} onClick={fetchRelaysByAddress}>OK</button>
+            </div>
           </div>
 
-          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-            <input
-              className="form-control"
-              style={{ maxWidth: 140 }}
-              value={relayZip}
-              onChange={(e) => setRelayZip(e.target.value)}
-            />
-            <span>✔</span>
-            <button style={lightBtn}>OK</button>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginTop: 8 }}>
+            <Field label="État (optionnel)">
+              <input className="form-control" value={relayState} onChange={(e) => setRelayState(e.target.value)} />
+            </Field>
+            <Field label="Pays (ISO 2)">
+              <input className="form-control" value={relayCountryIso} onChange={(e) => setRelayCountryIso(e.target.value.toUpperCase())} />
+            </Field>
+            <div />
           </div>
 
           <div style={{ margin: "10px 0", textAlign: "center", color: "#6b7280" }}>ou</div>
 
-          <div style={{ display: "flex", justifyContent: "center" }}>
-            <button style={lightBtn}>Localisez-moi</button>
+          {/* Ancien bouton ZIP (optionnel) */}
+          <div style={{ display: "flex", gap: 10, alignItems: "center", justifyContent: "center" }}>
+            <input className="form-control" style={{ maxWidth: 140 }} value={relayZip} onChange={(e) => setRelayZip(e.target.value)} />
+            <button style={lightBtn} onClick={fetchRelaysByZip}>
+              Chercher par CP
+            </button>
           </div>
+
+          {displayedRelaysLoading && <div style={{ color: "#6b7280", marginTop: 10 }}>Recherche des relais…</div>}
+
+          {!displayedRelaysLoading && displayedRelays.length > 0 && (
+            <div style={{ marginTop: 12, display: "grid", gap: 10, maxHeight: 260, overflow: "auto" }}>
+              {displayedRelays.map((r) => (
+                <label
+                  key={r.id}
+                  style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 10, display: "grid", gap: 4 }}
+                >
+                  <input
+                    type="radio"
+                    name="relay"
+                    checked={selectedRelay?.id === r.id}
+                    onChange={() => {
+                      setSelectedRelay(r);
+                      setDeliveryMode("relay");
+                    }}
+                  />
+                  <span><img src={getRelayLogo(r)} style={{width: 45}} alt={r.carrier} /></span>
+                  <strong>{r.name}  <span style={{color: "#6b7280"}}>({r.distance})</span></strong>
+                  <span>{r.address}</span>
+                  <span>{r.zipCode} {r.city}</span>
+                  <span><strong>{r.schedules}</strong></span>
+                </label>
+              ))}
+            </div>
+          )}
         </section>
       </div>
 
       {/* ==================== ADRESSE DE FACTURATION ==================== */}
-      <div
-        className="category-card"
-        style={{ padding: 16, marginBottom: 18, display: "grid", gap: 8 }}
-      >
+      <div className="category-card" style={{ padding: 16, marginBottom: 18, display: "grid", gap: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <i className="bi bi-file-earmark-text" aria-hidden="true" />
           <div style={{ fontWeight: 800 }}>Votre adresse de facturation</div>
@@ -513,12 +766,19 @@ export const DeliveryPayment = () => {
 
         <div style={addressWrap}>
           <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 800 }}>
-              {billing.firstName} {billing.lastName} — {billing.street}, {billing.extra}
-            </div>
-            <div>
-              {billing.zip} {billing.city} — {billing.country}
-            </div>
+            {billingAddress ? (
+              <>
+                <div style={{ fontWeight: 800 }}>
+                  {currentCustomer?.firstName} {currentCustomer?.lastName} — {billingAddress.address}
+                  {billingAddress.complementaryAddress ? `, ${billingAddress.complementaryAddress}` : ""}
+                </div>
+                <div>
+                  {billingAddress.postalCode} {billingAddress.city} — {billingAddress.country}
+                </div>
+              </>
+            ) : (
+              <div style={{ color: "#6b7280" }}>Aucune adresse de facturation.</div>
+            )}
           </div>
 
           <button style={lightBtn} onClick={() => setShowEditBilling(true)}>
@@ -532,19 +792,11 @@ export const DeliveryPayment = () => {
         Paiement
       </h2>
 
-      <div
-        className="pay-grid"
-        style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: 18 }}
-      >
+      <div className="pay-grid" style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: 18 }}>
         {/* ====== Carte bancaire (Stripe) ====== */}
         <section className="category-card" style={{ padding: 16 }}>
           <label className="pay-method" style={payMethodRow}>
-            <input
-              type="radio"
-              name="pay"
-              checked={payMethod === "card"}
-              onChange={() => setPayMethod("card")}
-            />
+            <input type="radio" name="pay" checked={payMethod === "card"} onChange={() => setPayMethod("card")} />
             <span style={{ fontWeight: 800 }}>Carte bancaire</span>
             <span aria-hidden="true">💳</span>
           </label>
@@ -556,11 +808,7 @@ export const DeliveryPayment = () => {
               </div>
 
               <label className="tos-row" style={tosRow}>
-                <input
-                  type="checkbox"
-                  checked={acceptTosCard}
-                  onChange={(e) => setAcceptTosCard(e.target.checked)}
-                />
+                <input type="checkbox" checked={acceptTosCard} onChange={(e) => setAcceptTosCard(e.target.checked)} />
                 <span>J’accepte les conditions générales de vente.</span>
               </label>
 
@@ -574,12 +822,7 @@ export const DeliveryPayment = () => {
 
           {/* ====== PayPal ====== */}
           <label className="pay-method" style={payMethodRow}>
-            <input
-              type="radio"
-              name="pay"
-              checked={payMethod === "paypal"}
-              onChange={() => setPayMethod("paypal")}
-            />
+            <input type="radio" name="pay" checked={payMethod === "paypal"} onChange={() => setPayMethod("paypal")} />
             <span style={{ fontWeight: 800 }}>PayPal</span>
           </label>
 
@@ -609,7 +852,7 @@ export const DeliveryPayment = () => {
 
           <div style={sumRow}>
             <span>Montant de vos produits</span>
-            <strong>{fmt(itemsTotal)}</strong>
+            <strong>{fmt(baseTotal)}</strong>
           </div>
 
           <div style={sumRow}>
@@ -688,13 +931,7 @@ function ShipOption({ value, label, sub, price, checked, onChange }) {
         cursor: "pointer",
       }}
     >
-      <input
-        id={`op-${value}`}
-        type="radio"
-        name="shipopt"
-        checked={checked}
-        onChange={onChange}
-      />
+      <input id={`op-${value}`} type="radio" name="shipopt" checked={checked} onChange={onChange} />
       <div>
         <div style={{ fontWeight: 700 }}>{label}</div>
         {sub && <div style={{ color: "#6b7280", fontSize: ".95rem" }}>{sub}</div>}
@@ -704,7 +941,6 @@ function ShipOption({ value, label, sub, price, checked, onChange }) {
   );
 }
 
-/* ---- tiny UI tokens ---- */
 const addressWrap = {
   display: "flex",
   gap: 14,
@@ -714,7 +950,6 @@ const addressWrap = {
   borderRadius: 12,
   background: "#fafafa",
 };
-
 const chipMuted = {
   fontSize: 12,
   background: "#eef2ff",
@@ -723,9 +958,7 @@ const chipMuted = {
   borderRadius: 999,
   fontWeight: 700,
 };
-
 const smallTitle = { fontWeight: 700, color: "#374151", marginBottom: 6 };
-
 const lightBtn = {
   padding: "8px 12px",
   borderRadius: 10,
@@ -734,7 +967,6 @@ const lightBtn = {
   cursor: "pointer",
   fontWeight: 700,
 };
-
 const primaryBtn = {
   padding: "10px 14px",
   borderRadius: 10,
@@ -744,14 +976,12 @@ const primaryBtn = {
   cursor: "pointer",
   fontWeight: 800,
 };
-
 const addressCard = {
   border: "1px solid #e5e7eb",
   borderRadius: 12,
   padding: 12,
   background: "#fff",
 };
-
 const stripeInfo = {
   background: "#f8fafc",
   border: "1px dashed #cfe1ff",
@@ -761,22 +991,8 @@ const stripeInfo = {
   margin: "8px 0 12px",
   fontWeight: 600,
 };
-
 const payMethodRow = { display: "flex", alignItems: "center", gap: 10, marginBottom: 8 };
-
 const tosRow = { display: "flex", alignItems: "center", gap: 10, margin: "8px 0 12px" };
-
-const ctaBtn = {
-  width: "100%",
-  border: 0,
-  borderRadius: 12,
-  padding: "12px 16px",
-  fontWeight: 800,
-  color: "#fff",
-  cursor: "pointer",
-  background: "linear-gradient(135deg, #3b79ff, #2c5dff)",
-};
-
 const summaryCard = {
   background: "#fff",
   borderRadius: 12,
@@ -786,7 +1002,6 @@ const summaryCard = {
   position: "sticky",
   top: 110,
 };
-
 const sumRow = {
   display: "flex",
   justifyContent: "space-between",

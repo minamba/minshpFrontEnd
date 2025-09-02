@@ -18,6 +18,9 @@ import applicationReducer from "./ApplicationReducers";
 import AccountReducer from "./AccountReducers";
 import billingAddressReducer from "./BillingAddressReducers";
 import deliveryAddressReducer from "./DeliveryAddressReducers";
+import orderCustomerProductReducer from "./OrderCustomerProductReducers";
+import shippingReducer from "./ShippingReducers";
+import packageprofilReducer from "./PackageProfilReducers";
 
 export default combineReducers({
     products : productReducer,
@@ -38,5 +41,8 @@ export default combineReducers({
     applications : applicationReducer,
     account : AccountReducer,
     billingAddresses : billingAddressReducer,
-    deliveryAddresses : deliveryAddressReducer
+    deliveryAddresses : deliveryAddressReducer,
+    orderProducts : orderCustomerProductReducer,
+    shipping : shippingReducer,
+    packageProfils : packageprofilReducer
 })

@@ -23,6 +23,7 @@ import {BillingAddressAdmin} from './BillingAddressAdmin';
 import {DeliveryAddressAdmin} from './DeliveryAddressAdmin';
 import {ApplicationAdmin} from './ApplicationAdmin';
 import {DeliveryPayment} from './DeliveryPayment';
+import {PackageProfilAdmin} from './PackageProfilAdmin';
 import {Cart} from './Cart';
 import {News} from './News';
 import {FeatureCategoryAdmin} from './FeatureCategoryAdmin';
@@ -35,6 +36,8 @@ import { getImageRequest } from "../../lib/actions/ImageActions";
 import { getVideoRequest } from "../../lib/actions/VideoActions";
 import { getFeatureCategoryRequest } from "../../lib/actions/FeatureCategoryActions";
 import { getCustomerRequest } from "../../lib/actions/CustomerActions";
+import { getBillingAddressRequest } from "../../lib/actions/BillingAddressActions";
+import { getDeliveryAddressRequest } from "../../lib/actions/DeliveryAddressActions";
 import {Product} from './Product';
 import { getFeaturesCategoryByProductRequest } from "../../lib/actions/FeatureCategoryActions";
 import {PromotionCodeAdmin} from './PromotionCodeAdmin';
@@ -45,6 +48,9 @@ import RequireAuth from './Authentication/RequireAuth';
 import {UserInformation} from './Account/UserInformation';  
 import {Address} from './Account/Address';
 import {Register} from './Account/Register';
+import {getOrderCustomerProductRequest} from '../../lib/actions/OrderCustomerProductActions';
+import {getOrderRequest} from '../../lib/actions/OrderActions';
+import {getPackageProfilRequest} from '../../lib/actions/PackageProfilActions';
 
 export const BaseApp = () => {
 
@@ -61,6 +67,11 @@ export const BaseApp = () => {
         dispatch(getApplicationRequest());
         dispatch(getApplicationRequest());
         dispatch(getCustomerRequest());
+        dispatch(getOrderCustomerProductRequest());
+        dispatch(getOrderRequest());
+        dispatch(getBillingAddressRequest());
+        dispatch(getDeliveryAddressRequest());
+        dispatch(getPackageProfilRequest());
     }, []);
 
     useEffect(() => {
@@ -82,7 +93,6 @@ export const BaseApp = () => {
                         <Route path="/admin/promotions" element={<PromotionAdmin/>} />
                         <Route path="/admin/features" element={<FeatureAdmin/>} />
                         <Route path="/admin/featureProducts" element={<FeatureProductAdmin/>} />
-                        <Route path="/admin/orders" element={<OrderAdmin/>} />
                         <Route path="/admin/images" element={<ImageAdmin/>} />
                         <Route path="/admin/videos" element={<VideoAdmin/>} />
                         <Route path="/product/:id" element={<Product/>} />
@@ -103,6 +113,8 @@ export const BaseApp = () => {
                         <Route path="/account" element={ <RequireAuth><Account /></RequireAuth> } /> fallback si pas d'id
                         <Route path="/admin/billingAddress" element={<RequireAuth><BillingAddressAdmin/></RequireAuth>}/>
                         <Route path="/admin/deliveryAddress" element={<RequireAuth><DeliveryAddressAdmin/></RequireAuth>}/>
+                        <Route path="/admin/orders" element={<RequireAuth><OrderAdmin/></RequireAuth>}/>
+                        <Route path="/admin/packageProfil" element={<RequireAuth><PackageProfilAdmin/></RequireAuth>}/>
                     </Routes>
                 </main>
                 <Footer/>

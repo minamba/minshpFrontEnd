@@ -1,7 +1,8 @@
 import {takeEvery, takeLatest, call, put, fork} from "redux-saga/effects";
 import * as actions from "../actions/PromotionActions";
+import * as actionsProduct from "../actions/ProductActions";
 import * as api from "../api/promotions";
-
+import * as apiProduct from "../api/products";
 
 
 function* getPromotions() {
@@ -21,6 +22,9 @@ function* addPromotion(action) {
         console.log("Promotion added :",response.data);
         const promotions = yield call (api.getPromotions);
         yield put (actions.getPromotionSuccess({promotions : promotions.data}));
+
+        const products = yield call (apiProduct.getProducts);
+        yield put (actionsProduct.getProductUserSuccess({products : products.data}));
     }
     catch (error) {
         yield put (actions.addPromotionFailure({error : error.response?.data || error.message}));
@@ -33,6 +37,9 @@ function* updatePromotion(action) {
         console.log("Promotion updated :",response.data);
         const promotions = yield call (api.getPromotions);
         yield put (actions.getPromotionSuccess({promotions : promotions.data}));
+        
+        const products = yield call (apiProduct.getProducts);
+        yield put (actionsProduct.getProductUserSuccess({products : products.data}));
     }
     catch (error) {
         yield put (actions.updatePromotionFailure({error : error.response?.data || error.message}));
@@ -46,6 +53,9 @@ function* deletePromotion(action) {
             const response = yield call(api.getPromotions);
 
             yield put (actions.getPromotionSuccess({promotions : response.data}));
+
+            const products = yield call (apiProduct.getProducts);
+            yield put (actionsProduct.getProductUserSuccess({products : products.data}));
     }
     catch (error) {
         yield put (actions.deletePromotionFailure({error : error.response?.data || error.message}));

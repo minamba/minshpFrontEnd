@@ -549,6 +549,12 @@ h1 { text-align: center; }
   background: linear-gradient(135deg, #3b79ff, #2c5dff);
   color: #fff; font-weight: 700; cursor: pointer; margin: 10px 0 8px;
 }
+.checkout-btn-disabled {
+  width: 100%;
+  border: 0; border-radius: 999px; padding: 14px 18px;
+  background: linear-gradient(135deg, #68686867, #4b4b4b41);
+  color: #fff; font-weight: 700; cursor: pointer; margin: 10px 0 8px;
+}
 .checkout-btn:hover { filter: brightness(.98); }
 .sum-note { color:#6b7280; font-size: .9rem; }
 
@@ -1089,6 +1095,32 @@ h1 { text-align: center; }
 .form-actions .btn {
   width: 160px;
 }
+
+/* ===================== Detail de la commande ===================== */
+
+/* ===== Account > Orders > Détails : lien produit sans soulignage, bleu gras ===== */
+.order-details .order-item a,
+.order-details .order-item a:visited{
+  color: var(--accent, #2b3b44);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.order-details .order-item a:hover,
+.order-details .order-item a:focus{
+  text-decoration: none;   /* on garde sans soulignage au hover/focus */
+  filter: brightness(.95); /* léger feedback visuel (optionnel) */
+}
+
+.order-details .order-item a:active{
+  filter: brightness(.90);
+}
+
+/* ===================== affichage du prix de livraison dans "mes commmandes" ===================== */
+
+.order-item--shipping .shipping-label { color:#16a34a; font-weight:700; }
+.order-item--shipping .order-item__qty { visibility:hidden; } /* réserve l’espace */
+
 
 
 

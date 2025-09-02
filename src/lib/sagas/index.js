@@ -16,6 +16,10 @@ import accountSaga from "./account";
 import customersSaga from "./customers";
 import billingAddressesSaga from "./billingAddress";
 import deliveryAddressesSaga from "./deliveryAddress";
+import ordersSaga from "./orders";
+import orderProductsSaga from "./orderProducts";
+import shippingSaga from "./shipping";
+import packageProfilsSaga from "./packageProfils";
 import { all } from "redux-saga/effects";
 
 
@@ -38,6 +42,10 @@ export default function* rootSaga() {
         accountSaga(),
         customersSaga(),
         billingAddressesSaga(),
-        deliveryAddressesSaga()
+        deliveryAddressesSaga(),
+        ordersSaga(),
+        orderProductsSaga(),
+        shippingSaga(),
+        packageProfilsSaga()
     ]);
 }

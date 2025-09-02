@@ -292,6 +292,7 @@ export const Cart = () => {
 
   const subTotal   = items.reduce((s, it) => s + it.price * it.qty, 0);
   const grandTotal = Math.max(0, subTotal);
+  const hasItems   = items.length > 0;  
 
   useEffect(() => { window.scrollTo({ top: 0, behavior: "instant" }); }, []);
 
@@ -390,7 +391,16 @@ export const Cart = () => {
           <h3 className="sum-title">Montant total de vos produits</h3>
           <div className="sum-amount">{fmt(grandTotal)}</div>
 
-          <button className="checkout-btn" onClick={() => navigate("/deliveryPayment")}>
+          <button
+            className= {hasItems ? "checkout-btn" : "checkout-btn-disabled"}
+            disabled={!hasItems}                                  // ✅ grisé si panier vide
+            onClick={() =>
+              hasItems &&                                         // ✅ sécurité côté JS
+              navigate("/deliveryPayment", {
+                state: { totalCents: Math.round(grandTotal * 100) },
+              })
+            }
+          >
             Passer commande
           </button>
 

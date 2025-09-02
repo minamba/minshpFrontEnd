@@ -10,6 +10,7 @@ import { addProductUserRequest } from '../lib/actions/ProductActions';
 import { postUploadRequest } from '../lib/actions/UploadActions';
 import { deleteProductUserRequest } from '../lib/actions/ProductActions';
 import { getFeaturesCategoryByProductRequest } from '../lib/actions/FeatureCategoryActions';
+import { getPackageProfilRequest } from '../lib/actions/PackageProfilActions';
 import { useDispatch } from 'react-redux'; 
 import { useMemo } from "react";
 import { Badge } from 'react-bootstrap';
@@ -222,6 +223,7 @@ const { isAuth, user } = useSelector((s) => s.account) || { isAuth: false, user:
                 <Link to="/admin/products" onClick={() => setIsOpen(false)}>Produits</Link>
                 <Link to="/admin/categories" onClick={() => setIsOpen(false)}>Catégories</Link>
                 <Link to="/admin/customers" onClick={() => setIsOpen(false)}>Clients</Link>
+                <Link to="/admin/orders" onClick={() => setIsOpen(false)}>Commandes</Link>
                 <Link to="/admin/featureCategories" onClick={() => setIsOpen(false)}>Catégories des caractéristiques</Link>
                 <Link to="/admin/stocks" onClick={() => setIsOpen(false)}>Stocks</Link>
                 <Link to="/admin/promotions" onClick={() => setIsOpen(false)}>Promotions</Link>
@@ -234,6 +236,7 @@ const { isAuth, user } = useSelector((s) => s.account) || { isAuth: false, user:
                 <Link to="/admin/application" onClick={() => setIsOpen(false)}>Application</Link>
                 <Link to="/admin/billingAddress" onClick={() => setIsOpen(false)}>Adresses de facturation</Link>
                 <Link to="/admin/deliveryAddress" onClick={() => setIsOpen(false)}>Adresses de livraison</Link>
+                <Link to="/admin/packageProfil" onClick={() => setIsOpen(false)}>Profils de colis</Link>
               </div>
             )}
           </div>
@@ -253,8 +256,9 @@ const { isAuth, user } = useSelector((s) => s.account) || { isAuth: false, user:
 
 // //////////////////////// Product Table ////////////////////////
 export const ProductTable = () => {
-  const productsFromStore = useSelector((state) => state.products.products) || [];
+  const productsFromStore   = useSelector((state) => state.products.products) || [];
   const categoriesFromStore = useSelector((state) => state.categories.categories) || [];
+  const packageProfils      = useSelector((s) => s.packageProfils?.packageProfils) || [];
   const dispatch = useDispatch();
 
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -264,6 +268,7 @@ export const ProductTable = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [formData, setFormData] = useState({
+    id: undefined,
     name: '',
     brand: '',
     model: '',
@@ -274,6 +279,8 @@ export const ProductTable = () => {
     stock: 0,
     promotion: 'Non',
     main: false,
+    // nouveau : select package profil
+    packageProfilId: '', // string (id sélectionné)
   });
 
   useEffect(() => { dispatch(getProductUserRequest()); }, [dispatch]);
@@ -302,8 +309,76 @@ export const ProductTable = () => {
   const handleAddClick = () => {
     setIsEditing(false);
     setCurrentId(null);
-    setFormData({ name: '', brand: '', model: '', description: '', price: '', category: '', image: '', stock: 0, promotion: 'Non', main: false });
+    setFormData({
+      id: undefined,
+      name: '',
+      brand: '',
+      model: '',
+      description: '',
+      price: '',
+      category: '',
+      image: '',
+      stock: 0,
+      promotion: 'Non',
+      main: false,
+      packageProfilId: '',
+    });
     setShowModal(true);
+  };
+
+  // helpers id package profil
+  const getPkgIdFromProduct = (p) =>
+    p?.idPackageProfil ??
+    p?.IdPackageProfil ??
+    p?.packageProfilId ??
+    p?.PackageProfilId ??
+    p?.idPackageProfile ??
+    null;
+
+  const getPkgIdFromCategory = (c) =>
+    c?.idPackageProfil ??
+    c?.IdPackageProfil ??
+    c?.packageProfilId ??
+    c?.PackageProfilId ??
+    c?.idPackageProfile ??
+    null;
+
+  const findCategoryForProduct = (p) => {
+    const pidCat =
+      p?.idCategory ?? p?.IdCategory ?? p?.categoryId ?? p?.CategoryId ?? null;
+    if (pidCat != null) {
+      const byId = categoriesFromStore.find(
+        (c) => String(c?.id ?? c?.Id) === String(pidCat)
+      );
+      if (byId) return byId;
+    }
+    if (p?.category) {
+      const byName = categoriesFromStore.find((c) => String(c?.name) === String(p.category));
+      if (byName) return byName;
+    }
+    return null;
+  };
+
+  const packageProfilsById = useMemo(() => {
+    const m = new Map();
+    for (const pp of packageProfils) {
+      const id = pp?.id ?? pp?.Id;
+      if (id != null) m.set(String(id), pp);
+    }
+    return m;
+  }, [packageProfils]);
+
+  const getPackageProfilNameForProduct = (p) => {
+    // 1) priorité : package profil du produit
+    let pid = getPkgIdFromProduct(p);
+    // 2) fallback : package profil de la catégorie du produit
+    if (pid == null) {
+      const cat = findCategoryForProduct(p);
+      pid = getPkgIdFromCategory(cat);
+    }
+    if (pid == null) return '—';
+    const pp = packageProfilsById.get(String(pid));
+    return pp?.name ?? pp?.Name ?? `#${pid}`;
   };
 
   const handleEditClick = (product) => {
@@ -320,6 +395,11 @@ export const ProductTable = () => {
       main: !!product.main,
       stock: product.stocks?.quantity,
       idStock: product.stocks?.id,
+      // pré-sélection du package profil uniquement si le produit en a un
+      packageProfilId: (() => {
+        const pid = getPkgIdFromProduct(product);
+        return pid != null ? String(pid) : ''; // si null -> pas de préselection
+      })(),
     });
     setShowModal(true);
   };
@@ -334,6 +414,10 @@ export const ProductTable = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // prépare IdPackageProfil si sélectionné
+    const pkgId = formData.packageProfilId ? Number(formData.packageProfilId) : null;
+
     if (isEditing) {
       await dispatch(updateProductUserRequest({
         Id: formData.id,
@@ -345,6 +429,7 @@ export const ProductTable = () => {
         IdCategory: idCategory,
         Main: formData.main,
         Stock: formData.stock,
+        ...(pkgId != null ? { IdPackageProfil: pkgId, PackageProfilId: pkgId } : {}), // on envoie si choisi
       }));
     } else {
       await dispatch(addProductUserRequest({
@@ -355,6 +440,7 @@ export const ProductTable = () => {
         Price: formData.price,
         Stock: formData.stock,
         IdCategory: idCategory,
+        ...(pkgId != null ? { IdPackageProfil: pkgId, PackageProfilId: pkgId } : {}),
       }));
     }
     await dispatch(getProductUserRequest());
@@ -384,7 +470,7 @@ export const ProductTable = () => {
   });
 
   return (
-    <div className="admin-products">{/* <- wrapper pour scoper le CSS des actions */}
+    <div className="admin-products">
       <div className="d-flex justify-content-between align-items-center mb-3">
         <h2>Produits</h2>
         <button className='btn btn-success' onClick={handleAddClick}>Ajouter un produit</button>
@@ -422,6 +508,7 @@ export const ProductTable = () => {
               <th>Prix (€)</th>
               <th>Prix TTC (€)</th>
               <th>Catégorie</th>
+              <th>Profil de colis</th>
               <th>Stock</th>
               <th>Promotion</th>
               <th>Vitrine</th>
@@ -434,7 +521,11 @@ export const ProductTable = () => {
             {filteredProducts.length > 0 ? (
               filteredProducts.map((prod) => (
                 <tr key={prod.id}>
-                  <td><Link to={`/product/${prod.id}`}><img src={prod.images?.[0]?.url} alt={prod.name} width={100} /></Link></td>
+                  <td>
+                    <Link to={`/product/${prod.id}`}>
+                      <img src={prod.images?.[0]?.url} alt={prod.name} width={100} />
+                    </Link>
+                  </td>
                   <td>{prod.name}</td>
                   <td>{prod.brand}</td>
                   <td>{prod.model}</td>
@@ -442,13 +533,13 @@ export const ProductTable = () => {
                   <td>{prod.price}</td>
                   <td>{prod.priceTtc}</td>
                   <td>{prod.category}</td>
+                  <td>{getPackageProfilNameForProduct(prod)}</td>
                   <td>{prod.stocks?.quantity ? prod.stocks.quantity : "Rupture"}</td>
                   <td>{prod.promotions?.length > 0 ? "Oui" : "Non"}</td>
                   <td>{prod.main ? "Oui" : "Non"}</td>
-                  <td>{new Date(prod.creationDate).toLocaleDateString()}</td>
+                  <td>{prod.creationDate ? new Date(prod.creationDate).toLocaleDateString() : "—"}</td>
                   <td>{prod.modificationDate ? new Date(prod.modificationDate).toLocaleDateString() : "NM"}</td>
 
-                  {/* ---- Actions : styles uniformisés via .admin-products .table-actions .btn ---- */}
                   <td className="table-actions">
                     <button
                       className='btn btn-warning me-2'
@@ -478,7 +569,7 @@ export const ProductTable = () => {
               ))
             ) : (
               <tr>
-                <td colSpan="14" className="text-center">Aucun produit trouvé.</td>
+                <td colSpan="15" className="text-center">Aucun produit trouvé.</td>
               </tr>
             )}
           </tbody>
@@ -542,6 +633,25 @@ export const ProductTable = () => {
                   ))}
                 </select>
               </div>
+
+              {/* ✅ Nouveau : sélection Package Profil (sous Catégorie) */}
+              <div className="mb-3">
+                <label>Profil de colis</label>
+                <select
+                  name="packageProfilId"
+                  className="form-select"
+                  value={formData.packageProfilId}
+                  onChange={handleInputChange}
+                >
+                  <option value="">— Aucun —</option>
+                  {packageProfils.map((pp) => (
+                    <option key={pp.id ?? pp.Id} value={String(pp.id ?? pp.Id)}>
+                      {pp.name ?? pp.Name ?? `#${pp.id ?? pp.Id}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <div className="mb-3">
                 <label>Stock</label>
                 <input type="number" name="stock" className="form-control" value={formData.stock ? formData.stock : 0} onChange={handleInputChange} required />
@@ -561,6 +671,7 @@ export const ProductTable = () => {
     </div>
   );
 };
+
 
 
 //////////////////////// Caracteristiques ////////////////////////
