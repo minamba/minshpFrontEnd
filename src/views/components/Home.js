@@ -19,7 +19,7 @@ export const Home = () => {
 
   useEffect(() => { dispatch(saveCartRequest(items)); }, [items, dispatch]);
 
-  const NEW_MAX = 4; // ← Limite d’affichage des nouveautés
+  const NEW_MAX = 4;
 
   const mainProduct = products.find((p) => p.main === true);
   const galleryProducts = products.filter((p) => p.id !== mainProduct?.id);
@@ -35,12 +35,12 @@ export const Home = () => {
   const heroVideo = mainProductVideos.find((vid) => vid.position === 1);
 
   const getProductImage = (id) => {
-    const productImages = images.filter((i) => i.idProduct === id);
+    const productImages = images.filter((i) => String(i.idProduct) === String(id));
     return productImages.length > 0 ? productImages[0].url : '/Images/placeholder.jpg';
   };
 
   const getCategoryImage = (idCategory) => {
-    const image = images.find((i) => i.idCategory === idCategory);
+    const image = images.find((i) => String(i.idCategory) === String(idCategory));
     return image ? image.url : '/Images/placeholder.jpg';
   };
 
@@ -50,7 +50,6 @@ export const Home = () => {
     return Number.isNaN(d.getTime()) ? null : d;
   };
 
-  // → max 4 produits
   const newestProducts = useMemo(() => {
     return [...galleryProducts]
       .sort((a, b) => new Date(b.creationDate) - new Date(a.creationDate))
@@ -161,7 +160,7 @@ export const Home = () => {
               typeof product.priceTtc === 'number' ? product.priceTtc : parseFloat(product.priceTtc)
             ) || 0;
 
-            // Promo PRODUIT (prend la 1ère et vérifie dates)
+            // ==== PROMO PRODUIT (dates inclusives, fin à 23:59:59) ====
             const p0 = product?.promotions?.[0];
             const hasProductPromo = (() => {
               if (!p0) return false;
@@ -169,37 +168,45 @@ export const Home = () => {
               if (pct <= 0) return false;
               const start = parseDate(p0.startDate);
               const end   = parseDate(p0.endDate);
-              const now = new Date();
-              const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0,0,0,0);
-              if (start && start.getTime() > now.getTime()) return false;
-              if (end && end.getTime() < startOfToday.getTime()) return false;
+              const now   = new Date();
+              const endOfDay = end ? new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23,59,59,999) : null;
+              if (start && start > now) return false;
+              if (endOfDay && endOfDay < now) return false;
               return true;
             })();
 
             const discountPct   = hasProductPromo ? Number(p0.purcentage) : 0;
             const computedPromo = +(priceRef * (1 - discountPct / 100)).toFixed(2);
-            const promoted      = Number(
+            const promotedVal   = Number(
               typeof product.priceTtcPromoted === 'number'
                 ? product.priceTtcPromoted
                 : parseFloat(product.priceTtcPromoted)
             );
 
-            // Promo par CODE CATEGORIE : si définie, on l’utilise comme prix promo
-            const priceCat = (() => {
-              const v = typeof product.priceTtcCategoryCodePromoted === 'number'
+            // Prix promo “produit” uniquement si la promo est ACTIVE
+            const productPromoPrice = hasProductPromo
+              ? (Number.isFinite(promotedVal) ? promotedVal : computedPromo)
+              : null;
+
+            // ==== PROMO PAR CODES (priorité sous-cat puis cat) ====
+            const subCatCodeVal = Number(
+              typeof product.priceTtcSubCategoryCodePromoted === 'number'
+                ? product.priceTtcSubCategoryCodePromoted
+                : parseFloat(product.priceTtcSubCategoryCodePromoted)
+            );
+            const catCodeVal = Number(
+              typeof product.priceTtcCategoryCodePromoted === 'number'
                 ? product.priceTtcCategoryCodePromoted
-                : parseFloat(product.priceTtcCategoryCodePromoted);
-              return Number.isFinite(v) ? v : null;
-            })();
-            const hasCategoryPromo = priceCat !== null;
+                : parseFloat(product.priceTtcCategoryCodePromoted)
+            );
 
-            // Prix affiché
-            const displayPrice = hasCategoryPromo
-              ? priceCat
-              : (hasProductPromo ? (Number.isFinite(promoted) ? promoted : computedPromo) : priceRef);
+            const codePrice =
+              Number.isFinite(subCatCodeVal) ? subCatCodeVal :
+              (Number.isFinite(catCodeVal) ? catCodeVal : null);
 
-            // Pour l’UI (pastille + ancien prix en barré)
-            const hasAnyPromo = hasCategoryPromo || hasProductPromo;
+            // ==== Prix affiché & indicateurs UI ====
+            const displayPrice = (codePrice ?? productPromoPrice ?? priceRef);
+            const hasAnyPromo  = (codePrice != null) || (productPromoPrice != null);
 
             const [euros, cents] = displayPrice.toFixed(2).split('.');
 
@@ -221,7 +228,6 @@ export const Home = () => {
                   </Link>
 
                   {hasAnyPromo && <span className="promo-pill">Promotion</span>}
-
                   <div className="thumb-overlay" aria-hidden="true" />
                   <button
                     type="button"
@@ -231,7 +237,7 @@ export const Home = () => {
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      const payloadItem = { id: product.id, name, price: displayPrice, image: img };
+                      const payloadItem = { id: product.id, name, price: displayPrice, image: img, packageProfil: product.packageProfil, containedCode: product.containedCode };
                       dispatch(addToCartRequest(payloadItem, 1));
                       setLastAdded({ id: product.id, name });
                       setShowAdded(true);
@@ -243,7 +249,6 @@ export const Home = () => {
 
                 <h3 className="product-name">{name}</h3>
 
-                {/* Statut + prix (pile à droite) */}
                 <div className="new-price-row">
                   <span className={`card-stock ${stockCls}`}>
                     <span className={`card-stock-dot ${stockCls}`} />

@@ -2,13 +2,19 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 
-// ⚠️ Renomme ces imports si tes action creators ont des noms différents
 import {
   getPackageProfilRequest,
   addPackageProfilRequest,
   updatePackageProfilRequest,
   deletePackageProfilRequest,
 } from "../../lib/actions/PackageProfilActions";
+import { getCartRequest } from "../../lib/actions/CartActions";
+
+// ✅ import utilitaire LS
+import {
+  patchPackageProfilInCart,
+  removePackageProfilFromCart,
+} from "../../lib/utils/cartLocalStorage";
 
 // ───────── Utils / Helpers
 const getId = (x) =>
@@ -20,25 +26,15 @@ const num = (v) => {
 };
 
 const toUI = (pp) => {
-  // Normalisation souple des propriétés (camelCase/PascalCase/FR)
   const name = pp?.name ?? pp?.Name ?? "";
   const description = pp?.description ?? pp?.Description ?? "";
   const longer = num(pp?.longer ?? pp?.Longer ?? pp?.longueur ?? pp?.Longueur);
   const width = num(pp?.width ?? pp?.Width ?? pp?.largeur ?? pp?.Largeur);
   const height = num(pp?.height ?? pp?.Height ?? pp?.hauteur ?? pp?.Hauteur);
   const weight = num(pp?.weight ?? pp?.Weight ?? pp?.poids ?? pp?.Poids);
-  return {
-    id: getId(pp),
-    name,
-    description,
-    longer,
-    width,
-    height,
-    weight,
-  };
+  return { id: getId(pp), name, description, longer, width, height, weight };
 };
 
-// Petite modale légère (sans dépendances externes)
 function Modal({ open, title, children, onClose }) {
   if (!open) return null;
   return (
@@ -78,15 +74,13 @@ function Modal({ open, title, children, onClose }) {
 
 export const PackageProfilAdmin = () => {
   const dispatch = useDispatch();
-  // ←--------- Données depuis le store
   const packageProfils = useSelector((s) => s.packageProfils?.packageProfils) || [];
 
-  // Charger la liste au montage
   useEffect(() => {
     dispatch(getPackageProfilRequest?.());
+    dispatch(getCartRequest());
   }, [dispatch]);
 
-  // Modale / Form
   const [modalOpen, setModalOpen] = useState(false);
   const [mode, setMode] = useState("add"); // "add" | "edit"
   const [editingId, setEditingId] = useState(null);
@@ -100,14 +94,7 @@ export const PackageProfilAdmin = () => {
   });
 
   const resetForm = () =>
-    setForm({
-      name: "",
-      description: "",
-      longer: "",
-      width: "",
-      height: "",
-      weight: "",
-    });
+    setForm({ name: "", description: "", longer: "", width: "", height: "", weight: "" });
 
   const openAdd = () => {
     setMode("add");
@@ -152,46 +139,39 @@ export const PackageProfilAdmin = () => {
   const onSubmit = async (e) => {
     e.preventDefault();
     const res = validate();
-    if (!res.ok) {
-      alert(res.msg);
-      return;
-    }
+    if (!res.ok) { alert(res.msg); return; }
 
-// helpers
-const toInt = (v, def = 0) => {
-    const n = parseInt(String(v).replace(',', '.').trim(), 10);
-    return Number.isFinite(n) ? n : def;
-  };
-  
-  const toDec = (v, def = 0) => {
-    const n = parseFloat(String(v).replace(',', '.').trim());
-    return Number.isFinite(n) ? n : def;
-  };
-  
-  // construction du payload
-  const payload = {
-    Name: form.name.trim(),
-    Description: form.description.trim(),
-    Longer: toInt(form.longer),      // ou toDec(form.longer) si tu veux autoriser les décimaux
-    Width:  toInt(form.width),       // idem
-    Height: toInt(form.height),      // idem
-    Weight: toDec(form.weight),      // ✅ decimal
-  };
+    const toInt = (v, def = 0) => {
+      const n = parseInt(String(v).replace(",", ".").trim(), 10);
+      return Number.isFinite(n) ? n : def;
+    };
+    const toDec = (v, def = 0) => {
+      const n = parseFloat(String(v).replace(",", ".").trim());
+      return Number.isFinite(n) ? n : def;
+    };
+
+    const payload = {
+      Name: form.name.trim(),
+      Description: form.description.trim(),
+      Longer: toInt(form.longer),
+      Width:  toInt(form.width),
+      Height: toInt(form.height),
+      Weight: toDec(form.weight),
+    };
 
     if (mode === "add") {
       await dispatch(addPackageProfilRequest(payload));
     } else {
-      await dispatch(
-        updatePackageProfilRequest({
-          Id: editingId,
-          ...payload,
-        })
-      );
+      // Update côté API
+      await dispatch(updatePackageProfilRequest({ Id: editingId, ...payload }));
+
+      // ✅ Patch immédiat du panier en localStorage
+      // (Si ton API renvoie l'entité normalisée en SUCCESS, tu peux remplacer
+      // { Id: editingId, ...payload } par cette entité pour être 100% fidèle.)
+      patchPackageProfilInCart({ Id: editingId, ...payload });
     }
 
-    // Rafraîchit la liste (si ta saga ne le fait pas déjà)
     await dispatch(getPackageProfilRequest?.());
-
     close();
   };
 
@@ -199,33 +179,29 @@ const toInt = (v, def = 0) => {
     const row = toUI(pp);
     if (!window.confirm(`Supprimer le profil “${row.name}” ?`)) return;
 
-    await dispatch(
-      deletePackageProfilRequest(row.id ?? row.Id ?? pp?.PackageProfilId)
-    );
+    await dispatch(deletePackageProfilRequest(row.id ?? row.Id ?? pp?.PackageProfilId));
+
+    // ✅ Nettoyage des items qui référencent ce packageProfil
+    removePackageProfilFromCart(row.id);
+
     await dispatch(getPackageProfilRequest?.());
   };
 
   const rows = useMemo(
-    () =>
-      (packageProfils || [])
-        .map(toUI)
-        .sort((a, b) => a.name.localeCompare(b.name)),
+    () => (packageProfils || []).map(toUI).sort((a, b) => a.name.localeCompare(b.name)),
     [packageProfils]
   );
 
   return (
     <div className="container py-4">
-      {/* Gros titre */}
       <h1 className="display-5 mb-3">Gestion des PackageProfil</h1>
 
-      {/* Bouton d'ajout */}
       <div className="mb-3">
         <button className="btn btn-primary" onClick={openAdd}>
           + Ajouter un PackageProfil
         </button>
       </div>
 
-      {/* Tableau */}
       <div className="table-responsive">
         <table className="table table-striped table-hover align-middle shadow-sm">
           <thead className="table-dark">
@@ -242,32 +218,22 @@ const toInt = (v, def = 0) => {
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={7} className="text-center">
-                  Aucun PackageProfil.
-                </td>
+                <td colSpan={7} className="text-center">Aucun PackageProfil.</td>
               </tr>
             ) : (
               rows.map((r) => (
                 <tr key={r.id}>
                   <td>{r.name}</td>
-                  <td style={{ whiteSpace: "pre-wrap" }}>
-                    {r.description || "—"}
-                  </td>
+                  <td style={{ whiteSpace: "pre-wrap" }}>{r.description || "—"}</td>
                   <td>{r.longer}</td>
                   <td>{r.width}</td>
                   <td>{r.height}</td>
                   <td>{r.weight}</td>
                   <td className="d-flex gap-2">
-                    <button
-                      className="btn btn-sm btn-warning"
-                      onClick={() => openEdit(r)}
-                    >
+                    <button className="btn btn-sm btn-warning" onClick={() => openEdit(r)}>
                       Modifier
                     </button>
-                    <button
-                      className="btn btn-sm btn-danger"
-                      onClick={() => onDelete(r)}
-                    >
+                    <button className="btn btn-sm btn-danger" onClick={() => onDelete(r)}>
                       Supprimer
                     </button>
                   </td>
@@ -278,7 +244,6 @@ const toInt = (v, def = 0) => {
         </table>
       </div>
 
-      {/* Modale d'ajout / modification */}
       <Modal
         open={modalOpen}
         title={mode === "add" ? "Ajouter un PackageProfil" : "Modifier un PackageProfil"}

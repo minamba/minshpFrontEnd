@@ -28,9 +28,6 @@ export const News = () => {
     return applications[0]?.displayNewProductNumber;
   }, [applications]);
 
-  console.log("applicationSSSSSSSSSSSSSSS", applications);
-  console.log("limit", limit);
-
   // Sauvegarde panier (comme Home)
   useEffect(() => { dispatch(saveCartRequest(items)); }, [items, dispatch]);
 
@@ -54,37 +51,39 @@ export const News = () => {
 
       const priceRef = Number(toNum(product?.priceTtc)) || 0;
 
+      // ===== Promo PRODUIT (active seulement si start ≤ now ≤ end@23:59:59) =====
       const p0 = product?.promotions?.[0];
       const hasProductPromo = (() => {
         if (!p0) return false;
-        const pct = Number(p0.purcentage) || 0;
+        const pct = Number(p0?.purcentage) || 0;
         if (pct <= 0) return false;
-        const start = parseDate(p0.startDate);
-        const end   = parseDate(p0.endDate);
-        const now = new Date();
-        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0,0,0,0);
-        if (start && start.getTime() > now.getTime()) return false;
-        if (end && end.getTime() < startOfToday.getTime()) return false;
+        const start = parseDate(p0?.startDate);
+        const end   = parseDate(p0?.endDate);
+        const now   = new Date();
+        const endOfDay = end ? new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59, 999) : null;
+        if (start && start > now) return false;
+        if (endOfDay && endOfDay < now) return false;
         return true;
       })();
 
-      const discountPct   = hasProductPromo ? Number(p0?.purcentage) : 0;
-      const computedPromo = +(priceRef * (1 - discountPct / 100)).toFixed(2);
-      const promoted      = Number(toNum(product?.priceTtcPromoted));
+      const productPct     = hasProductPromo ? Number(p0?.purcentage) : 0;
+      const computedPromo  = +(priceRef * (1 - productPct / 100)).toFixed(2);
+      const promotedFromBE = Number(toNum(product?.priceTtcPromoted));
+      const productPromoPrice = hasProductPromo
+        ? (Number.isFinite(promotedFromBE) ? promotedFromBE : computedPromo)
+        : null;
 
-      const priceCat = (() => {
-        const v = toNum(product?.priceTtcCategoryCodePromoted);
-        return Number.isFinite(v) ? v : null;
-      })();
-      const hasCategoryPromo = priceCat !== null;
+      // ===== Prix via CODES (priorité sous-cat → cat) =====
+      // ⚠️ NE PAS inclure priceTtcPromoted ici (sinon on contourne la vérif de date)
+      const subCatCodeVal = Number(toNum(product?.priceTtcSubCategoryCodePromoted));
+      const catCodeVal    = Number(toNum(product?.priceTtcCategoryCodePromoted));
+      const codePrice = Number.isFinite(subCatCodeVal)
+        ? subCatCodeVal
+        : (Number.isFinite(catCodeVal) ? catCodeVal : null);
 
-      const displayPrice = hasCategoryPromo
-        ? priceCat
-        : hasProductPromo
-        ? (Number.isFinite(promoted) ? promoted : computedPromo)
-        : priceRef;
-
-      const hasAnyPromo = hasCategoryPromo || hasProductPromo;
+      // ===== Prix affiché & drapeaux UI =====
+      const displayPrice = codePrice ?? productPromoPrice ?? priceRef;
+      const hasAnyPromo  = (codePrice != null) || (productPromoPrice != null);
 
       const creationTs = parseDate(product?.creationDate)?.getTime() ?? 0;
 
@@ -213,7 +212,7 @@ export const News = () => {
             </div>
           )}
 
-          {filteredLimited.map(({ product, name, priceRef, displayPrice, hasAnyPromo }, idx) => {
+          {filteredLimited.map(({ product, name, priceRef, displayPrice, hasAnyPromo }) => {
             const img = getProductImage(product.id);
             const [euros, cents] = displayPrice.toFixed(2).split(".");
 
@@ -243,7 +242,7 @@ export const News = () => {
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      const payloadItem = { id: product.id, name, price: displayPrice, image: img };
+                      const payloadItem = { id: product.id, name, price: displayPrice, image: img, packageProfil: product.packageProfil, containedCode: product.containedCode };
                       dispatch(addToCartRequest(payloadItem, 1));
                       setLastAdded({ id: product.id, name });
                       setShowAdded(true);

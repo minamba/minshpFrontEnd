@@ -34,6 +34,8 @@ export default function cartReducer(state = initialState, action) {
               price: Number(item.price) || 0,
               qty: q,
               image: item.image || item.url || null,
+              packageProfil: item.packageProfil,
+              containedCode: item.containedCode,
             },
           ];
 

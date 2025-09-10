@@ -10,8 +10,7 @@ import {
   getCartRequest
 } from "../../lib/actions/CartActions";
 import { GenericModal } from "../../components";
-// ❌ On ne marque plus IsUsed ici (ça se fera au paiement)
-// import { updatePromotionCodeRequest } from "../../lib/actions/PromotionCodeActions";
+import { getPromotionCodesRequest } from "../../lib/actions/PromotionCodeActions"; // ✅ CHARGER LES CODES
 
 // ---------- helpers ----------
 const fmt = (n) =>
@@ -39,6 +38,10 @@ const isPromoActive = (p) => {
 const getCategoryIdFromProduct = (p) =>
   p?.idCategory ?? p?.categoryId ?? p?.idCategorie ?? p?.categorieId ?? p?.category?.id ?? p?.category ?? null;
 
+// ✅ helper sous-catégorie
+const getSubCategoryIdFromProduct = (p) =>
+  p?.idSubCategory ?? p?.subCategoryId ?? p?.IdSubCategory ?? null;
+
 // MAJ prix d’un item dans le localStorage (items)
 const updateLsPrice = (productId, newPrice) => {
   let arr = [];
@@ -57,7 +60,7 @@ const readLsItems = () => {
   catch { return []; }
 };
 
-// --- nouvelle persistance : code promo appliqué par produit ---
+// persistance : code promo appliqué par produit
 const readPromoMap = () => {
   try { return JSON.parse(localStorage.getItem("promo_map") || "{}"); }
   catch { return {}; }
@@ -78,15 +81,18 @@ export const Cart = () => {
 
   // ===== Code promo UI =====
   const [promoInput, setPromoInput] = useState("");
-  const [appliedCode, setAppliedCode] = useState(null); // pour feedback
+  const [appliedCode, setAppliedCode] = useState(null);
   const [promoModal, setPromoModal] = useState({ open: false, message: "", variant: "" });
   const closePromoModal = () => setPromoModal({ open: false, message: "", variant: "" });
 
-  // ===== Map produit -> code appliqué (pour bloquer la ressaisie) =====
+  // map produit -> code appliqué
   const [promoAppliedMap, setPromoAppliedMap] = useState(() => readPromoMap());
 
-  // Charger le panier Redux au montage
-  useEffect(() => { dispatch(getCartRequest()); }, [dispatch]);
+  // Charger panier + ✅ codes promos au montage
+  useEffect(() => {
+    dispatch(getCartRequest());
+    dispatch(getPromotionCodesRequest()); // ✅ IMPORTANT
+  }, [dispatch]);
 
   // Persister Redux → LS à chaque changement
   useEffect(() => { dispatch(saveCartRequest(reduxItems)); }, [reduxItems, dispatch]);
@@ -131,7 +137,6 @@ export const Cart = () => {
     const next = Object.fromEntries(
       Object.entries(promoAppliedMap).filter(([pid]) => ids.has(String(pid)))
     );
-    // éviter setState en boucle
     if (JSON.stringify(next) !== JSON.stringify(promoAppliedMap)) {
       setPromoAppliedMap(next);
       writePromoMap(next);
@@ -141,7 +146,7 @@ export const Cart = () => {
   // Helpers LS-only
   const persistLsItems = (next) => {
     localStorage.setItem("items", JSON.stringify(
-      next.map(i => ({ id: i.id, name: i.name, price: i.price, qty: i.qty, image: i.imageUrl }))
+      next.map(i => ({ id: i.id, name: i.name, price: i.price, qty: i.qty, image: i.imageUrl, packageProfil: i.packageProfil, containedCode: i.containedCode }))
     ));
   };
 
@@ -186,6 +191,7 @@ export const Cart = () => {
     return { cls, label };
   };
 
+  // ======== Appliquer un code promo (produit / catégorie / sous-catégorie) ========
   const applyPromo = () => {
     const code = norm(promoInput);
     if (!code) return;
@@ -196,41 +202,65 @@ export const Cart = () => {
       setPromoModal({
         open: true,
         variant: "info",
-        message:
-          "Ce code a déjà été appliqué à un produit de votre panier."
+        message: "Ce code a déjà été appliqué à un produit de votre panier."
       });
       return;
     }
 
+    // Trouver la promo par son nom (code)
     const promo = promotionCodes.find(p => norm(p?.name) === code) || null;
     if (!promo || !isPromoActive(promo)) {
       setAppliedCode(null);
-      setPromoModal({ open:true, message: "Code promo invalide ou expiré.", variant: "warning" });
+      setPromoModal({ open: true, message: "Code promo invalide ou expiré.", variant: "warning" });
       return;
     }
 
     const pct = Number(promo.purcentage) || 0;
     if (pct <= 0) {
       setAppliedCode(null);
-      setPromoModal({ open:true, message: "Ce code n'a pas de pourcentage valide.", variant: "warning" });
+      setPromoModal({ open: true, message: "Ce code n'a pas de pourcentage valide.", variant: "warning" });
       return;
     }
 
-    const promoId = promo.id ?? promo.idPromotionCode ?? promo.promoId;
+    // IDs robustes de la promo (category / subcategory / product)
+    const promoId            = promo.id ?? promo.idPromotionCode ?? promo.promoId;
+    const promoCategoryId    = promo?.idCategory    ?? promo?.IdCategory    ?? promo?.categoryId    ?? null;
+    const promoSubCategoryId = promo?.idSubCategory ?? promo?.IdSubCategory ?? promo?.subCategoryId ?? null;
+    const promoProductId     = promo?.idProduct     ?? promo?.IdProduct     ?? promo?.productId     ?? null;
+
+    // 1) Produits liés directement par idPromotionCode (avec fallback IdPromotionCode)
     const byCode = products
-      .filter(p => String(p?.idPromotionCode) === String(promoId))
+      .filter(p => String(p?.idPromotionCode ?? p?.IdPromotionCode) === String(promoId))
       .map(p => p.id);
 
-    const byCategory = promo?.idCategory != null
+    // 2) Produits par catégorie de la promo
+    const byCategory = promoCategoryId != null
       ? products
-          .filter(p => String(getCategoryIdFromProduct(p)) === String(promo.idCategory))
+          .filter(p => String(getCategoryIdFromProduct(p)) === String(promoCategoryId))
           .map(p => p.id)
       : [];
 
-    const affectedProductIds = Array.from(new Set([...byCode, ...byCategory]));
+    // 3) Produits par sous-catégorie de la promo
+    const bySubCategory = promoSubCategoryId != null
+      ? products
+          .filter(p => String(getSubCategoryIdFromProduct(p)) === String(promoSubCategoryId))
+          .map(p => p.id)
+      : [];
+
+    // 4) Promo ciblant un produit précis
+    const byDirectProduct = promoProductId != null ? [String(promoProductId)] : [];
+
+    const affectedProductIds = Array.from(
+      new Set([...byCode, ...byCategory, ...bySubCategory, ...byDirectProduct].map(String))
+    );
+
     if (affectedProductIds.length === 0) {
       setAppliedCode(null);
-      setPromoModal({ open:true, message: "Code valide, mais aucun article correspondant dans votre panier.", variant: "warning" });
+      setPromoModal({
+        open: true,
+        message: "Code valide, mais aucun article correspondant dans votre panier.",
+        variant: "warning"
+      });
       return;
     }
 
@@ -239,10 +269,10 @@ export const Cart = () => {
     const changedIds   = [];
 
     for (const it of items) {
-      if (!affectedProductIds.includes(it.id)) continue;
+      if (!affectedProductIds.includes(String(it.id))) continue;
 
-      const base = Number(it.price) || 0;                 // empile les remises
-      const newPrice = +(base * (1 - pct/100)).toFixed(2);
+      const base = Number(it.price) || 0; // empile les remises
+      const newPrice = +(base * (1 - pct / 100)).toFixed(2);
 
       if (Math.abs((Number(it.price) || 0) - newPrice) < 0.001) continue;
 
@@ -253,7 +283,7 @@ export const Cart = () => {
         const orig = reduxItems.find(i => String(i.id) === String(it.id)) || { id: it.id, qty: it.qty };
         const updated = { ...orig, price: newPrice };
         dispatch(updateCartRequest(updated, it.qty));
-        updateLsPrice(it.id, newPrice);                   // patch immédiat LS
+        updateLsPrice(it.id, newPrice);
       } else {
         const next = items.map(i => i.id === it.id ? { ...i, price: newPrice } : i);
         setItems(next);
@@ -269,30 +299,34 @@ export const Cart = () => {
     if (changedNames.length > 0) {
       setAppliedCode(code);
       setPromoModal({
-        open:true,
-        message: changedNames.length === 1
-          ? `Code promo appliqué sur le produit « ${changedNames[0]} ».`
-          : `Code promo appliqué sur ${changedNames.length} produits : ${changedNames.join(", ")}.`,
+        open: true,
+        message:
+          changedNames.length === 1
+            ? `Code promo appliqué sur le produit « ${changedNames[0]} ».`
+            : `Code promo appliqué sur ${changedNames.length} produits : ${changedNames.join(", ")}.`,
         variant: "success"
       });
 
-      // ✅ marquer localement quels produits portent ce code
+      // marquer localement quels produits portent ce code
       const nextMap = { ...promoAppliedMap };
       for (const id of changedIds) nextMap[String(id)] = code;
       setPromoAppliedMap(nextMap);
       writePromoMap(nextMap);
 
-      // ❌ ne plus marquer IsUsed ici (on le fera au paiement)
-      // dispatch(updatePromotionCodeRequest({ Id: promo.id, IsUsed: true }));
+      // ❌ pas de IsUsed ici (on le fera au paiement)
     } else {
       setAppliedCode(null);
-      setPromoModal({ open:true, message: "Code valide, mais aucun article correspondant dans votre panier." });
+      setPromoModal({
+        open: true,
+        message: "Code valide, mais aucun article correspondant dans votre panier.",
+        variant: "warning"
+      });
     }
   };
 
   const subTotal   = items.reduce((s, it) => s + it.price * it.qty, 0);
   const grandTotal = Math.max(0, subTotal);
-  const hasItems   = items.length > 0;  
+  const hasItems   = items.length > 0;
 
   useEffect(() => { window.scrollTo({ top: 0, behavior: "instant" }); }, []);
 
@@ -393,9 +427,9 @@ export const Cart = () => {
 
           <button
             className= {hasItems ? "checkout-btn" : "checkout-btn-disabled"}
-            disabled={!hasItems}                                  // ✅ grisé si panier vide
+            disabled={!hasItems}
             onClick={() =>
-              hasItems &&                                         // ✅ sécurité côté JS
+              hasItems &&
               navigate("/deliveryPayment", {
                 state: { totalCents: Math.round(grandTotal * 100) },
               })

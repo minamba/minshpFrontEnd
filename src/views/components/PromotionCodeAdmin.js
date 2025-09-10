@@ -13,31 +13,34 @@ import { updateCartRequest, getCartRequest } from '../../lib/actions/CartActions
 export const PromotionCodeAdmin = () => {
   const dispatch = useDispatch();
 
-  // Store
+  // ===== Store =====
   const promotionCodesFromStore = useSelector((s) => s.promotionCodes?.promotionCodes) || [];
   const productsFromStore       = useSelector((s) => s.products?.products) || [];
   const categoriesFromStore     = useSelector((s) => s.categories?.categories) || [];
+  const subCategoriesFromStore  = useSelector((s) => s.subCategories?.subCategories) || [];
   const cartItems               = useSelector((s) => s?.items?.items) ?? JSON.parse(localStorage.getItem('items') || '[]');
 
-  // UI state
+  // ===== UI =====
   const [showModal, setShowModal]     = useState(false);
   const [isEditing, setIsEditing]     = useState(false);
   const [currentId, setCurrentId]     = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Form state (ids en string)
+  // ===== Form =====
   const [formData, setFormData] = useState({
     name: '',
-    idProduct: '',
-    idCategory: '',
+    idProduct: '',      // string | ''
+    idCategory: '',     // string | ''
+    idSubCategory: '',  // string | ''
     purcentage: 0,
     startDate: '',
     endDate: '',
     isUsed: false,
   });
 
-  // Catégorie sélectionnée (filtre produits) — string
-  const [selectedCategoryId, setSelectedCategoryId] = useState('');
+  // Sélections pilotant les listes
+  const [selectedCategoryId, setSelectedCategoryId]       = useState(''); // string
+  const [selectedSubCategoryId, setSelectedSubCategoryId] = useState(''); // string
 
   // ===== Helpers =====
   const parseDate = (val) => {
@@ -95,78 +98,65 @@ export const PromotionCodeAdmin = () => {
     dispatch(getCartRequest());
   };
 
-  // ---- Catégories <-> Produits ----
+  // ===== Id helpers robustes =====
+  // Map nom (ou title) de catégorie -> id (string)
   const categoryNameToId = useMemo(() => {
-    const map = new Map();
+    const m = new Map();
     (categoriesFromStore || []).forEach(c => {
-      const id = c?.id ?? c?.categoryId ?? c?.idCategorie ?? c?.categorieId;
-      const name = (c?.name ?? c?.title ?? '').toString().trim().toLowerCase();
-      if (id != null && name) map.set(name, String(id));
+      const id = c?.id ?? c?.Id;
+      const names = [c?.name, c?.title, c?.Name, c?.Title].filter(Boolean);
+      names.forEach(n => {
+        m.set(String(n).trim().toLowerCase(), String(id));
+      });
     });
-    return map;
+    return m;
   }, [categoriesFromStore]);
 
   const getCategoryIdFromProduct = (p) => {
+    // 1) Id direct
     const direct =
-      p?.idCategory ?? p?.categoryId ?? p?.idCategorie ?? p?.categorieId ?? p?.category?.id ?? p?.category;
-    if (direct != null && (typeof direct === 'number' || /^\d+$/.test(String(direct)))) {
+      p?.idCategory ?? p?.categoryId ?? p?.idCategorie ?? p?.categorieId ?? p?.category?.id;
+    if (direct != null && /^\d+$/.test(String(direct))) {
       return String(direct);
     }
-    const name = (p?.categoryName ?? p?.category ?? p?.categorie ?? '').toString().trim().toLowerCase();
-    if (!name) return null;
-    return categoryNameToId.get(name) ?? null;
-  };
-
-  // Trouve le produit lié à une promo (id direct, idPromotionCode)
-  const getProductFromPromo = (promo) => {
-    let found = productsFromStore.find(p => String(p.id) === String(promo?.idProduct));
-    if (found) return found;
-    found = productsFromStore.find(p => String(p.idPromotionCode) === String(promo?.id));
-    if (found) return found;
+    // 2) Nom -> id
+    const name = (p?.categoryName ?? p?.category ?? p?.categorie ?? p?.Category ?? '')
+      .toString()
+      .trim()
+      .toLowerCase();
+    if (name) {
+      const mapped = categoryNameToId.get(name);
+      if (mapped) return mapped;
+    }
     return null;
   };
 
-  // Produits filtrés selon la catégorie — inclut toujours le produit sélectionné si absent
-  const filteredProductsForModal = useMemo(() => {
-    let base = selectedCategoryId
-      ? productsFromStore.filter((p) => String(getCategoryIdFromProduct(p)) === String(selectedCategoryId))
-      : productsFromStore;
+  const getSubCategoryIdFromProduct = (p) =>
+    p?.idSubCategory ?? p?.subCategoryId ?? p?.IdSubCategory ?? null;
 
-    if (formData.idProduct) {
-      const exists = base.some(p => String(p.id) === String(formData.idProduct));
-      if (!exists) {
-        const picked = productsFromStore.find(p => String(p.id) === String(formData.idProduct));
-        if (picked) base = [...base, picked];
-      }
-    }
+  const getCategoryIdFromSubCategory = (sc) =>
+    sc?.idCategory ?? sc?.IdCategory ?? sc?.categoryId ?? null;
 
-    return [...base].sort((a, b) =>
-      String(a?.name || '').localeCompare(String(b?.name || ''), 'fr', { sensitivity: 'base' })
-    );
-  }, [productsFromStore, selectedCategoryId, formData.idProduct]);
+  // Maps rapides
+  const categoriesById = useMemo(() => {
+    const m = new Map();
+    categoriesFromStore.forEach(c => {
+      const id = c?.id ?? c?.Id;
+      if (id != null) m.set(String(id), c);
+    });
+    return m;
+  }, [categoriesFromStore]);
 
-  // Reset produit si changement de catégorie incompatible
-  useEffect(() => {
-    if (!formData.idProduct) return;
-    const stillThere = filteredProductsForModal.some(
-      (p) => String(p.id) === String(formData.idProduct)
-    );
-    if (!stillThere) {
-      setFormData((prev) => ({ ...prev, idProduct: '' }));
-    }
-  }, [filteredProductsForModal, formData.idProduct]);
+  const subCategoriesById = useMemo(() => {
+    const m = new Map();
+    subCategoriesFromStore.forEach(sc => {
+      const id = sc?.id ?? sc?.Id;
+      if (id != null) m.set(String(id), sc);
+    });
+    return m;
+  }, [subCategoriesFromStore]);
 
-  // Resynchronise la catégorie quand on choisit un produit manuellement
-  useEffect(() => {
-    if (!formData.idProduct) return;
-    const prod = productsFromStore.find(p => String(p.id) === String(formData.idProduct));
-    const prodCat = prod ? getCategoryIdFromProduct(prod) : null;
-    if (prodCat != null && String(prodCat) !== String(selectedCategoryId)) {
-      setSelectedCategoryId(String(prodCat));
-    }
-  }, [formData.idProduct, productsFromStore]);
-
-  // ===== Data loading =====
+  // ===== Chargement =====
   useEffect(() => {
     dispatch(getPromotionCodesRequest());
     dispatch(getProductUserRequest());
@@ -177,12 +167,12 @@ export const PromotionCodeAdmin = () => {
     dispatch(getCartRequest());
   }, [cartItems, dispatch]);
 
-  // Quand la liste des codes promo change, on recharge les produits
+  // Quand la liste des codes promo change, on recharge aussi les produits
   useEffect(() => {
     dispatch(getProductUserRequest());
   }, [promotionCodesFromStore, dispatch]);
 
-  // ======= 🔁 MAJ PRIX PANIER VIA priceTtcCategoryCodePromoted =======
+  // ======= 🔁 MAJ PRIX PANIER via priceTtcCategoryCodePromoted =======
   const toNumOrNull = (v) => {
     if (v === null || v === undefined) return null;
     if (String(v).toLowerCase() === 'null') return null;
@@ -191,7 +181,6 @@ export const PromotionCodeAdmin = () => {
   };
 
   useEffect(() => {
-    // parcourt le localStorage directement pour éviter les boucles
     const ls = JSON.parse(localStorage.getItem('items') || '[]');
     if (!Array.isArray(ls) || ls.length === 0) return;
 
@@ -204,14 +193,13 @@ export const PromotionCodeAdmin = () => {
 
       const current = toNumOrNull(it.price);
       if (current == null || Math.abs(current - catPrice) > 0.001) {
-        // met à jour LS + Redux pour cet item
         syncCartPrice(it.id, catPrice);
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [productsFromStore]); // dès que les produits sont rafraîchis
+  }, [productsFromStore]);
 
-  // ===== UI handlers =====
+  // ===== Lock body scroll quand modal ouverte =====
   useEffect(() => {
     document.body.classList.toggle('no-scroll', showModal);
     const onKey = (e) => { if (e.key === 'Escape') setShowModal(false); };
@@ -222,6 +210,82 @@ export const PromotionCodeAdmin = () => {
     };
   }, [showModal]);
 
+  // ===== Listes filtrées =====
+
+  // Sous-catégories en fonction de la catégorie choisie
+  const filteredSubCategories = useMemo(() => {
+    if (!selectedCategoryId) return subCategoriesFromStore;
+    return subCategoriesFromStore.filter(
+      (sc) => String(getCategoryIdFromSubCategory(sc)) === String(selectedCategoryId)
+    );
+  }, [subCategoriesFromStore, selectedCategoryId]);
+
+  // Produits (priorité sous-catégorie, sinon catégorie)
+  const filteredProductsForModal = useMemo(() => {
+    let base = productsFromStore;
+
+    if (selectedSubCategoryId) {
+      base = base.filter(
+        (p) => String(getSubCategoryIdFromProduct(p)) === String(selectedSubCategoryId)
+      );
+    } else if (selectedCategoryId) {
+      base = base.filter(
+        (p) => String(getCategoryIdFromProduct(p)) === String(selectedCategoryId)
+      );
+    }
+
+    // garder le produit déjà choisi même s'il ne matche plus (édition)
+    if (formData.idProduct) {
+      const exists = base.some(p => String(p.id) === String(formData.idProduct));
+      if (!exists) {
+        const picked = productsFromStore.find(p => String(p.id) === String(formData.idProduct));
+        if (picked) base = [...base, picked];
+      }
+    }
+
+    return [...base].sort((a, b) =>
+      String(a?.name || '').localeCompare(String(b?.name || ''), 'fr', { sensitivity: 'base' })
+    );
+  }, [
+    productsFromStore,
+    selectedCategoryId,
+    selectedSubCategoryId,
+    formData.idProduct,
+    categoryNameToId, // <= important si mapping nom->id change
+  ]);
+
+  // Si la sous-cat sélectionnée n’appartient plus à la catégorie, on la reset
+  useEffect(() => {
+    if (!selectedSubCategoryId || !selectedCategoryId) return;
+    const sc = subCategoriesById.get(String(selectedSubCategoryId));
+    if (!sc) return;
+    const scCatId = getCategoryIdFromSubCategory(sc);
+    if (String(scCatId) !== String(selectedCategoryId)) {
+      setSelectedSubCategoryId('');
+      setFormData(prev => ({ ...prev, idSubCategory: '', idProduct: '' }));
+    }
+  }, [selectedCategoryId, selectedSubCategoryId, subCategoriesById]);
+
+  // Resync Cat/SubCat quand on choisit un produit manuellement
+  useEffect(() => {
+    if (!formData.idProduct) return;
+    const prod = productsFromStore.find(p => String(p.id) === String(formData.idProduct));
+    if (!prod) return;
+
+    const scId  = getSubCategoryIdFromProduct(prod);
+    const catId = scId
+      ? getCategoryIdFromSubCategory(subCategoriesById.get(String(scId)))
+      : getCategoryIdFromProduct(prod);
+
+    if (catId != null && String(catId) !== String(selectedCategoryId)) {
+      setSelectedCategoryId(String(catId));
+    }
+    if (scId != null && String(scId) !== String(selectedSubCategoryId)) {
+      setSelectedSubCategoryId(String(scId));
+    }
+  }, [formData.idProduct, productsFromStore, selectedCategoryId, selectedSubCategoryId, subCategoriesById]);
+
+  // ===== Handlers =====
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
     if (type === 'checkbox') {
@@ -234,17 +298,28 @@ export const PromotionCodeAdmin = () => {
   const handleCategoryChange = (e) => {
     const catId = String(e.target.value);
     setSelectedCategoryId(catId);
-    setFormData((prev) => ({ ...prev, idCategory: catId, idProduct: '' })); // force un choix cohérent
+    // reset sous-cat & produit pour cohérence
+    setSelectedSubCategoryId('');
+    setFormData((prev) => ({ ...prev, idCategory: catId, idSubCategory: '', idProduct: '' }));
+  };
+
+  const handleSubCategoryChange = (e) => {
+    const scId = String(e.target.value);
+    setSelectedSubCategoryId(scId);
+    // reset produit quand on change de sous-cat
+    setFormData((prev) => ({ ...prev, idSubCategory: scId, idProduct: '' }));
   };
 
   const handleAddClick = () => {
     setIsEditing(false);
     setCurrentId(null);
     setSelectedCategoryId('');
+    setSelectedSubCategoryId('');
     setFormData({
       name: '',
       idProduct: '',
       idCategory: '',
+      idSubCategory: '',
       purcentage: 0,
       startDate: '',
       endDate: '',
@@ -253,21 +328,40 @@ export const PromotionCodeAdmin = () => {
     setShowModal(true);
   };
 
+  const findProductByPromo = (promo) => {
+    return (
+      productsFromStore.find(p => String(p.id) === String(promo?.idProduct)) ||
+      productsFromStore.find(p => String(p.idPromotionCode) === String(promo?.id)) ||
+      null
+    );
+  };
+
   const handleEditClick = (promo) => {
     setIsEditing(true);
     setCurrentId(promo.id);
 
-    const prod = getProductFromPromo(promo);
-    const prodIdStr = prod ? String(prod.id) : String(promo?.idProduct ?? '');
-    const baseCat   = (promo?.idCategory != null && promo.idCategory !== '') ? String(promo.idCategory) : (prod ? getCategoryIdFromProduct(prod) : '');
-    const catIdStr  = String(baseCat ?? '');
+    const prod = findProductByPromo(promo);
+    const subCatFromPromo = promo?.idSubCategory ?? '';
+    const subCatFromProd  = prod ? getSubCategoryIdFromProduct(prod) : '';
+    const scIdStr         = String(subCatFromPromo || subCatFromProd || '');
 
-    setSelectedCategoryId(catIdStr);
+    const catFromPromo    = promo?.idCategory ?? '';
+    let catFromSubCat     = '';
+    if (scIdStr) {
+      const sc = subCategoriesById.get(String(scIdStr));
+      catFromSubCat = sc ? getCategoryIdFromSubCategory(sc) : '';
+    }
+    const catFromProd     = prod ? getCategoryIdFromProduct(prod) : '';
+    const catIdStr        = String(catFromPromo || catFromSubCat || catFromProd || '');
+
+    setSelectedCategoryId(catIdStr || '');
+    setSelectedSubCategoryId(scIdStr || '');
 
     setFormData({
       name: promo?.name ?? '',
-      idProduct: prodIdStr,
-      idCategory: catIdStr,
+      idProduct: prod ? String(prod.id) : (promo?.idProduct ? String(promo.idProduct) : ''),
+      idCategory: catIdStr || '',
+      idSubCategory: scIdStr || '',
       purcentage: promo?.purcentage ?? 0,
       startDate: promo?.startDate ? String(promo.startDate).slice(0, 10) : '',
       endDate:   promo?.endDate   ? String(promo.endDate).slice(0, 10)   : '',
@@ -294,7 +388,6 @@ export const PromotionCodeAdmin = () => {
         }
       }
 
-      // recharge codes + produits (pour récupérer les priceTtcCategoryCodePromoted à jour)
       await dispatch(getPromotionCodesRequest());
       await dispatch(getProductUserRequest());
     }
@@ -303,15 +396,29 @@ export const PromotionCodeAdmin = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // autoriser "aucun produit" => null
-    const idProductToSend  = formData.idProduct ? formData.idProduct : null;
-    const idCategoryToSend = selectedCategoryId || formData.idCategory || null;
+    const hasSub = !!selectedSubCategoryId;
+    const idProductToSend  = formData.idProduct ? String(formData.idProduct) : null;
+
+    let idCategoryToSend    = null;
+    let idSubCategoryToSend = null;
+
+    if (hasSub) {
+      // sous-catégorie prioritaire
+      idSubCategoryToSend = String(selectedSubCategoryId);
+      idCategoryToSend    = null; // on neutralise la catégorie
+      // si pas de produit sélectionné, idProductToSend reste null
+    } else {
+      // pas de sous-cat → on cible la catégorie si fournie
+      idSubCategoryToSend = null;
+      idCategoryToSend    = selectedCategoryId || formData.idCategory || null;
+    }
 
     const payload = {
       id: currentId,
       name: formData.name,
       idProduct: idProductToSend,
-      idCategory: idCategoryToSend,
+      idCategory: selectedCategoryId,
+      idSubCategory: idSubCategoryToSend,
       purcentage: Number(formData.purcentage) || 0,
       startDate: formData.startDate,
       endDate: formData.endDate,
@@ -325,25 +432,33 @@ export const PromotionCodeAdmin = () => {
       await dispatch(addPromotionCodeRequest(createPayload));
     }
 
-    // recharge codes + produits puis l'effet [productsFromStore] mettra à jour les prix du panier
     await dispatch(getPromotionCodesRequest());
     await dispatch(getProductUserRequest());
-
     setShowModal(false);
   };
 
-  // ===== Affichage tableau : noms robustes =====
+  // ===== Affichage tableau (helpers noms) =====
   const getRowProductName = (promo) => {
-    const prod = productsFromStore.find(p => String(p.idPromotionCode) === String(promo?.id));
+    const prod =
+      productsFromStore.find(p => String(p.id) === String(promo?.idProduct)) ||
+      productsFromStore.find(p => String(p.idPromotionCode) === String(promo?.id));
     return prod?.name || prod?.title || 'NONE';
   };
 
   const getRowCategoryName = (promo) => {
-    const cat = categoriesFromStore.find(p => String(p.idPromotionCode) === String(promo?.id));
-    return cat?.name || cat?.title || 'NONE';
+    const category = categoriesFromStore.find(sc => sc.idPromotionCode === promo.id);
+    if (category) return category.name
+    else return "NONE";
   };
 
-  // Tri + filtre pour le tableau
+  const getRowSubCategoryName = (promo) => {
+
+    const subCategory = subCategoriesFromStore.find(sc => sc.idPromotionCode === promo.id);
+    if (subCategory) return subCategory.name
+    else return "NONE";
+  };
+
+  // Tri + filtre tableau
   const sortedPromotions = [...promotionCodesFromStore].sort((a, b) => {
     const dateA = new Date(a?.dateCreation || 0);
     const dateB = new Date(b?.dateCreation || 0);
@@ -357,7 +472,7 @@ export const PromotionCodeAdmin = () => {
     return productName.includes(q) || codeName.includes(q);
   });
 
-  // ===== RENDER =====
+  // ===== Render =====
   return (
     <div className='container py-5'>
       <h1 className="text-center mb-4">Gestion des promotions (codes)</h1>
@@ -381,6 +496,7 @@ export const PromotionCodeAdmin = () => {
             <tr>
               <th>Produit</th>
               <th>Catégorie</th>
+              <th>Sous Catégorie</th>
               <th>Code</th>
               <th>Pourcentage</th>
               <th>Date début</th>
@@ -391,9 +507,14 @@ export const PromotionCodeAdmin = () => {
           </thead>
           <tbody>
             {filteredPromotions.map((promo) => (
-              <tr key={promo.id} onClick={() => handleEditClick(promo)} style={{ cursor: 'pointer' }}>
-                <td className={getRowProductName(promo) === 'NONE' ? 'text-danger fw-bold' : 'text-primary fw-bold'}>{getRowProductName(promo)}</td>
-                <td className={getRowCategoryName(promo) === 'NONE' ? 'text-danger fw-bold' : 'text-primary fw-bold'}>{getRowCategoryName(promo)}</td>
+              <tr
+                key={promo.id}
+                onClick={() => handleEditClick(promo)}
+                style={{ cursor: 'pointer' }}
+              >
+                <td className={getRowProductName(promo) !== 'NONE' ? 'fw-bold text-primary' : 'fw-bold text-danger'}>{getRowProductName(promo)}</td>
+                <td className='fw-bold text-muted'>{getRowCategoryName(promo)}</td>
+                <td className='fw-bold text-muted'>{getRowSubCategoryName(promo)}</td>
                 <td>{promo.name}</td>
                 <td>{promo.purcentage}%</td>
                 <td className='text-success fw-bold'>
@@ -421,7 +542,7 @@ export const PromotionCodeAdmin = () => {
             ))}
             {filteredPromotions.length === 0 && (
               <tr>
-                <td colSpan="8" className="text-center">Aucune promotion trouvée.</td>
+                <td colSpan="9" className="text-center">Aucune promotion trouvée.</td>
               </tr>
             )}
           </tbody>
@@ -471,14 +592,32 @@ export const PromotionCodeAdmin = () => {
                 >
                   <option value="">Toutes les catégories</option>
                   {categoriesFromStore.map((cat) => (
-                    <option key={cat.id} value={String(cat.id)}>
-                      {cat.name || cat.title || `Catégorie ${cat.id}`}
+                    <option key={cat.id ?? cat.Id} value={String(cat.id ?? cat.Id)}>
+                      {cat.name || cat.title || `Catégorie ${cat.id ?? cat.Id}`}
                     </option>
                   ))}
                 </select>
               </div>
 
-              {/* Produit (filtré par catégorie) — facultatif */}
+              {/* Sous-catégorie (dépend de la catégorie) */}
+              <div className="mb-3">
+                <label>Sous Catégorie (facultatif)</label>
+                <select
+                  name="idSubCategory"
+                  className="form-select"
+                  value={selectedSubCategoryId}
+                  onChange={handleSubCategoryChange}
+                >
+                  <option value="">— Aucune —</option>
+                  {filteredSubCategories.map((sc) => (
+                    <option key={sc.id ?? sc.Id} value={String(sc.id ?? sc.Id)}>
+                      {sc.name || sc.title || `Sous-catégorie ${sc.id ?? sc.Id}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Produit (filtré par sous-catégorie prioritairement, sinon catégorie) */}
               <div className="mb-3">
                 <label>Produit (facultatif)</label>
                 <select
@@ -487,7 +626,7 @@ export const PromotionCodeAdmin = () => {
                   value={formData.idProduct}
                   onChange={handleInputChange}
                 >
-                  <option value="">Sélectionnez un produit</option>
+                  <option value="">— Sélectionnez un produit —</option>
                   {filteredProductsForModal.map((product) => (
                     <option key={product.id} value={String(product.id)}>
                       {product.name}

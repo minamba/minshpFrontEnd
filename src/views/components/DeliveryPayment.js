@@ -12,17 +12,479 @@ import {
 } from "../../lib/actions/OrderCustomerProductActions";
 import { saveCartRequest } from "../../lib/actions/CartActions";
 
-// 👇 Actions Redux/Saga pour Boxtal
+// Shipping
 import {
   getShippingRatesRequest,
-  getRelaysRequest,              // (par ZIP) — conservé si tu veux garder l’ancien bouton
-  getRelaysByAddressRequest,     // (par adresse) — NOUVEAU
+  getRelaysByAddressRequest,
   createShipmentRequest,
 } from "../../lib/actions/ShippingActions";
 
+// Delivery addresses
+import {
+  getDeliveryAddressRequest,
+  updateDeliveryAddressRequest,
+  addDeliveryAddressRequest,
+} from "../../lib/actions/DeliveryAddressActions";
+
+// Billing addresses
+import {
+  getBillingAddressRequest,
+  updateBillingAddressRequest,
+  addBillingAddressRequest,
+} from "../../lib/actions/BillingAddressActions";
+
+//stripe 
+import { createCheckoutSessionRequest, confirmCheckoutSessionRequest } from "../../lib/actions/StripeActions";
+
 /* ------------------------------------------------------------------ */
-/* --------------------------- Mini Modales -------------------------- */
+/* --------------------------- Helpers & UI -------------------------- */
 /* ------------------------------------------------------------------ */
+
+const carrierToOperator = (carrier, fallbackNetwork) => {
+  const s = String(carrier || "").toLowerCase();
+  if (fallbackNetwork && /^[A-Z]{4}$/.test(fallbackNetwork)) return fallbackNetwork;
+  if (s.includes("chrono")) return "CHRP";
+  if (s.includes("ups")) return "UPSE";
+  if (s.includes("mondial")) return "MONR";
+  if (s.includes("la poste")) return "POFR";
+  return fallbackNetwork || "";
+};
+
+const normalizeRelay = (r) => {
+  const id = r?.id ?? r?.code ?? r?.pickupPointCode ?? r?.PUDO_ID ?? r?.ident ?? r?.pickupCode ?? "";
+  return {
+    id: String(id),
+    code: String(id),
+    name: r?.name ?? r?.label ?? r?.shopName ?? "",
+    address: r?.address ?? r?.street ?? r?.address1 ?? "",
+    zip: String(r?.zipCode ?? r?.postalCode ?? r?.zip ?? ""),
+    city: r?.city ?? "",
+    network: r?.network ?? null,
+    carrier: r?.carrier ?? null,
+    schedules: r?.schedules ?? r?.openingHours ?? "",
+    distance: r?.distance ?? "",
+    raw: r,
+  };
+};
+
+const fmt = (n) =>
+  new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(Number(n) || 0);
+
+const readLsItems = () => {
+  try {
+    return JSON.parse(localStorage.getItem("items") || "[]");
+  } catch {
+    return [];
+  }
+};
+const getPid = (it) => it?.productId ?? it?.id ?? it?.Id ?? null;
+const getQty = (it) => Number(it?.qty ?? it?.quantity ?? 1);
+const toNum = (v) => (typeof v === "number" ? v : parseFloat(v));
+const toNumOrNull = (v) => {
+  if (v === null || v === undefined) return null;
+  const s = String(v).trim().toLowerCase();
+  if (s === "" || s === "null" || s === "nan" || s === "undefined") return null;
+  const n = typeof v === "number" ? v : parseFloat(v);
+  return Number.isFinite(n) ? n : null;
+};
+const parseDate = (val) => {
+  if (!val) return null;
+  const d = new Date(val);
+  return Number.isNaN(d.getTime()) ? null : d;
+};
+
+const getActiveProductPromoPrice = (product) => {
+  const promo = product?.promotions?.[0];
+  if (!promo) return null;
+  const pct = Number(promo?.purcentage) || 0;
+  if (pct <= 0) return null;
+  const start = parseDate(promo?.startDate);
+  const end = parseDate(promo?.endDate);
+  const now = new Date();
+  const endOfDay = end ? new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59, 999) : null;
+  if (start && start > now) return null;
+  if (endOfDay && endOfDay < now) return null;
+  const base = Number(toNum(product?.priceTtc ?? product?.price)) || 0;
+  const promotedField = toNumOrNull(product?.priceTtcPromoted);
+  if (promotedField != null) return promotedField;
+  return +(base * (1 - pct / 100)).toFixed(2);
+};
+
+const getProductUnitPrice = (it, productsFromStore) => {
+  const pid = getPid(it);
+  const product = productsFromStore.find((p) => String(p?.id) === String(pid));
+  if (!product) return Number(toNum(it?.price ?? it?.priceTtc)) || 0;
+  const subCatCode = toNumOrNull(product?.priceTtcSubCategoryCodePromoted);
+  if (subCatCode != null) return subCatCode;
+  const catCode = toNumOrNull(product?.priceTtcCategoryCodePromoted);
+  if (catCode != null) return catCode;
+  const activePromo = getActiveProductPromoPrice(product);
+  if (activePromo != null) return activePromo;
+  return Number(toNum(product?.priceTtc ?? product?.price)) || 0;
+};
+
+const getOrderEntityId = (o) => o?.id ?? o?.Id ?? o?.orderId ?? null;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const waitForNewOrderId = async (
+  dispatch,
+  store,
+  customerId,
+  beforeIds,
+  { attempts = 25, delay = 200 } = {}
+) => {
+  const beforeSet = new Set((beforeIds || []).map(String));
+  for (let i = 0; i < attempts; i++) {
+    await dispatch(getOrderRequest?.());
+    await new Promise((r) => setTimeout(r, delay));
+    const state = store.getState();
+    const allOrders = state?.orders?.orders || [];
+    let newId = null;
+    const order = allOrders.find((o) => {
+      const cid = String(
+        o?.idCustomer ?? o?.customerId ?? o?.CustomerId ?? o?.customer?.id ?? ""
+      );
+      if (cid !== String(customerId)) return false;
+      const id = String(getOrderEntityId(o) || "");
+      if (!id || beforeSet.has(id)) return false;
+      newId = id;
+      return true;
+    });
+    if (newId) return { newId, orderNumber: order?.orderNumber };
+  }
+  return null;
+};
+
+const relayCode = { MondialRelay: "MONR", Ups: "UPSE", Chronopost: "CHRP", LaPoste: "POFR" };
+const getRelayLogo = (relay) => {
+  switch (relay.network) {
+    case relayCode.MondialRelay:
+      return "../images/mondialrelay.png";
+    case relayCode.Ups:
+      return "../images/ups.png";
+    case relayCode.Chronopost:
+      return "../images/chronopost.png";
+    case relayCode.LaPoste:
+      return "../images/laposte.png";
+    default:
+      return relay.logo ? relay.logo : "https://via.placeholder.com/150";
+  }
+};
+
+// Parse adresse une ligne
+export function parseRelayAddress(input, defaults = { countryIso: "FR" }) {
+  let s = String(input || "").trim().replace(/\s+/g, " ");
+  if (!s)
+    return {
+      number: undefined,
+      street: undefined,
+      city: undefined,
+      postalCode: undefined,
+      countryIsoCode: defaults.countryIso,
+    };
+  const countryMap = { fr: "FR", france: "FR", be: "BE", belgique: "BE", ch: "CH", suisse: "CH" };
+  const mCountry = s.match(/\b(france|fr|belgique|be|suisse|ch)\b/i);
+  let countryIso = defaults.countryIso;
+  if (mCountry) {
+    countryIso = countryMap[mCountry[1].toLowerCase()] || defaults.countryIso;
+    s = s.replace(mCountry[0], "").trim();
+  }
+  const zipRe = countryIso === "FR" ? /\b\d{5}\b/ : /\b\d{4}\b/;
+  const mZip = s.match(zipRe);
+  const postalCode = mZip ? mZip[0] : undefined;
+  if (postalCode) s = s.replace(postalCode, "").trim();
+  const mNum = s.match(/^\s*(\d+[A-Za-z]?)\b/);
+  const number = mNum ? mNum[1] : undefined;
+  if (number) s = s.replace(mNum[0], "").trim();
+  let street, city, state;
+  const parts = s.split(",").map((x) => x.trim()).filter(Boolean);
+  if (parts.length >= 2) {
+    street = parts.slice(0, -1).join(", ");
+    city = parts[parts.length - 1];
+  } else {
+    const tokens = s.split(" ");
+    if (tokens.length > 1) {
+      city = tokens[tokens.length - 1];
+      street = tokens.slice(0, -1).join(" ");
+    } else {
+      street = s || undefined;
+    }
+  }
+  return { number, street, city, postalCode, countryIsoCode: countryIso, state };
+}
+
+/* ----------------------- Phone helpers / component ----------------------- */
+
+const PHONE_COUNTRIES = [
+  { iso: "FR", label: "France", dial: "+33" },
+  { iso: "BE", label: "Belgique", dial: "+32" },
+  { iso: "ES", label: "Espagne", dial: "+34" },
+  { iso: "IT", label: "Italie", dial: "+39" },
+  { iso: "DE", label: "Allemagne", dial: "+49" },
+  { iso: "IE", label: "Irlande", dial: "+353" },
+  { iso: "US", label: "États-Unis", dial: "+1" },
+  { iso: "ML", label: "Mali", dial: "+223" },
+  { iso: "SN", label: "Sénégal", dial: "+221" },
+  { iso: "MA", label: "Maroc", dial: "+212" },
+  { iso: "DZ", label: "Algérie", dial: "+213" },
+  { iso: "AE", label: "Dubai (EAU)", dial: "+971" },
+];
+const DEFAULT_DIAL = PHONE_COUNTRIES[0].dial;
+function cleanPhoneLocal(s) {
+  return String(s || "").replace(/[^\d]/g, "");
+}
+function PhoneInputWithCountry({ valueDial, valueLocal, onChange }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: 8 }}>
+      <select
+        className="form-control"
+        value={valueDial || DEFAULT_DIAL}
+        onChange={(e) => onChange({ dial: e.target.value, local: valueLocal })}
+      >
+        {PHONE_COUNTRIES.map((c) => (
+          <option key={c.iso} value={c.dial}>
+            {c.label} ({c.dial})
+          </option>
+        ))}
+      </select>
+      <input
+        className="form-control"
+        placeholder="Numéro (ex: 6 12 34 56 78)"
+        value={valueLocal || ""}
+        onChange={(e) =>
+          onChange({ dial: valueDial || DEFAULT_DIAL, local: cleanPhoneLocal(e.target.value) })
+        }
+      />
+    </div>
+  );
+}
+
+/* ----------------------- Address autocomplete (BAN) ---------------------- */
+/**
+ * Autocomplétion :
+ * - active uniquement pendant la saisie et si l'input est focus
+ * - se ferme dès la sélection
+ */
+function AddressAutocomplete({
+  value,
+  onChangeText,
+  onSelect,
+  placeholder = "Saisis ton adresse",
+}) {
+  const [q, setQ] = useState(value || "");
+  const [items, setItems] = useState([]);
+  const [open, setOpen] = useState(false);
+  const [hi, setHi] = useState(-1);
+  const [typing, setTyping] = useState(false);
+  const [hasFocus, setHasFocus] = useState(false);
+  const timerRef = React.useRef(null);
+  const abortRef = React.useRef(null);
+  const inputRef = React.useRef(null);
+
+  useEffect(() => {
+    setQ(value ?? "");
+  }, [value]);
+
+  useEffect(() => {
+    if (!hasFocus || !typing || !q || q.trim().length < 3) {
+      setItems([]);
+      setOpen(false);
+      return;
+    }
+    clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(async () => {
+      if (abortRef.current) abortRef.current.abort();
+      const ctrl = new AbortController();
+      abortRef.current = ctrl;
+      const url = `https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(q)}&limit=8&autocomplete=1`;
+      try {
+        const res = await fetch(url, { signal: ctrl.signal });
+        const json = await res.json();
+        const list = (json?.features || []).map((f) => {
+          const p = f.properties || {};
+          return {
+            id: f.id || `${p.id}-${p.citycode}-${p.postcode}-${p.name}`,
+            label: p.label,
+            name: p.name,
+            housenumber: p.housenumber,
+            street: p.street || p.name,
+            postcode: p.postcode,
+            city: p.city,
+            country: "France (métropolitaine)",
+            lat: f.geometry?.coordinates?.[1],
+            lon: f.geometry?.coordinates?.[0],
+          };
+        });
+        setItems(list);
+        setOpen(list.length > 0);
+        setHi(-1);
+      } catch (e) {
+        if (e.name !== "AbortError") console.error(e);
+      }
+    }, 250);
+    return () => clearTimeout(timerRef.current);
+  }, [q, typing, hasFocus]);
+
+  const choose = (it) => {
+    setOpen(false);
+    setItems([]);
+    setHi(-1);
+    setTyping(false);
+    // ne pas réécrire l'input si le parent gère la valeur;
+    // on appelle onSelect + onChangeText pour laisser le parent setter ce qu'il veut
+    onChangeText?.(it.label);
+    onSelect?.(it);
+    if (inputRef.current) inputRef.current.blur();
+    setHasFocus(false);
+  };
+
+  const onKeyDown = (e) => {
+    if (!open || items.length === 0) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHi((x) => Math.min(items.length - 1, x + 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHi((x) => Math.max(0, x - 1));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const it = items[hi] || items[0];
+      if (it) choose(it);
+    } else if (e.key === "Escape") {
+      setOpen(false);
+    }
+  };
+
+  return (
+    <div style={{ position: "relative" }}>
+      <input
+        ref={inputRef}
+        className="form-control"
+        placeholder={placeholder}
+        value={q}
+        onChange={(e) => {
+          setQ(e.target.value);
+          setTyping(true);
+          onChangeText?.(e.target.value);
+        }}
+        onFocus={() => {
+          setHasFocus(true);
+          if (typing && items.length > 0) setOpen(true);
+        }}
+        onBlur={() => {
+          setTimeout(() => {
+            setHasFocus(false);
+            setOpen(false);
+          }, 100);
+        }}
+        onKeyDown={onKeyDown}
+        autoComplete="off"
+      />
+      {open && items.length > 0 && (
+        <div
+          style={{
+            position: "absolute",
+            zIndex: 30,
+            top: "100%",
+            left: 0,
+            right: 0,
+            background: "#fff",
+            border: "1px solid #e5e7eb",
+            borderRadius: 8,
+            marginTop: 6,
+            boxShadow: "0 8px 24px rgba(0,0,0,.08)",
+            maxHeight: 300,
+            overflow: "auto",
+          }}
+        >
+          {items.map((it, i) => (
+            <div
+              key={it.id}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => choose(it)}
+              onMouseEnter={() => setHi(i)}
+              style={{
+                padding: "10px 12px",
+                cursor: "pointer",
+                background: hi === i ? "#f3f4f6" : "transparent",
+              }}
+            >
+              <div style={{ fontWeight: 600 }}>{it.label}</div>
+              <div style={{ color: "#6b7280", fontSize: 12 }}>
+                {it.postcode} {it.city}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ----------------------- Form mapping / payload ----------------------- */
+
+const PHONE_DEFAULT_COUNTRY_LABEL = "France (métropolitaine)";
+const makeStreetLine = (addr) =>
+  `${addr?.housenumber ? `${addr.housenumber} ` : ""}${addr?.street || addr?.name || ""}`.trim();
+
+const toForm = (a, currentCustomer) => {
+  const phoneRaw =
+    a?.phone ?? a?.Phone ?? a?.phoneNumber ?? currentCustomer?.phoneNumber ?? "";
+  const dial =
+    (phoneRaw.startsWith("+") ? phoneRaw.match(/^\+\d{1,3}/)?.[0] : null) ||
+    DEFAULT_DIAL;
+  const local = phoneRaw.replace(dial, "").replace(/[^\d]/g, "");
+
+  if (!a)
+    return {
+      id: undefined,
+      civ: currentCustomer?.civ || "M.",
+      firstName: currentCustomer?.firstName || "",
+      lastName: currentCustomer?.lastName || "",
+      address1: "",
+      address2: "",
+      zip: "",
+      city: "",
+      country: PHONE_DEFAULT_COUNTRY_LABEL,
+      phoneDial: dial,
+      phoneLocal: local,
+      favorite: false,
+    };
+
+  return {
+    id: a?.id ?? a?.Id ?? a?.deliveryAddressId ?? a?.billingAddressId ?? undefined,
+    civ: a?.civ ?? a?.civility ?? a?.Civ ?? currentCustomer?.civ ?? "M.",
+    firstName: a?.firstName ?? a?.FirstName ?? currentCustomer?.firstName ?? "",
+    lastName: a?.lastName ?? a?.LastName ?? currentCustomer?.lastName ?? "",
+    address1: a?.address ?? a?.Address ?? a?.addressLine ?? a?.line1 ?? "",
+    address2: a?.complementaryAddress ?? a?.ComplementaryAddress ?? a?.line2 ?? "",
+    zip: a?.postalCode ?? a?.PostalCode ?? a?.zip ?? a?.zipCode ?? "",
+    city: a?.city ?? a?.City ?? a?.ville ?? "",
+    country: a?.country ?? a?.Country ?? PHONE_DEFAULT_COUNTRY_LABEL,
+    phoneDial: dial,
+    phoneLocal: local,
+    favorite: a?.favorite ?? a?.Favorite ?? false,
+  };
+};
+
+const toPayload = (form, currentCustomer, type) => {
+  const fullPhone = `${form.phoneDial || DEFAULT_DIAL}${cleanPhoneLocal(form.phoneLocal)}`;
+  const base = {
+    Id: form.id ?? undefined,
+    IdCustomer: currentCustomer?.id,
+    Civ: form.civ,
+    FirstName: type === "billing" ? currentCustomer?.firstName : form.firstName,
+    LastName: type === "billing" ? currentCustomer?.lastName : form.lastName,
+    Address: form.address1,
+    ComplementaryAddress: form.address2,
+    PostalCode: form.zip,
+    City: form.city,
+    Country: form.country,
+    Phone: fullPhone,
+  };
+  return type === "billing" ? base : { ...base, Favorite: !!form.favorite };
+};
+
+/* ------------------------------ Mini Modales ------------------------------ */
 
 function SimpleModal({ open, title, children, onClose, footer }) {
   if (!open) return null;
@@ -56,20 +518,12 @@ function SimpleModal({ open, title, children, onClose, footer }) {
           <button
             onClick={onClose}
             aria-label="Fermer"
-            style={{
-              border: 0,
-              background: "transparent",
-              cursor: "pointer",
-              fontSize: 20,
-              lineHeight: 1,
-            }}
+            style={{ border: 0, background: "transparent", cursor: "pointer", fontSize: 20, lineHeight: 1 }}
           >
             ×
           </button>
         </div>
-
         <div style={{ marginTop: 12 }}>{children}</div>
-
         {footer && (
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
             {footer}
@@ -80,27 +534,20 @@ function SimpleModal({ open, title, children, onClose, footer }) {
   );
 }
 
-function AddressFormModal({ open, initial, onSave, onCancel, title = "Adresse" }) {
-  const [form, setForm] = useState(() => ({
-    civility: initial?.civility ?? "M.",
-    firstName: initial?.firstName ?? "Minamba",
-    lastName: initial?.lastName ?? "Camara",
-    company: initial?.company ?? "",
-    street: initial?.street ?? "",
-    extra: initial?.extra ?? "",
-    zip: initial?.zip ?? "",
-    city: initial?.city ?? "",
-    country: initial?.country ?? "France (métropolitaine)",
-    phone: initial?.phone ?? "",
-    phoneFix: initial?.phoneFix ?? "",
-  }));
+function AddressFormModal({
+  open,
+  initial,
+  onSave,
+  onCancel,
+  title = "Adresse",
+  type = "delivery",
+}) {
+  const [form, setForm] = useState(() => initial);
+  useEffect(() => {
+    setForm(initial);
+  }, [initial]);
 
   const change = (k, v) => setForm((s) => ({ ...s, [k]: v }));
-
-  const save = () => {
-    if (!String(form.firstName).trim() || !String(form.lastName).trim()) return;
-    onSave(form);
-  };
 
   return (
     <SimpleModal
@@ -111,84 +558,115 @@ function AddressFormModal({ open, initial, onSave, onCancel, title = "Adresse" }
         <button key="cancel" onClick={onCancel} style={lightBtn}>
           Annuler
         </button>,
-        <button key="ok" onClick={save} style={primaryBtn}>
+        <button key="ok" onClick={() => onSave(form)} style={primaryBtn}>
           Valider
         </button>,
       ]}
     >
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <div>
-          <div style={{ marginBottom: 6, fontWeight: 700 }}>Civilité *</div>
-          <div style={{ display: "flex", gap: 16 }}>
-            {["M.", "Mme"].map((c) => (
-              <label key={c} style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
-                <input type="radio" name="civ" checked={form.civility === c} onChange={() => change("civility", c)} />
-                <span>{c}</span>
-              </label>
-            ))}
+      {form && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div>
+            <div style={{ marginBottom: 6, fontWeight: 700 }}>Civilité *</div>
+            <div style={{ display: "flex", gap: 16 }}>
+              {["M.", "Mme"].map((c) => (
+                <label key={c} style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+                  <input
+                    type="radio"
+                    name={`civ-${type}`}
+                    checked={form.civ === c}
+                    onChange={() => change("civ", c)}
+                  />
+                  <span>{c}</span>
+                </label>
+              ))}
+            </div>
           </div>
+
+          <div />
+
+          <Field label="Prénom *">
+            <input
+              className="form-control"
+              value={form.firstName}
+              onChange={(e) => change("firstName", e.target.value)}
+              disabled={type === "billing"}
+            />
+          </Field>
+          <Field label="Nom *">
+            <input
+              className="form-control"
+              value={form.lastName}
+              onChange={(e) => change("lastName", e.target.value)}
+              disabled={type === "billing"}
+            />
+          </Field>
+
+          <Field label="Adresse *">
+            <AddressAutocomplete
+              value={form.address1}
+              onChangeText={(txt) => change("address1", txt)}
+              onSelect={(addr) => {
+                // 👉 N° + rue seulement dans "Adresse"
+                const streetLine = makeStreetLine(addr);
+                change("address1", streetLine);
+                // remplir les autres champs
+                change("zip", addr.postcode || "");
+                change("city", addr.city || "");
+                change("country", addr.country || PHONE_DEFAULT_COUNTRY_LABEL);
+              }}
+              placeholder="N° et libellé de rue"
+            />
+          </Field>
+
+          <Field label="Complément d’adresse">
+            <input
+              className="form-control"
+              placeholder="Bâtiment, étage, digicode…"
+              value={form.address2}
+              onChange={(e) => change("address2", e.target.value)}
+            />
+          </Field>
+
+          <Field label="Code postal *">
+            <input className="form-control" value={form.zip} onChange={(e) => change("zip", e.target.value)} />
+          </Field>
+          <Field label="Ville *">
+            <input className="form-control" value={form.city} onChange={(e) => change("city", e.target.value)} />
+          </Field>
+
+          <Field label="Pays *">
+            <select className="form-control" value={form.country} onChange={(e) => change("country", e.target.value)}>
+              <option>France (métropolitaine)</option>
+              <option>Belgique</option>
+              <option>Suisse</option>
+            </select>
+          </Field>
+
+          <div />
+
+          <Field label="Téléphone">
+            <PhoneInputWithCountry
+              valueDial={form.phoneDial}
+              valueLocal={form.phoneLocal}
+              onChange={({ dial, local }) => {
+                change("phoneDial", dial);
+                change("phoneLocal", local);
+              }}
+            />
+          </Field>
+
+          {type === "delivery" && (
+            <label style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+              <input
+                type="checkbox"
+                checked={!!form.favorite}
+                onChange={(e) => change("favorite", e.target.checked)}
+              />
+              <span>Définir comme préférée</span>
+            </label>
+          )}
         </div>
-
-        <div />
-
-        <Field label="Prénom *">
-          <input className="form-control" value={form.firstName} onChange={(e) => change("firstName", e.target.value)} />
-        </Field>
-
-        <Field label="Nom *">
-          <input className="form-control" value={form.lastName} onChange={(e) => change("lastName", e.target.value)} />
-        </Field>
-
-        <Field label="Nom de la société">
-          <input className="form-control" value={form.company} onChange={(e) => change("company", e.target.value)} />
-        </Field>
-
-        <div />
-
-        <Field label="Adresse *">
-          <input
-            className="form-control"
-            placeholder="N° et libellé de rue"
-            value={form.street}
-            onChange={(e) => change("street", e.target.value)}
-          />
-        </Field>
-
-        <Field label="Complément d’adresse">
-          <input
-            className="form-control"
-            placeholder="N°bât, étage, appt, digicode…"
-            value={form.extra}
-            onChange={(e) => change("extra", e.target.value)}
-          />
-        </Field>
-
-        <Field label="Code postal *">
-          <input className="form-control" value={form.zip} onChange={(e) => change("zip", e.target.value)} />
-        </Field>
-
-        <Field label="Ville *">
-          <input className="form-control" value={form.city} onChange={(e) => change("city", e.target.value)} />
-        </Field>
-
-        <Field label="Pays *">
-          <select className="form-control" value={form.country} onChange={(e) => change("country", e.target.value)}>
-            <option>France (métropolitaine)</option>
-            <option>Belgique</option>
-            <option>Suisse</option>
-          </select>
-        </Field>
-
-        <div />
-
-        <Field label="Téléphone portable">
-          <input className="form-control" value={form.phone} onChange={(e) => change("phone", e.target.value)} />
-        </Field>
-
-        <Field label="Téléphone fixe">
-          <input className="form-control" value={form.phoneFix} onChange={(e) => change("phoneFix", e.target.value)} />
-        </Field>
-      </div>
+      )}
     </SimpleModal>
   );
 }
@@ -196,19 +674,22 @@ function AddressFormModal({ open, initial, onSave, onCancel, title = "Adresse" }
 function AddressBookModal({ open, addresses, onChoose, onEdit, onClose }) {
   return (
     <SimpleModal open={open} onClose={onClose} title="Carnet d’adresses">
-      {addresses.length === 0 && <div style={{ color: "#6b7280" }}>Aucune adresse enregistrée.</div>}
+      {addresses.length === 0 && <div style={{ color: "#6b7280" }}>Aucune adresse de livraison.</div>}
       <div style={{ display: "grid", gap: 12 }}>
         {addresses.map((a, idx) => (
           <div key={idx} style={addressCard}>
-            <div style={{ fontWeight: 800, marginBottom: 6 }}>
-              {a.firstName} {a.lastName}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ fontWeight: 800, marginBottom: 6 }}>
+                {a.firstName} {a.lastName}
+              </div>
+              {a.favorite ? <span className="badge bg-primary">Préférée</span> : null}
             </div>
             <div>
-              {a.street}
-              {a.extra ? `, ${a.extra}` : ""}
+              {a.address}
+              {a.complementaryAddress ? `, ${a.complementaryAddress}` : ""}
             </div>
             <div>
-              {a.zip} {a.city}
+              {a.postalCode} {a.city}
             </div>
             <div>{a.country}</div>
             {(a.phone || a.phoneFix) && (
@@ -223,7 +704,12 @@ function AddressBookModal({ open, addresses, onChoose, onEdit, onClose }) {
               <button style={lightBtn} onClick={() => onEdit(idx)}>
                 Modifier
               </button>
-              <button style={primaryBtn} onClick={() => onChoose(idx)}>
+              <button
+                style={primaryBtn}
+                onClick={() => onChoose(idx)}
+                disabled={a.favorite === true}
+                title={a.favorite ? "Déjà l’adresse préférée" : "Définir comme préférée"}
+              >
                 Choisir
               </button>
             </div>
@@ -244,103 +730,69 @@ function Field({ label, children }) {
 }
 
 /* ------------------------------------------------------------------ */
-/* --------------------------- Helpers divers ------------------------ */
-/* ------------------------------------------------------------------ */
-
-const fmt = (n) => new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(Number(n) || 0);
-
-const readLsItems = () => {
-  try {
-    return JSON.parse(localStorage.getItem("items") || "[]");
-  } catch {
-    return [];
-  }
-};
-const getPid = (it) => it?.productId ?? it?.id ?? it?.Id ?? null;
-const getQty = (it) => Number(it?.qty ?? it?.quantity ?? 1);
-const getProductUnitPrice = (it, productsFromStore) => {
-  let price = 0;
-  var product = productsFromStore.find((p) => String(p.id) === String(it.id));
-  if (product?.priceTtcCategoryCodePromoted != null) return (price = product.priceTtcCategoryCodePromoted);
-  if (product?.priceTtcPromoted != null && product?.priceTtcCategoryCodePromoted == null) return (price = product.priceTtcPromoted);
-  if (product?.priceTtc != null && product?.priceTtcPromoted == null && product?.priceTtcCategoryCodePromoted == null) return (price = product.priceTtc);
-  return price;
-};
-
-// util orders
-const getOrderEntityId = (o) => o?.id ?? o?.Id ?? o?.orderId ?? null;
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const waitForNewOrderId = async (dispatch, store, customerId, beforeIds, { attempts = 25, delay = 200 } = {}) => {
-  const beforeSet = new Set((beforeIds || []).map(String));
-  for (let i = 0; i < attempts; i++) {
-    await dispatch(getOrderRequest?.());
-    await sleep(delay);
-    const state = store.getState();
-    const allOrders = state?.orders?.orders || [];
-    const forCustomer = allOrders.filter(
-      (o) => String(o?.idCustomer ?? o?.customerId ?? o?.CustomerId ?? o?.customer?.id ?? "") === String(customerId)
-    );
-    const ids = forCustomer.map(getOrderEntityId).filter(Boolean).map(String);
-    const newId = ids.find((id) => !beforeSet.has(id));
-    if (newId) return newId;
-  }
-  return null;
-};
-
-
-const relayCode = {
-  MondialRelay: "MONR",
-  Ups: "UPSE",
-  Chronopost: "CHRP"
-};
-
-const getRelayLogo = (relay) => {
-switch(relay.network){
-  case relayCode.MondialRelay: return "../images/mondialrelay.png";
-  case relayCode.Ups: return "../images/ups.png";
-  case relayCode.Chronopost: return "../images/chronopost.png";
-}
-
-  const logo = relay.logo;
-  return logo ? logo : "https://via.placeholder.com/150";
-};
-
-
-/* ------------------------------------------------------------------ */
 /* ------------------------ Page principale -------------------------- */
 /* ------------------------------------------------------------------ */
 
 export const DeliveryPayment = () => {
+  // Snapshot du panier
+  const [products] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("items") || "[]");
+    } catch {
+      return [];
+    }
+  });
+
   const dispatch = useDispatch();
   const store = useStore();
 
-  const { state } = useLocation();
+  const location = useLocation();
+  const { state } = location;
+
+  // Lecture directe du slice payment
+  const payment = useSelector((s) => s?.payment) || {};
+  const paymentConfirmed = !!payment.confirmed;
   const totalCents = state?.totalCents ?? 0;
   const totalFromState = totalCents / 100;
 
   const productsFromStore = useSelector((s) => s?.products?.products) || [];
-
   const { user } = useSelector((s) => s.account);
   const customers = useSelector((s) => s?.customers?.customers) || [];
   const uid = user?.id || null;
   const currentCustomer = customers.find((c) => c.idAspNetUser === uid);
 
+  // 📦 Adresses
   const billingAddresses = useSelector((s) => s?.billingAddresses?.billingAddresses || []);
   const deliveryAddresses = useSelector((s) => s?.deliveryAddresses?.deliveryAddresses || []);
 
-  const billingLst = billingAddresses.filter((a) => a?.idCustomer === currentCustomer?.id);
-  const deliveryLst = deliveryAddresses.filter((a) => a?.idCustomer === currentCustomer?.id);
-  const deliveryFavoriteAddress = deliveryAddresses.find(
-    (a) => a?.idCustomer === currentCustomer?.id && a?.favorite
+  const deliveryLst = (deliveryAddresses || []).filter(
+    (a) => a?.idCustomer === currentCustomer?.id
   );
+  const deliveryFavoriteAddress = deliveryLst.find((a) => a?.favorite);
   const billingAddress = billingAddresses.find((a) => a?.idCustomer === currentCustomer?.id);
 
-  const orders = useSelector((s) => s?.orders?.orders) || [];
+  // Charger données nécessaires
   useEffect(() => {
     dispatch(getOrderRequest?.());
   }, [dispatch]);
+  useEffect(() => {
+    dispatch(getDeliveryAddressRequest?.());
+  }, [dispatch]);
+  useEffect(() => {
+    dispatch(getBillingAddressRequest?.());
+  }, [dispatch]);
 
-  // 👉 état Shipping depuis Redux
+  // Déclenche la confirmation Stripe si on revient avec session_id
+    useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const sessionId = params.get("session_id");
+    if (sessionId) {
+      dispatch(confirmCheckoutSessionRequest(sessionId));
+    }
+  }, [location.search, dispatch]);
+
+
+  // Shipping slice
   const {
     rates = [],
     ratesLoading,
@@ -350,33 +802,37 @@ export const DeliveryPayment = () => {
     relaysByAddressLoading,
   } = useSelector((s) => s?.shipping || {});
 
-  const [addresses, setAddresses] = useState([...billingLst, ...deliveryLst]);
-  const [shippingIndex, setShippingIndex] = useState(0);
-  const [billing, setBilling] = useState(addresses[0]);
-
+  // ⚙️ États UI
   const [showBook, setShowBook] = useState(false);
-  const [showAddShip, setShowAddShip] = useState(false);
   const [editShipIdx, setEditShipIdx] = useState(null);
   const [showEditBilling, setShowEditBilling] = useState(false);
 
   const [deliveryMode, setDeliveryMode] = useState("home"); // "home" | "relay"
   const [selectedRelay, setSelectedRelay] = useState(null);
 
-  // ---- Champs de recherche relais par adresse (Boxtal v3.1) ----
-  const [relayNumber, setRelayNumber] = useState("");       // ex: "4"
-  const [relayStreet, setRelayStreet] = useState("");       // ex: "boulevard des capucines"
-  const [relayCity, setRelayCity] = useState("");           // ex: "Paris"
-  const [relayZip, setRelayZip] = useState("75001");        // postalCode
-  const [relayState, setRelayState] = useState("");         // optionnel
-  const [relayCountryIso, setRelayCountryIso] = useState("FR");
+  // -------------------- PREFILL: une ligne depuis la favorite --------------------
+  const preferredRelayAddress = useMemo(() => {
+    if (!deliveryFavoriteAddress) return "";
+    const parts = [];
+    if (deliveryFavoriteAddress.address) parts.push(deliveryFavoriteAddress.address);
+    const cityPart = [deliveryFavoriteAddress.postalCode, deliveryFavoriteAddress.city]
+      .filter(Boolean)
+      .join(" ");
+    if (cityPart) parts.push(cityPart);
+    const country = deliveryFavoriteAddress.country || "FR";
+    if (country) parts.push(country);
+    return parts.join(", ");
+  }, [deliveryFavoriteAddress]);
 
-  // Tarifs sélectionnés
+  const [relayFullAddress, setRelayFullAddress] = useState(preferredRelayAddress);
+  useEffect(() => {
+    if (!relayFullAddress && preferredRelayAddress) {
+      setRelayFullAddress(preferredRelayAddress);
+    }
+  }, [preferredRelayAddress, relayFullAddress]);
+
+  // Tarif sélectionné (à domicile)
   const [selectedRateCode, setSelectedRateCode] = useState(null);
-
-  // Paiement
-  const [payMethod, setPayMethod] = useState("card");
-  const [acceptTosCard, setAcceptTosCard] = useState(false);
-  const [acceptTosPaypal, setAcceptTosPaypal] = useState(false);
 
   // Totaux
   const lsItemsAmount = useMemo(
@@ -385,109 +841,187 @@ export const DeliveryPayment = () => {
   );
   const baseTotal = totalFromState > 0 ? totalFromState : lsItemsAmount;
 
-  // Poids panier (fallback 0.25 kg / article)
+  // Poids panier
   const cartWeightKg = useMemo(() => {
     const items = readLsItems();
     return items.reduce((s, it) => s + (it.weightKg ?? 0.25) * getQty(it), 0);
   }, []);
 
-  const declaredValue = baseTotal;
+  // Packages
+  const packages = useMemo(
+    () =>
+      products.flatMap((p) =>
+        p.packageProfil
+          ? [
+              {
+                Id: String(p.packageProfil.id ?? ""),
+                ContainedCode: String(p.containedCode ?? ""),
+                PackageWeight: String(p.packageProfil.weight ?? ""),
+                PackageLonger: String(p.packageProfil.longer ?? ""),
+                PackageWidth: String(p.packageProfil.width ?? ""),
+                PackageHeight: String(p.packageProfil.height ?? ""),
+                PackageValue: parseFloat(p.price ?? 0) || null,
+                PackageStackable: true,
+                Type: "PARCEL",
+              },
+            ]
+          : []
+      ),
+    [products]
+  );
 
-  // === 1) Charger les tarifs (à domicile) selon l'adresse de livraison ===
+  /* === 1) Tarifs domicile === */
+  const depZip = deliveryFavoriteAddress?.postalCode || billingAddress?.postalCode || null;
+  const depCountry = (deliveryFavoriteAddress?.country || "FR").slice(0, 2).toUpperCase();
+  const depCity = deliveryFavoriteAddress?.city || billingAddress?.city || null;
+
   useEffect(() => {
-    const zip = deliveryFavoriteAddress?.postalCode || billingAddress?.postalCode;
-    const country = (deliveryFavoriteAddress?.country || "FR").slice(0, 2).toUpperCase();
-    if (!zip) return;
-
+    if (!depZip || !depCity) return;
     dispatch(
       getShippingRatesRequest({
-        toZip: zip,
-        country,
-        weightKg: cartWeightKg,
-        value: declaredValue,
+        RecipientZipCode: String(depZip),
+        RecipientCountry: depCountry,
+        RecipientCity: depCity,
+        Packages: packages,
       })
     );
-  }, [deliveryFavoriteAddress, billingAddress, cartWeightKg, declaredValue, dispatch]);
+  }, [dispatch, depZip, depCity, depCountry, packages]);
 
-  // === 2) Recharger les tarifs si on choisit un relais ===
+  const normalizedRates = useMemo(
+    () =>
+      (rates || []).map((r) => ({
+        ...r,
+        isRelay: r?.isRelay ?? String(r?.deliveryTypeCode).toUpperCase() === "PICKUP_POINT",
+        operator: r?.operator || r?.carrierCode || null,
+        carrier: r?.carrier || r?.labelCarrier || r?.label || "",
+        priceTtc: Number(r?.priceTtc ?? r?.price ?? 0),
+      })),
+    [rates]
+  );
+
+  const homeRates = useMemo(() => normalizedRates.filter((r) => !r.isRelay), [normalizedRates]);
+  const relayRates = useMemo(() => normalizedRates.filter((r) => r.isRelay), [normalizedRates]);
+
   useEffect(() => {
-    if (deliveryMode !== "relay" || !selectedRelay) return;
-    dispatch(
-      getShippingRatesRequest({
-        toZip: selectedRelay.zip,
-        country: "FR",
-        weightKg: cartWeightKg,
-        value: declaredValue,
-      })
-    );
-  }, [deliveryMode, selectedRelay, cartWeightKg, declaredValue, dispatch]);
+    if (ratesLoading || homeRates.length === 0) return;
+    setSelectedRateCode((prev) => prev || homeRates[0].code);
+  }, [ratesLoading, homeRates]);
 
-  // === 3) Recherche des relais ===
-
-  // a) Recherche par adresse (NOUVEAU)
+  /* === 2) Recherche relais via adresse UNE LIGNE === */
   const fetchRelaysByAddress = () => {
+    const parsed = parseRelayAddress(relayFullAddress, { countryIso: "FR" });
+    setDeliveryMode("relay");
     dispatch(
       getRelaysByAddressRequest({
-        number: relayNumber || undefined,
-        street: relayStreet || undefined,
-        city: relayCity || undefined,
-        postalCode: relayZip || undefined,
-        state: relayState || undefined,
-        countryIsoCode: relayCountryIso || "FR",
-        // searchNetworks: ["MONR","CHRP"], // si tu veux filtrer par transporteurs
+        number: parsed.number || undefined,
+        street: parsed.street || undefined,
+        city: parsed.city || undefined,
+        postalCode: parsed.postalCode || undefined,
+        state: parsed.state || undefined,
+        countryIsoCode: parsed.countryIsoCode || "FR",
         limit: 30,
       })
     );
-    setDeliveryMode("relay");
   };
 
-  // b) Ancienne recherche par ZIP (si tu veux la garder)
-  const fetchRelaysByZip = () => {
-    dispatch(getRelaysRequest({ zip: relayZip, country: "FR" }));
-    setDeliveryMode("relay");
-  };
-
-  // Liste à afficher : priorité aux résultats “par adresse”
-  const displayedRelays = (relaysByAddress && relaysByAddress.length > 0) ? relaysByAddress : relays;
+  const displayedRelaysRaw =
+    relaysByAddress && relaysByAddress.length > 0 ? relaysByAddress : relays;
+  const displayedRelays = (displayedRelaysRaw || []).map(normalizeRelay);
   const displayedRelaysLoading = relaysByAddressLoading || relaysLoading;
 
-  // Prix en fonction de la sélection
+  const relayOperator = selectedRelay?.network || null;
+  const selectedRelayRate = useMemo(() => {
+    if (!relayRates || relayRates.length === 0) return null;
+    if (!relayOperator) return relayRates[0];
+    const upper = String(relayOperator).toUpperCase();
+    return (
+      relayRates.find(
+        (r) =>
+          (r.operator && String(r.operator).toUpperCase() === upper) ||
+          (r.carrier &&
+            r.carrier
+              .toLowerCase()
+              .includes(
+                upper === "MONR"
+                  ? "mondial"
+                  : upper === "CHRP"
+                  ? "chrono"
+                  : upper === "UPSE"
+                  ? "ups"
+                  : upper === "POFR"
+                  ? "laposte"
+                  : ""
+              ))
+      ) || relayRates[0]
+    );
+  }, [relayRates, relayOperator]);
+
   const shippingPrice = useMemo(() => {
-    if (deliveryMode === "relay") {
-      const relayOffer = rates.find((r) => r.isRelay) || rates[0];
-      return relayOffer ? Number(relayOffer.priceTtc) : 0;
-    }
-    const o = rates.find((r) => r.code === selectedRateCode);
-    return o ? Number(o.priceTtc) : 0;
-  }, [deliveryMode, rates, selectedRateCode]);
+    if (deliveryMode === "relay") return Number(selectedRelayRate?.priceTtc ?? 0);
+    const o = homeRates.find((r) => r.code === selectedRateCode) || homeRates[0];
+    return Number(o?.priceTtc ?? 0);
+  }, [deliveryMode, selectedRelayRate, homeRates, selectedRateCode]);
 
   const grandTotal = +(baseTotal + shippingPrice).toFixed(2);
 
-  const chooseFromBook = (idx) => {
-    setShippingIndex(idx);
+  /* ------------ Choisir une adresse dans le carnet (favorite) ------------ */
+  const chooseFromBook = async (idx) => {
+    const a = deliveryLst[idx];
+    if (!a) return;
+    const id = a?.id ?? a?.deliveryAddressId ?? a?.Id ?? null;
+    if (!id) return;
+
+    await dispatch(
+      updateDeliveryAddressRequest({ Id: id, IdCustomer: currentCustomer?.id, Favorite: true })
+    );
+    await dispatch(getDeliveryAddressRequest());
+
+    try {
+      const parts = [];
+      if (a?.address) parts.push(a.address);
+      const cityPart = [a?.postalCode, a?.city].filter(Boolean).join(" ");
+      if (cityPart) parts.push(cityPart);
+      const country = a?.country || "FR";
+      if (country) parts.push(country);
+      const line = parts.join(", ");
+      if (line) setRelayFullAddress(line);
+    } catch {}
     setShowBook(false);
   };
-  const addShippingAddress = (payload) => {
-    setAddresses((arr) => {
-      const next = [...arr, payload];
-      setShippingIndex(next.length - 1);
-      return next;
-    });
-    setShowAddShip(false);
-  };
+
+  /* ------------------------ Edition & sauvegarde ------------------------ */
+
   const startEditShipping = (idx) => setEditShipIdx(idx);
-  const saveEditShipping = (payload) => {
-    setAddresses((arr) => arr.map((a, i) => (i === editShipIdx ? payload : a)));
-    setEditShipIdx(null);
+
+  const deliveryEditInitial =
+    editShipIdx !== null ? toForm(deliveryLst[editShipIdx], currentCustomer) : null;
+  const billingEditInitial = toForm(billingAddress, currentCustomer);
+
+  const save = async (form, meta) => {
+    const { type, mode } = meta;
+    const payload = toPayload(form, currentCustomer, type);
+
+    if (type === "billing") {
+      if (mode === "add") await dispatch(addBillingAddressRequest(payload));
+      else await dispatch(updateBillingAddressRequest(payload));
+      await dispatch(getBillingAddressRequest());
+      setShowEditBilling(false);
+    } else {
+      if (mode === "add") await dispatch(addDeliveryAddressRequest(payload));
+      else await dispatch(updateDeliveryAddressRequest(payload));
+      await dispatch(getDeliveryAddressRequest());
+      setEditShipIdx(null);
+    }
   };
 
-  /* ---- Création de la commande + lignes depuis LS + (ex) création d'envoi Boxtal ---- */
-  const createOrderFromCart = async (paymentMethodLabel) => {
-    if (!currentCustomer?.id) {
+  /* ---- Création de la commande + lignes + shipment ---- */
+  const orders = useSelector((s) => s?.orders?.orders) || [];
+  const handleOrderAfterPayment = async (paymentMethodLabel) => {
+    const currentCustomerId = currentCustomer?.id;
+    if (!currentCustomerId) {
       alert("Veuillez vous connecter pour finaliser votre commande.");
       return;
     }
-
     if (deliveryMode === "relay" && !selectedRelay) {
       alert("Choisissez un point relais avant de continuer.");
       return;
@@ -496,43 +1030,46 @@ export const DeliveryPayment = () => {
     const beforeIds = (orders || [])
       .filter(
         (o) =>
-          String(o?.idCustomer ?? o?.customerId ?? o?.CustomerId ?? o?.customer?.id ?? "") ===
-          String(currentCustomer.id)
+          String(
+            o?.idCustomer ?? o?.customerId ?? o?.CustomerId ?? o?.customer?.id ?? ""
+          ) === String(currentCustomerId)
       )
       .map(getOrderEntityId)
       .filter(Boolean);
 
     const chosenRate =
       deliveryMode === "relay"
-        ? rates.find((r) => r.isRelay) || rates.find((r) => r.code === selectedRateCode)
-        : rates.find((r) => r.code === selectedRateCode);
+        ? selectedRelayRate || relayRates[0] || null
+        : homeRates.find((r) => r.code === selectedRateCode) || homeRates[0] || null;
 
-    // 1) créer la commande
-    await dispatch(
-      addOrderRequest({
-        CustomerId: Number(currentCustomer.id),
-        PaymentMethod: paymentMethodLabel, // "Carte" | "PayPal"
-        Status: "En attente",
-        Amount: Number(grandTotal),
-        DeliveryAmount: Number(shippingPrice),
-
-        // 👉 Infos transport
-        DeliveryMode: deliveryMode,
-        DeliveryCarrier: chosenRate?.carrier || "Boxtal",
-        DeliveryMethodCode: chosenRate?.code || "",
-        DeliveryPointId: deliveryMode === "relay" ? selectedRelay?.id ?? null : null,
-        DeliveryPointLabel: deliveryMode === "relay" ? selectedRelay?.name ?? null : null,
-      })
-    );
-
-    // 2) récupérer l'ID créé
-    const newOrderId = await waitForNewOrderId(dispatch, store, currentCustomer.id, beforeIds);
-    if (!newOrderId) {
-      alert("Commande créée mais identifiant introuvable pour l’instant. Réessayez ou actualisez.");
+    if (chosenRate != null) {
+      await dispatch(
+        addOrderRequest({
+          CustomerId: Number(currentCustomerId),
+          PaymentMethod: paymentMethodLabel,
+          Status: "En attente",
+          Amount: Number(grandTotal),
+          DeliveryAmount: Number(shippingPrice),
+          DeliveryMode: deliveryMode,
+          DeliveryCarrier: chosenRate?.carrier || "Boxtal",
+          DeliveryMethodCode: chosenRate?.code || "",
+          DeliveryPointId: deliveryMode === "relay" ? selectedRelay?.id ?? null : null,
+          DeliveryPointLabel: deliveryMode === "relay" ? selectedRelay?.name ?? null : null,
+          ServiceCode: chosenRate?.dropOffPointCodes?.[0] || "",
+        })
+      );
+    } else {
+      alert("Veuillez choisir un mode de livraison !");
       return;
     }
 
-    // 3) ajouter les lignes depuis le localStorage
+    const res = await waitForNewOrderId(dispatch, store, currentCustomerId, beforeIds);
+    if (!res?.newId) {
+      alert("Commande créée mais identifiant introuvable pour l’instant. Réessayez ou actualisez.");
+      return;
+    }
+    const newOrderId = res.newId;
+
     const items = readLsItems();
     for (const it of items) {
       const pid = getPid(it);
@@ -543,7 +1080,7 @@ export const DeliveryPayment = () => {
       await dispatch(
         addOrderCustomerProductRequest({
           OrderId: Number(newOrderId),
-          CustomerId: Number(currentCustomer.id),
+          CustomerId: Number(currentCustomerId),
           ProductId: Number(pid),
           Quantity: Number(qty),
           IdOrder: Number(newOrderId),
@@ -553,51 +1090,218 @@ export const DeliveryPayment = () => {
       );
     }
 
-    // 4) (exemple) créer l'expédition Boxtal côté backend via Saga
+    const today = new Date().toISOString().slice(0, 10);
+
+    const shipmentPackages =
+      packages && packages.length > 0
+        ? packages
+        : [
+            {
+              Type: "PARCEL",
+              PackageWeight: String(cartWeightKg || 0.25),
+              PackageLonger: "20",
+              PackageWidth: "15",
+              PackageHeight: "10",
+              PackageValue: parseFloat(baseTotal || 0) || 0,
+              PackageStackable: true,
+            },
+          ];
+
+    const operatorCode = carrierToOperator(chosenRate?.carrier, selectedRelay?.network);
+    const serviceCode = chosenRate?.code || "";
+    if (!operatorCode || !serviceCode) {
+      console.warn("V1: operator/service manquants", { operatorCode, serviceCode, chosenRate, selectedRelay });
+      alert("Impossible de déterminer l’opérateur ou le service pour l’expédition.");
+      return;
+    }
+
+    const toIsRelay = deliveryMode === "relay";
+    const toAddressLine = deliveryFavoriteAddress?.address || "";
+    const toZip = String(deliveryFavoriteAddress?.postalCode || "");
+    const toCity = deliveryFavoriteAddress?.city || "";
+    const toCountry = "FR";
+
+    const pickupPointCode = toIsRelay ? String(selectedRelay?.id || "") : null;
+
+    const defaultDropOffForShopToShop = "CHRP-736BX";
+    const dropOffPointCode = defaultDropOffForShopToShop || null;
+
+    const declaredValue = Number(baseTotal) || 0;
+
     try {
       const body = {
-        serviceCode: chosenRate?.code || "",
-        isRelay: deliveryMode === "relay",
-        relayId: deliveryMode === "relay" ? selectedRelay?.id ?? null : null,
-        toFirstName: currentCustomer?.firstName ?? "",
-        toLastName: currentCustomer?.lastName ?? "",
-        toStreet: deliveryFavoriteAddress?.address ?? "",
-        toExtra: deliveryFavoriteAddress?.complementaryAddress ?? "",
-        toZip:
-          deliveryMode === "relay" ? selectedRelay?.zip ?? "" : deliveryFavoriteAddress?.postalCode ?? "",
-        toCity:
-          deliveryMode === "relay" ? selectedRelay?.city ?? "" : deliveryFavoriteAddress?.city ?? "",
-        toCountry: "FR",
-        weightKg: cartWeightKg,
-        declaredValue: baseTotal,
+        OperatorCode: operatorCode,
+        ServiceCode: serviceCode,
+        IsRelay: toIsRelay,
+        DropOffPointCode: dropOffPointCode,
+        PickupPointCode: pickupPointCode,
+        ContentDescription: "Montres connectées",
+        DeclaredValue: declaredValue,
+        Packages: shipmentPackages,
+        // Destinataire
+        ToType: "particulier",
+        ToCivility: currentCustomer?.civility || null,
+        ToLastName: currentCustomer?.lastName || "",
+        ToFirstName: currentCustomer?.firstName || "",
+        ToEmail: user?.email || null,
+        ToPhone: currentCustomer?.phone || null,
+        ToAddress: toAddressLine,
+        ToZip: toZip,
+        ToCity: toCity,
+        ToCountry: toCountry,
+        // Expéditeur
+        FromType: "entreprise",
+        FromCivility: "M",
+        FromCompany: "Mins Shop",
+        FromLastName: "Camara",
+        FromFirstName: "Minamba",
+        FromEmail: "minamba.c@gmail.com",
+        FromPhone: "+33624957558",
+        FromAddress: "2 Rue jules vallès",
+        FromZip: "91000",
+        FromCity: "Evry-courcouronnes",
+        FromCountry: "FR",
+        TakeOverDate: today,
+        ExternalOrderId: String(newOrderId),
       };
-      // ⚠️ En prod, lance plutôt après succès du paiement
-      dispatch(createShipmentRequest(newOrderId, body));
+      dispatch(createShipmentRequest(body));
     } catch (e) {
       console.error("Create shipment error:", e);
     }
 
-    // 5) refresh
     await Promise.all([dispatch(getOrderRequest?.()), dispatch(getOrderCustomerProductRequest?.())]);
-
-    // 6) vider le panier (Redux + LS)
     await dispatch(saveCartRequest([]));
     localStorage.setItem("items", "[]");
-
     alert("Votre commande a été enregistrée.");
   };
 
-  const handleStripePay = async () => {
-    if (!acceptTosCard) return;
-    await createOrderFromCart("Carte");
+  //----------------------------------------STRIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIPE-----------------------------------------------------------------
+
+  const buildCheckoutPayload = () => {
+    const currentCustomerId = currentCustomer?.id;
+    if (!currentCustomerId) {
+      alert("Veuillez vous connecter pour finaliser votre commande.");
+      return null;
+    }
+  
+    const chosenRate =
+      deliveryMode === "relay"
+        ? (selectedRelayRate || relayRates[0] || null)
+        : (homeRates.find((r) => r.code === selectedRateCode) || homeRates[0] || null);
+  
+    if (!chosenRate) {
+      alert("Veuillez choisir un mode de livraison.");
+      return null;
+    }
+    if (deliveryMode === "relay" && !selectedRelay) {
+      alert("Choisissez un point relais.");
+      return null;
+    }
+  
+    return {
+      amount: Math.round(grandTotal * 100),
+      currency: "eur",
+      customerId: currentCustomerId,
+      userEmail: user?.email,
+      shipping: {
+        mode: deliveryMode,
+        price: shippingPrice,
+        rateCode: chosenRate?.code,
+        carrier: chosenRate?.carrier,
+        relay:
+          deliveryMode === "relay"
+            ? {
+                id: selectedRelay?.id,
+                name: selectedRelay?.name,
+                address: selectedRelay?.address,
+                zip: selectedRelay?.zip,
+                city: selectedRelay?.city,
+                network: selectedRelay?.network,
+              }
+            : null,
+        homeAddress: deliveryFavoriteAddress
+          ? {
+              address: deliveryFavoriteAddress.address,
+              zip: deliveryFavoriteAddress.postalCode,
+              city: deliveryFavoriteAddress.city,
+              country: "FR",
+            }
+          : null,
+      },
+      basket: readLsItems().map((it) => ({
+        productId: getPid(it),
+        qty: getQty(it),
+        unitPriceTtc: getProductUnitPrice(it, productsFromStore),
+      })),
+      shipment: { packages, cartWeightKg, baseTotal },
+    };
   };
 
-  const handlePayPal = async () => {
-    if (!acceptTosPaypal) return;
-    await createOrderFromCart("PayPal");
-  };
+/** ───────── Fonction unique de paiement que ce soit par carte ou paypal ─────────
+ * method: "CARTE" | "paypal"
+ */
+const pay = async (method) => {
+  if (method === "carte") {
+    const payload = buildCheckoutPayload();
+    if (!payload) return;
+    // 👉 action en camelCase
+    dispatch(createCheckoutSessionRequest(payload));
+    return;
+  }
 
-  const shipAddr = addresses[shippingIndex];
+  if (method === "paypal") {
+    // PayPal : on exécute directement ton flux existant
+    await handleOrderAfterPayment("PayPal");
+    return;
+  }
+
+  console.warn("Méthode de paiement inconnue:", method);
+};
+
+
+// Effet: ne finalise la commande que pour STRIPE + si confirmé. TODO IMPLEMENT PAYPAL
+const [hasFinalized, setHasFinalized] = useState(false);
+useEffect(() => {
+  const params = new URLSearchParams(location.search);
+  const sessionId = params.get("session_id");   // présent uniquement au retour Stripe
+  if (!sessionId) return;                        // => pas Stripe, ne rien faire ici
+
+  if (payment?.confirmed && !hasFinalized) {
+    (async () => {
+      try {
+        await handleOrderAfterPayment("Carte");
+        setHasFinalized(true);
+
+        // optionnel: nettoyer l'URL pour éviter tout retrigger visuel
+        const clean = new URL(window.location.href);
+        clean.searchParams.delete("session_id");
+        window.history.replaceState({}, "", clean.toString());
+      } catch (e) {
+        console.error("Erreur dans la finalisation du paiement stripe :", e);
+      }
+    })();
+  }
+}, [payment?.confirmed, hasFinalized, location.search]);
+
+
+    //----------------------------------------STRIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIPE-----------------------------------------------------------------
+
+    const handleStripePay = () => pay("carte");
+    const handlePayPal = () => pay("paypal");
+
+  /* ===== Hauteur étendue pour la liste de relais ===== */
+  const RELAY_LIST_MIN_HEIGHT = 340;
+  const RELAY_LIST_MAX_HEIGHT = 540;
+
+  const uniqueHomeRates = useMemo(() => {
+    const seen = new Set();
+    return (homeRates || []).filter((r) => {
+      const k = `${r.carrier}|${r.code}|${r.label}|${r.priceTtc}`;
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+  }, [homeRates]);
 
   return (
     <div className="product-page dp-page" style={{ maxWidth: 1200 }}>
@@ -608,29 +1312,32 @@ export const DeliveryPayment = () => {
 
       <div
         className="new-grid"
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: 16,
-          marginBottom: 18,
-        }}
+        style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 18 }}
       >
         {/* ----- À domicile ----- */}
         <section className="category-card" style={{ padding: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-            <input type="radio" name="deliv" checked={deliveryMode === "home"} onChange={() => setDeliveryMode("home")} />
+            <input
+              type="radio"
+              name="deliv"
+              checked={deliveryMode === "home"}
+              onChange={() => {
+                setDeliveryMode("home");
+                setSelectedRelay(null);
+              }}
+            />
             <h3 style={{ margin: 0 }}>À domicile</h3>
             <span style={chipMuted}>Tarifs en direct</span>
           </div>
 
-          <div style={smallTitle}>Votre adresse de livraison</div>
+          <div style={smallTitle}>Votre adresse de livraison préférée</div>
           <div style={addressWrap}>
             <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 800 }}>
-                {currentCustomer?.firstName} {currentCustomer?.lastName}
-              </div>
               {deliveryFavoriteAddress ? (
                 <>
+                  <div style={{ fontWeight: 800 }}>
+                    {deliveryFavoriteAddress.firstName} {deliveryFavoriteAddress.lastName}
+                  </div>
                   <div>{deliveryFavoriteAddress.address}</div>
                   {deliveryFavoriteAddress.complementaryAddress && (
                     <div>{deliveryFavoriteAddress.complementaryAddress}</div>
@@ -644,7 +1351,7 @@ export const DeliveryPayment = () => {
                   )}
                 </>
               ) : (
-                <div style={{ color: "#6b7280" }}>Aucune adresse de livraison favorite.</div>
+                <div style={{ color: "#6b7280" }}>Aucune adresse de livraison préférée.</div>
               )}
             </div>
 
@@ -652,19 +1359,20 @@ export const DeliveryPayment = () => {
               <button style={lightBtn} onClick={() => setShowBook(true)}>
                 Changer
               </button>
-              <button style={lightBtn} onClick={() => setShowAddShip(true)}>
-                Ajouter
-              </button>
+              <button style={lightBtn} onClick={() => setEditShipIdx(0)} hidden />
             </div>
           </div>
 
-          {/* Offres Boxtal */}
+          {/* Offres domicile */}
           <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
             {ratesLoading && <div style={{ color: "#6b7280" }}>Chargement des offres…</div>}
+            {!ratesLoading && uniqueHomeRates.length === 0 && (
+              <div style={{ color: "#6b7280" }}>Aucune offre disponible pour cette adresse.</div>
+            )}
             {!ratesLoading &&
-              rates.map((o) => (
+              uniqueHomeRates.map((o, i) => (
                 <ShipOption
-                  key={o.code}
+                  key={`${o.carrier || "carrier"}-${o.code}-${o.label || ""}-${o.priceTtc}-${i}`}
                   value={o.code}
                   price={fmt(o.priceTtc)}
                   label={`${o.carrier} — ${o.label}`}
@@ -672,6 +1380,7 @@ export const DeliveryPayment = () => {
                   onChange={() => {
                     setSelectedRateCode(o.code);
                     setDeliveryMode("home");
+                    setSelectedRelay(null);
                   }}
                 />
               ))}
@@ -681,77 +1390,135 @@ export const DeliveryPayment = () => {
         {/* ----- En point relais ----- */}
         <section className="category-card" style={{ padding: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-            <input type="radio" name="deliv" checked={deliveryMode === "relay"} onChange={() => setDeliveryMode("relay")} />
+            <input
+              type="radio"
+              name="deliv"
+              checked={deliveryMode === "relay"}
+              onChange={() => setDeliveryMode("relay")}
+            />
             <h3 style={{ margin: 0 }}>En point relais</h3>
-            <span style={chipMuted}>Choisissez un relais</span>
+            <span style={chipMuted}>Adresse en une ligne</span>
           </div>
 
-          <div style={{ color: "#2563eb", fontWeight: 800, fontSize: 12, marginBottom: 6 }}>Recherche par adresse</div>
+          <div style={{ color: "#2563eb", fontWeight: 800, fontSize: 12, marginBottom: 6 }}>
+            Recherche par adresse
+          </div>
 
-          {/* Formulaire adresse Boxtal v3.1 */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr 1fr 1fr 100px", gap: 8, alignItems: "end" }}>
-            <Field label="N°">
-              <input className="form-control" value={relayNumber} onChange={(e) => setRelayNumber(e.target.value)} />
-            </Field>
-            <Field label="Rue">
-              <input className="form-control" value={relayStreet} onChange={(e) => setRelayStreet(e.target.value)} />
-            </Field>
-            <Field label="Ville">
-              <input className="form-control" value={relayCity} onChange={(e) => setRelayCity(e.target.value)} />
-            </Field>
-            <Field label="Code postal">
-              <input className="form-control" value={relayZip} onChange={(e) => setRelayZip(e.target.value)} />
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "minmax(350px, 1fr) 60px",
+              gap: 12,
+              alignItems: "end",
+            }}
+          >
+            <Field label="Adresse complète">
+              <AddressAutocomplete
+                value=""
+                onChangeText={setRelayFullAddress}
+                onSelect={(addr) => {
+                  const line = [makeStreetLine(addr), [addr.postcode, addr.city].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+                  setRelayFullAddress(line);
+                  const parsed = parseRelayAddress(line, { countryIso: "FR" });
+                  setDeliveryMode("relay");
+                  dispatch(
+                    getRelaysByAddressRequest({
+                      number: parsed.number || undefined,
+                      street: parsed.street || undefined,
+                      city: parsed.city || undefined,
+                      postalCode: parsed.postalCode || undefined,
+                      state: parsed.state || undefined,
+                      countryIsoCode: parsed.countryIsoCode || "FR",
+                      limit: 30,
+                    })
+                  );
+                }}
+                placeholder="ex: 4 bd des Capucines, 75009 Paris"
+              />
             </Field>
             <div>
-              <button style={lightBtn} onClick={fetchRelaysByAddress}>OK</button>
+              <button style={lightBtn} onClick={fetchRelaysByAddress}>
+                OK
+              </button>
             </div>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginTop: 8 }}>
-            <Field label="État (optionnel)">
-              <input className="form-control" value={relayState} onChange={(e) => setRelayState(e.target.value)} />
-            </Field>
-            <Field label="Pays (ISO 2)">
-              <input className="form-control" value={relayCountryIso} onChange={(e) => setRelayCountryIso(e.target.value.toUpperCase())} />
-            </Field>
-            <div />
-          </div>
-
-          <div style={{ margin: "10px 0", textAlign: "center", color: "#6b7280" }}>ou</div>
-
-          {/* Ancien bouton ZIP (optionnel) */}
-          <div style={{ display: "flex", gap: 10, alignItems: "center", justifyContent: "center" }}>
-            <input className="form-control" style={{ maxWidth: 140 }} value={relayZip} onChange={(e) => setRelayZip(e.target.value)} />
-            <button style={lightBtn} onClick={fetchRelaysByZip}>
-              Chercher par CP
-            </button>
-          </div>
-
-          {displayedRelaysLoading && <div style={{ color: "#6b7280", marginTop: 10 }}>Recherche des relais…</div>}
+          {displayedRelaysLoading && (
+            <div style={{ color: "#6b7280", marginTop: 10 }}>Recherche des relais…</div>
+          )}
 
           {!displayedRelaysLoading && displayedRelays.length > 0 && (
-            <div style={{ marginTop: 12, display: "grid", gap: 10, maxHeight: 260, overflow: "auto" }}>
+            <div
+              style={{
+                marginTop: 12,
+                display: "grid",
+                gap: 12,
+                minHeight: RELAY_LIST_MIN_HEIGHT,
+                maxHeight: RELAY_LIST_MAX_HEIGHT,
+                overflow: "auto",
+                paddingRight: 4,
+              }}
+            >
               {displayedRelays.map((r) => (
                 <label
                   key={r.id}
-                  style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 10, display: "grid", gap: 4 }}
+                  style={{
+                    border: "1px solid #e5e7eb",
+                    borderRadius: 12,
+                    padding: 12,
+                    display: "grid",
+                    gap: 6,
+                    background: "#fff",
+                    cursor: "pointer",
+                  }}
+                  onClick={() => {
+                    setSelectedRelay(r);
+                    setDeliveryMode("relay");
+                  }}
                 >
                   <input
                     type="radio"
                     name="relay"
-                    checked={selectedRelay?.id === r.id}
+                    value={r.id}
+                    checked={String(selectedRelay?.id || "") === r.id}
                     onChange={() => {
                       setSelectedRelay(r);
                       setDeliveryMode("relay");
                     }}
                   />
-                  <span><img src={getRelayLogo(r)} style={{width: 45}} alt={r.carrier} /></span>
-                  <strong>{r.name}  <span style={{color: "#6b7280"}}>({r.distance})</span></strong>
+                  <span>
+                    <img
+                      src={getRelayLogo(r)}
+                      style={{ width: 45 }}
+                      alt={r.carrier || r.network || "relay"}
+                    />
+                  </span>
+                  <strong>
+                    {r.name} <span style={{ color: "#6b7280" }}>({r.distance})</span>
+                  </strong>
                   <span>{r.address}</span>
-                  <span>{r.zipCode} {r.city}</span>
-                  <span><strong>{r.schedules}</strong></span>
+                  <span>
+                    {r.zip} {r.city}
+                  </span>
+                  {r.schedules && (
+                    <span>
+                      <strong>{r.schedules}</strong>
+                    </span>
+                  )}
                 </label>
               ))}
+            </div>
+          )}
+
+          {selectedRelay && deliveryMode === "relay" && (
+            <div style={{ marginTop: 8, fontSize: 12, color: "#2563eb" }}>
+              Point relais sélectionné : <b>{selectedRelay.name}</b>
+              {selectedRelayRate && (
+                <>
+                  {" "}
+                  — tarif <b>{fmt(selectedRelayRate.priceTtc)}</b>
+                </>
+              )}
             </div>
           )}
         </section>
@@ -769,12 +1536,13 @@ export const DeliveryPayment = () => {
             {billingAddress ? (
               <>
                 <div style={{ fontWeight: 800 }}>
-                  {currentCustomer?.firstName} {currentCustomer?.lastName} — {billingAddress.address}
+                  {currentCustomer.firstName} {currentCustomer.lastName} — {billingAddress.address}
                   {billingAddress.complementaryAddress ? `, ${billingAddress.complementaryAddress}` : ""}
                 </div>
                 <div>
                   {billingAddress.postalCode} {billingAddress.city} — {billingAddress.country}
                 </div>
+                <div>{currentCustomer.phoneNumber}</div>
               </>
             ) : (
               <div style={{ color: "#6b7280" }}>Aucune adresse de facturation.</div>
@@ -793,60 +1561,40 @@ export const DeliveryPayment = () => {
       </h2>
 
       <div className="pay-grid" style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: 18 }}>
-        {/* ====== Carte bancaire (Stripe) ====== */}
+        {/* Carte bancaire */}
         <section className="category-card" style={{ padding: 16 }}>
           <label className="pay-method" style={payMethodRow}>
-            <input type="radio" name="pay" checked={payMethod === "card"} onChange={() => setPayMethod("card")} />
+            <input type="radio" name="pay" checked readOnly />
             <span style={{ fontWeight: 800 }}>Carte bancaire</span>
             <span aria-hidden="true">💳</span>
           </label>
 
-          {payMethod === "card" && (
-            <>
-              <div style={stripeInfo}>
-                Paiement sécurisé via Stripe. Vous serez redirigé pour renseigner votre carte.
-              </div>
-
-              <label className="tos-row" style={tosRow}>
-                <input type="checkbox" checked={acceptTosCard} onChange={(e) => setAcceptTosCard(e.target.checked)} />
-                <span>J’accepte les conditions générales de vente.</span>
-              </label>
-
-              <button className="dp-pay-btn" disabled={!acceptTosCard} onClick={handleStripePay}>
-                Payer ma commande
-              </button>
-            </>
-          )}
+          <>
+            <div style={stripeInfo}>
+              Paiement sécurisé via Stripe. Vous serez redirigé pour renseigner votre carte.
+            </div>
+            <button className="dp-pay-btn" onClick={handleStripePay}>
+              Payer ma commande
+            </button>
+          </>
 
           <div style={{ height: 10 }} />
 
-          {/* ====== PayPal ====== */}
+          {/* PayPal */}
           <label className="pay-method" style={payMethodRow}>
-            <input type="radio" name="pay" checked={payMethod === "paypal"} onChange={() => setPayMethod("paypal")} />
+            <input type="radio" name="pay2" readOnly />
             <span style={{ fontWeight: 800 }}>PayPal</span>
           </label>
 
-          {payMethod === "paypal" && (
-            <>
-              <div style={stripeInfo}>Vous serez redirigé vers PayPal pour finaliser le paiement.</div>
-
-              <label className="tos-row" style={tosRow}>
-                <input
-                  type="checkbox"
-                  checked={acceptTosPaypal}
-                  onChange={(e) => setAcceptTosPaypal(e.target.checked)}
-                />
-                <span>J’accepte les conditions générales de vente.</span>
-              </label>
-
-              <button className="dp-pay-btn" disabled={!acceptTosPaypal} onClick={handlePayPal}>
-                Payer avec PayPal
-              </button>
-            </>
-          )}
+          <>
+            <div style={stripeInfo}>Vous serez redirigé vers PayPal pour finaliser le paiement.</div>
+            <button className="dp-pay-btn" onClick={handlePayPal}>
+              Payer avec PayPal
+            </button>
+          </>
         </section>
 
-        {/* ====== Récapitulatif ====== */}
+        {/* Récapitulatif */}
         <aside className="cart-summary" style={summaryCard}>
           <h3 style={{ margin: 0, fontWeight: 800 }}>Récapitulatif</h3>
 
@@ -876,36 +1624,29 @@ export const DeliveryPayment = () => {
       {/* ==================== POPUPS ==================== */}
       <AddressBookModal
         open={showBook}
-        addresses={addresses}
+        addresses={deliveryLst}
         onChoose={chooseFromBook}
         onEdit={startEditShipping}
         onClose={() => setShowBook(false)}
       />
 
-      <AddressFormModal
-        open={showAddShip}
-        initial={null}
-        title="Adresse de livraison"
-        onSave={addShippingAddress}
-        onCancel={() => setShowAddShip(false)}
-      />
-
+      {/* Édition Livraison */}
       <AddressFormModal
         open={editShipIdx !== null}
-        initial={editShipIdx !== null ? addresses[editShipIdx] : null}
-        title="Adresse de livraison"
-        onSave={saveEditShipping}
+        initial={deliveryEditInitial || toForm(null, currentCustomer)}
+        title="Modifier l’adresse de livraison"
+        type="delivery"
+        onSave={(f) => save(f, { type: "delivery", mode: "edit" })}
         onCancel={() => setEditShipIdx(null)}
       />
 
+      {/* Édition Facturation */}
       <AddressFormModal
         open={showEditBilling}
-        initial={billing}
-        title="Adresse de facturation"
-        onSave={(p) => {
-          setBilling(p);
-          setShowEditBilling(false);
-        }}
+        initial={billingEditInitial}
+        title="Modifier l’adresse de facturation"
+        type="billing"
+        onSave={(f) => save(f, { type: "billing", mode: "edit" })}
         onCancel={() => setShowEditBilling(false)}
       />
     </div>
@@ -929,6 +1670,7 @@ function ShipOption({ value, label, sub, price, checked, onChange }) {
         border: "1px solid #e5e7eb",
         borderRadius: 12,
         cursor: "pointer",
+        background: "#fff",
       }}
     >
       <input id={`op-${value}`} type="radio" name="shipopt" checked={checked} onChange={onChange} />
@@ -992,7 +1734,6 @@ const stripeInfo = {
   fontWeight: 600,
 };
 const payMethodRow = { display: "flex", alignItems: "center", gap: 10, marginBottom: 8 };
-const tosRow = { display: "flex", alignItems: "center", gap: 10, margin: "8px 0 12px" };
 const summaryCard = {
   background: "#fff",
   borderRadius: 12,

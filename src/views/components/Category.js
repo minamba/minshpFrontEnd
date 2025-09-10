@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from "react";                  // ⬅️ nouveau CSS extrait
+import React, { useMemo, useState, useEffect } from "react";
 import "../../App.css";
 import { useSelector, useDispatch } from "react-redux";
 import { Link, useParams, useNavigate } from "react-router-dom";
@@ -93,7 +93,7 @@ export const Category = () => {
 
   // ---------- Recherche + tri ----------
   const [search, setSearch]   = useState("");
-  const [sortKey, setSortKey] = useState(""); // ⬅️ placeholder “Trier les produits”
+  const [sortKey, setSortKey] = useState(""); // placeholder “Trier les produits”
 
   // Pré-calculs pour trier/afficher
   const augmented = useMemo(() => {
@@ -106,7 +106,7 @@ export const Category = () => {
           typeof product.priceTtc === "number" ? product.priceTtc : parseFloat(product.priceTtc)
         ) ?? 0;
 
-      // Promo produit (1ère valide)
+      // ==== PROMO PRODUIT (dates inclusives, fin à 23:59:59) ====
       const p0 = product?.promotions?.[0];
       const hasProductPromo = (() => {
         if (!p0) return false;
@@ -115,34 +115,45 @@ export const Category = () => {
         const start = parseDate(p0.startDate);
         const end   = parseDate(p0.endDate);
         const now   = new Date();
-        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0,0,0,0);
-        if (start && start.getTime() > now.getTime()) return false;
-        if (end && end.getTime() < startOfToday.getTime()) return false;
+        const endOfDay = end ? new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23,59,59,999) : null;
+        if (start && start > now) return false;
+        if (endOfDay && endOfDay < now) return false;
         return true;
       })();
 
       const productPct    = hasProductPromo ? Number(p0.purcentage) : 0;
       const computedPromo = +(priceRef * (1 - productPct / 100)).toFixed(2);
-      const promoted      = toNumOrNull(
+      const promotedVal   = toNumOrNull(
         typeof product.priceTtcPromoted === "number"
           ? product.priceTtcPromoted
           : parseFloat(product.priceTtcPromoted)
       );
 
-      // Promo par code catégorie prioritaire
-      const priceCat = toNumOrNull(
+      // Prix promo “produit” uniquement si promo active
+      const productPromoPrice = hasProductPromo
+        ? (Number.isFinite(promotedVal) ? promotedVal : computedPromo)
+        : null;
+
+      // ==== PROMO PAR CODES (priorité sous-cat puis cat) ====
+      const subCatCodeVal = toNumOrNull(
+        typeof product.priceTtcSubCategoryCodePromoted === "number"
+          ? product.priceTtcSubCategoryCodePromoted
+          : parseFloat(product.priceTtcSubCategoryCodePromoted)
+      );
+      const catCodeVal = toNumOrNull(
         typeof product.priceTtcCategoryCodePromoted === "number"
           ? product.priceTtcCategoryCodePromoted
           : parseFloat(product.priceTtcCategoryCodePromoted)
       );
 
-      const displayPrice =
-        priceCat ?? (hasProductPromo ? (Number.isFinite(promoted) ? promoted : computedPromo) : priceRef);
+      const codePrice = (subCatCodeVal ?? catCodeVal);
 
-      const hasAnyPromo = priceCat != null || hasProductPromo;
+      // ==== Prix affiché & indicateurs UI ====
+      const displayPrice = (codePrice ?? productPromoPrice ?? priceRef);
+      const hasAnyPromo  = (codePrice != null) || (productPromoPrice != null);
 
-      // % de réduction EFFECTIVE (sert pour le tri “Réduction” et marche aussi pour les codes catégorie)
-      const discountRate = priceRef > 0 ? (priceRef - displayPrice) / priceRef : 0; // ex: 0.15 = 15%
+      // Pour les tris “remise” & “promo d’abord”
+      const discountRate = priceRef > 0 ? (priceRef - displayPrice) / priceRef : 0;
       const discountPct  = +(discountRate * 100).toFixed(2);
 
       const creationTs = (() => {
@@ -157,8 +168,8 @@ export const Category = () => {
         priceRef,
         displayPrice,
         hasAnyPromo,
-        discountRate,   // 0..1
-        discountPct,    // %
+        discountRate,
+        discountPct,
         creationTs
       };
     });
@@ -194,7 +205,6 @@ export const Category = () => {
         list.sort((a, b) => b.creationTs - a.creationTs);
         break;
       case "promo-first":
-        // d’abord les produits en promo, puis plus forte réduction, puis nouveautés
         list.sort((a, b) =>
           (Number(b.hasAnyPromo) - Number(a.hasAnyPromo)) ||
           (b.discountRate - a.discountRate) ||
@@ -202,10 +212,9 @@ export const Category = () => {
         );
         break;
       case "discount-desc":
-        // plus forte réduction → plus faible (puis nouveautés)
         list.sort((a, b) => (b.discountRate - a.discountRate) || (b.creationTs - a.creationTs));
         break;
-      case "": // placeholder : pas de tri
+      case "":
       default:
         break;
     }
@@ -221,7 +230,7 @@ export const Category = () => {
   return (
     <div className="category-page">
       {/* BANNIÈRE */}
-      <section  className="category-hero" style={{ '--hero-url': `url("${categoryBannerUrl}")` }} >
+      <section className="category-hero" style={{ '--hero-url': `url("${categoryBannerUrl}")` }} >
         <h1 className="category-hero__title">
           {currentCategory?.name || currentCategory?.title || "Catégorie"}
         </h1>
@@ -230,7 +239,7 @@ export const Category = () => {
         </div>
       </section>
 
-      {/* BARRE D'OUTILS : recherche + tri (centrés) */}
+      {/* BARRE D'OUTILS */}
       <div className="category-toolbar">
         <input
           className="form-control category-search"
@@ -245,9 +254,7 @@ export const Category = () => {
           onChange={(e) => setSortKey(e.target.value)}
           title="Trier"
         >
-          {/* Placeholder non cliquable + style plus clair */}
           <option value="" disabled>Trier les produits</option>
-
           <option value="date-desc">Nouveautés (récent → ancien)</option>
           <option value="date-asc">Plus ancien → récent</option>
           <option value="name-asc">Nom (A → Z)</option>
@@ -261,7 +268,7 @@ export const Category = () => {
         </select>
       </div>
 
-      {/* GRILLE PRODUITS (style “Nouveautés”) */}
+      {/* GRILLE PRODUITS */}
       <section className="new-section" id="category-products">
         <div className="new-grid">
           {filteredSorted.length === 0 && (
@@ -298,7 +305,7 @@ export const Category = () => {
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      const payloadItem = { id: product.id, name, price: displayPrice, image: img };
+                      const payloadItem = { id: product.id, name, price: displayPrice, image: img, packageProfil: product.packageProfil, containedCode: product.containedCode };
                       dispatch(addToCartRequest(payloadItem, 1));
                       setLastAdded({ id: product.id, name });
                       setShowAdded(true);

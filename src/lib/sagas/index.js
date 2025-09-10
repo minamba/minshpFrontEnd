@@ -20,6 +20,8 @@ import ordersSaga from "./orders";
 import orderProductsSaga from "./orderProducts";
 import shippingSaga from "./shipping";
 import packageProfilsSaga from "./packageProfils";
+import subCategoriesSaga from "./subCategories";
+import stripeSaga from "./stripe";
 import { all } from "redux-saga/effects";
 
 
@@ -46,6 +48,8 @@ export default function* rootSaga() {
         ordersSaga(),
         orderProductsSaga(),
         shippingSaga(),
-        packageProfilsSaga()
+        packageProfilsSaga(),
+        subCategoriesSaga(),
+        stripeSaga()
     ]);
 }

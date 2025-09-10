@@ -130,6 +130,9 @@ export const Product = () => {
   // 1) Si priceTtcCategoryCodePromoted est défini => on l’affiche
   const priceFromCategoryCode = toNum(product?.priceTtcCategoryCodePromoted);
 
+  // 2) Si priceTtcSubCategoryCodePromoted est défini => on l’affiche
+  const priceFromSubCategoryCode = toNum(product?.priceTtcSubCategoryCodePromoted);
+
   // 2) Si purcentageCodePromoted est défini => le badge affiche ce pourcentage
   const pctFromCategoryCode = product?.purcentageCodePromoted != null && product.purcentageCodePromoted !== ''
     ? Number(product.purcentageCodePromoted)
@@ -148,7 +151,8 @@ export const Product = () => {
 
   // Prix affiché (priorité au prix de code catégorie s’il existe)
   const displayPrice = useMemo(() => {
-    if (priceFromCategoryCode != null) return priceFromCategoryCode;
+    if (priceFromSubCategoryCode != null) return priceFromSubCategoryCode;
+    if (priceFromCategoryCode != null && priceFromSubCategoryCode == null) return priceFromCategoryCode;
     return discountedPriceProduct;
   }, [priceFromCategoryCode, discountedPriceProduct]);
 
@@ -179,6 +183,8 @@ export const Product = () => {
       name: product.name || product.title,
       price: displayPrice,
       image: currentImage,
+      packageProfil: product.packageProfil,
+      containedCode: product.containedCode,
     };
     dispatch(addToCartRequest(payloadItem, qty));
     setShowAdded(true);

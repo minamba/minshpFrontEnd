@@ -9,7 +9,59 @@ import {
   updateUserPasswordReset,
 } from "../../../lib/actions/AccountActions";
 
-/** Modal succès basée sur tes classes .gmodal-* (backdrop + carte centrée) */
+/* =================== Phone helpers (tri par label) =================== */
+// Liste brute
+const PHONE_COUNTRIES_BASE = [
+  { iso: "FR", label: "France",        dial: "+33",  trunk: "0" },
+  { iso: "BE", label: "Belgique",      dial: "+32",  trunk: "0" },
+  { iso: "ES", label: "Espagne",       dial: "+34",  trunk: "0" },
+  { iso: "IT", label: "Italie",        dial: "+39",  trunk: "0" },
+  { iso: "DE", label: "Allemagne",     dial: "+49",  trunk: "0" },
+  { iso: "IE", label: "Irlande",       dial: "+353", trunk: "0" },
+  { iso: "US", label: "États-Unis",    dial: "+1",   trunk: ""  },
+  { iso: "ML", label: "Mali",          dial: "+223", trunk: ""  },
+  { iso: "SN", label: "Sénégal",       dial: "+221", trunk: ""  },
+  { iso: "MA", label: "Maroc",         dial: "+212", trunk: "0" },
+  { iso: "DZ", label: "Algérie",       dial: "+213", trunk: "0" },
+  { iso: "AE", label: "Dubaï (EAU)",   dial: "+971", trunk: "0" },
+];
+
+// Tri alphabétique par label (locale FR)
+const PHONE_COUNTRIES = [...PHONE_COUNTRIES_BASE].sort((a, b) =>
+  a.label.localeCompare(b.label, "fr", { sensitivity: "base" })
+);
+
+// ⚠️ Garder France en valeur par défaut même si la liste est triée
+const DEFAULT_DIAL = "+33";
+const byDial = Object.fromEntries(PHONE_COUNTRIES.map((c) => [c.dial, c]));
+const cleanDigits = (s) => String(s || "").replace(/[^\d]/g, "");
+
+/** Assemble en E.164: dial + local (retire la tête nationale "trunk" si présente) */
+function composeE164(dial, local) {
+  const meta = byDial[dial] || { trunk: "" };
+  let loc = cleanDigits(local);
+  if (meta.trunk && loc.startsWith(meta.trunk)) {
+    loc = loc.slice(meta.trunk.length);
+  }
+  return `${dial}${loc}`;
+}
+
+/** Décompose un E.164 vers { dial, local } pour l’UI (réinjecte le trunk s’il existe) */
+function splitE164(phone) {
+  const raw = String(phone || "");
+  const match = PHONE_COUNTRIES
+    .sort((a, b) => b.dial.length - a.dial.length)
+    .find((c) => raw.startsWith(c.dial));
+  if (!match) return { dial: DEFAULT_DIAL, local: cleanDigits(raw) };
+
+  let rest = raw.slice(match.dial.length);
+  if (match.trunk && rest && !rest.startsWith(match.trunk)) {
+    rest = `${match.trunk}${rest}`;
+  }
+  return { dial: match.dial, local: cleanDigits(rest) };
+}
+
+/* =================== UI: Modal générique succès =================== */
 function Modal({ open, title, children, onClose }) {
   if (!open) return null;
   return (
@@ -28,6 +80,34 @@ function Modal({ open, title, children, onClose }) {
   );
 }
 
+/* =================== UI: Phone Input =================== */
+function PhoneInput({ dial, local, onChange }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 8 }}>
+      <select
+        className="form-control"
+        value={dial || DEFAULT_DIAL}
+        onChange={(e) => onChange({ dial: e.target.value, local })}
+      >
+        {PHONE_COUNTRIES.map((c) => (
+          <option key={c.iso} value={c.dial}>
+            {c.label} ({c.dial})
+          </option>
+        ))}
+      </select>
+      <input
+        className="form-control"
+        placeholder="n° national (ex: 06 24 95 75 58)"
+        value={local || ""}
+        onChange={(e) => onChange({ dial: dial || DEFAULT_DIAL, local: cleanDigits(e.target.value) })}
+        inputMode="tel"
+        autoComplete="tel-national"
+      />
+    </div>
+  );
+}
+
+/* =================== Page =================== */
 export const UserInformation = ({ user = {} }) => {
   const dispatch = useDispatch();
 
@@ -53,7 +133,13 @@ export const UserInformation = ({ user = {} }) => {
   const [email] = useState(currentCustomer?.email ?? "");
   const [birthdate, setBirthdate] = useState(initialBirth);
   const [pseudo, setPseudo] = useState(currentCustomer?.pseudo ?? "");
-  const [phone, setPhone] = useState(currentCustomer?.phoneNumber ?? "");
+
+  // Téléphone (décomposé en {dial, local})
+  const initPhone = currentCustomer?.phoneNumber ?? "";
+  const initSplit = splitE164(initPhone);
+  const [phoneDial, setPhoneDial] = useState(initSplit.dial);
+  const [phoneLocal, setPhoneLocal] = useState(initSplit.local);
+
   const [saving, setSaving] = useState(false);
 
   // ---- États du formulaire "mot de passe"
@@ -71,23 +157,29 @@ export const UserInformation = ({ user = {} }) => {
   useEffect(() => {
     const d = currentCustomer?.birthDate;
     setBirthdate(d ? d.slice(0, 10) : "");
-    if (currentCustomer?.phoneNumber != null) setPhone(currentCustomer.phoneNumber);
-    if (currentCustomer?.firstName != null) setFirstName(currentCustomer.firstName);
-    if (currentCustomer?.lastName != null) setLastName(currentCustomer.lastName);
-    if (currentCustomer?.pseudo != null) setPseudo(currentCustomer.pseudo);
-    if (currentCustomer?.civilite != null) setCivility(currentCustomer.civilite);
+
+    if (currentCustomer) {
+      if (currentCustomer.firstName != null) setFirstName(currentCustomer.firstName);
+      if (currentCustomer.lastName != null) setLastName(currentCustomer.lastName);
+      if (currentCustomer.pseudo != null) setPseudo(currentCustomer.pseudo);
+      if (currentCustomer.civilite != null) setCivility(currentCustomer.civilite);
+
+      // 🔁 resync phone {dial, local} depuis currentCustomer.phoneNumber
+      const p = currentCustomer.phoneNumber ?? "";
+      const { dial, local } = splitE164(p);
+      setPhoneDial(dial);
+      setPhoneLocal(local);
+    }
   }, [currentCustomer]);
 
   // Validations
-  const profileValid = useMemo(
-    () =>
-      firstName.trim().length > 0 &&
-      lastName.trim().length > 0 &&
-      pseudo.trim().length > 0 &&
-      (birthdate ? !Number.isNaN(new Date(birthdate).getTime()) : true) &&
-      phone.trim().length > 0,
-    [firstName, lastName, pseudo, birthdate, phone]
-  );
+  const profileValid = useMemo(() => {
+    const hasNames = firstName.trim().length > 0 && lastName.trim().length > 0;
+    const hasPseudo = pseudo.trim().length > 0;
+    const birthOk = birthdate ? !Number.isNaN(new Date(birthdate).getTime()) : true;
+    const phoneOk = cleanDigits(phoneLocal).length > 0; // simple check
+    return hasNames && hasPseudo && birthOk && phoneOk;
+  }, [firstName, lastName, pseudo, birthdate, phoneLocal]);
 
   const passwordValid = useMemo(
     () => currentPassword.length >= 1 && newPassword.length >= 6,
@@ -123,6 +215,10 @@ export const UserInformation = ({ user = {} }) => {
   const saveProfile = async (e) => {
     e.preventDefault();
     if (!profileValid) return;
+
+    // ⚙️ Compose E.164 propre: ex FR 06… -> +336…
+    const phoneE164 = composeE164(phoneDial || DEFAULT_DIAL, phoneLocal || "");
+
     const payload = {
       Id: currentCustomer?.idAspNetUser ?? user.id, // fallback par sécurité
       Civility: civility,
@@ -132,7 +228,7 @@ export const UserInformation = ({ user = {} }) => {
       BirthDate: birthdate || null,
       Pseudo: pseudo.trim(),
       Actif: true,
-      Phone: phone.trim(),
+      Phone: phoneE164,
     };
     setSaving(true);
     await dispatch(updateUserRequest(payload));
@@ -222,14 +318,17 @@ export const UserInformation = ({ user = {} }) => {
           <span>
             Téléphone <span style={{ color: "#ef4444" }}>*</span>
           </span>
-          <input
-            className="form-control"
-            type="tel"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="Votre numéro de téléphone"
-            required
+          <PhoneInput
+            dial={phoneDial}
+            local={phoneLocal}
+            onChange={({ dial, local }) => {
+              setPhoneDial(dial);
+              setPhoneLocal(local);
+            }}
           />
+          <small style={{ color: "#6b7280" }}>
+            Exemple FR : tapez <b>06…</b> — sera enregistré <b>+336…</b>
+          </small>
         </div>
 
         {/* Colonne droite */}

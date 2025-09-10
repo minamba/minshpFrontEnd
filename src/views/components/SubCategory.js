@@ -1,34 +1,51 @@
 import React, { useMemo, useState, useEffect } from "react";
 import "../../App.css";
 import { useSelector, useDispatch } from "react-redux";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useParams, useNavigate } from "react-router-dom";
 import { addToCartRequest, saveCartRequest } from "../../lib/actions/CartActions";
 import { GenericModal } from "../../components";
 
-/* ---------- Helpers ---------- */
+/* -------- Helpers communs -------- */
 const parseDate = (val) => {
   if (!val) return null;
   const d = new Date(val);
   return Number.isNaN(d.getTime()) ? null : d;
 };
+
 const toNumOrNull = (v) => {
   if (v === null || v === undefined) return null;
   const n = typeof v === "number" ? v : parseFloat(v);
   return Number.isFinite(n) ? n : null;
 };
 
-/* ---------- Component ---------- */
-export const Promotion = () => {
+/* Récup id sous-cat depuis un produit (robuste sur plusieurs clés possibles) */
+const getSubCategoryIdFromProduct = (p) =>
+  p?.idSubCategory ?? p?.subCategoryId ?? p?.IdSubCategory ?? p?.subcategoryId ?? p?.subCategory?.id ?? null;
+
+export const SubCategory = () => {
+  const { id: routeSubCategoryId } = useParams();
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
   // Store
-  const products = useSelector((s) => s.products?.products) || [];
-  const images   = useSelector((s) => s.images?.images)     || [];
-  const items    = useSelector((s) => s.items?.items)       || [];
+  const products        = useSelector((s) => s.products?.products) || [];
+  const images          = useSelector((s) => s.images?.images) || [];
+  const items           = useSelector((s) => s.items?.items) || [];
+  const subCategories   = useSelector((s) => s.subCategories?.subCategories) || [];
 
   // Sauvegarde panier
   useEffect(() => { dispatch(saveCartRequest(items)); }, [items, dispatch]);
+
+  // Sous-catégorie courante + bannière
+  const currentSubCategory = useMemo(
+    () => (subCategories || []).find((sc) => String(sc.id) === String(routeSubCategoryId)) || null,
+    [subCategories, routeSubCategoryId]
+  );
+
+  const subCategoryBannerUrl = useMemo(() => {
+    const bySubCat = images.find((i) => String(i.idSubCategory) === String(routeSubCategoryId));
+    return bySubCat?.url || "/Images/placeholder.jpg";
+  }, [images, routeSubCategoryId]);
 
   // Image principale du produit
   const getProductImage = (productId) => {
@@ -36,18 +53,22 @@ export const Promotion = () => {
     return productImages.length > 0 ? productImages[0].url : "/Images/placeholder.jpg";
   };
 
+  // Produits de la sous-catégorie
+  const subCategoryProducts = useMemo(() => {
+    if (!routeSubCategoryId) return [];
+    return (products || []).filter(
+      (p) => String(getSubCategoryIdFromProduct(p)) === String(routeSubCategoryId)
+    );
+  }, [products, routeSubCategoryId]);
+
   /* ---------- Recherche + tri ---------- */
   const [search, setSearch]   = useState("");
   const [sortKey, setSortKey] = useState(""); // placeholder “Trier les produits”
 
-  // Pré-calculs (prix/promo) puis filtre: on ne garde QUE les produits en promo
+  // Pré-calculs pour trier/afficher
   const augmented = useMemo(() => {
-    return (products || []).map((product, index) => {
-      const name  =
-        product.name ||
-        product.title ||
-        `${product.brand || ""} ${product.model || ""}`.trim() ||
-        `Produit ${index + 1}`;
+    return subCategoryProducts.map((product, index) => {
+      const name  = product.name || product.title || `Produit ${index + 1}`;
       const brand = (product.brand || "").toString();
 
       const priceRef =
@@ -55,7 +76,7 @@ export const Promotion = () => {
           typeof product.priceTtc === "number" ? product.priceTtc : parseFloat(product.priceTtc)
         ) ?? 0;
 
-      // --- Promo produit (1re valide, dates inclusives jusqu'à 23:59:59) ---
+      // Promo produit (1ère valide)
       const p0 = product?.promotions?.[0];
       const hasProductPromo = (() => {
         if (!p0) return false;
@@ -64,13 +85,13 @@ export const Promotion = () => {
         const start = parseDate(p0.startDate);
         const end   = parseDate(p0.endDate);
         const now   = new Date();
-        const endOfDay = end ? new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59, 999) : null;
-        if (start && start > now) return false;
-        if (endOfDay && endOfDay < now) return false;
+        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0,0,0,0);
+        if (start && start.getTime() > now.getTime()) return false;
+        if (end && end.getTime() < startOfToday.getTime()) return false;
         return true;
       })();
 
-      const productPct    = hasProductPromo ? Number(p0?.purcentage) : 0;
+      const productPct    = hasProductPromo ? Number(p0.purcentage) : 0;
       const computedPromo = +(priceRef * (1 - productPct / 100)).toFixed(2);
       const promoted      = toNumOrNull(
         typeof product.priceTtcPromoted === "number"
@@ -78,34 +99,32 @@ export const Promotion = () => {
           : parseFloat(product.priceTtcPromoted)
       );
 
-      // --- Prix via codes (PRIORITÉ sous-cat -> cat) ---
-      const priceSubCat = toNumOrNull(
-        typeof product.priceTtcSubCategoryCodePromoted === "number"
-          ? product.priceTtcSubCategoryCodePromoted
-          : parseFloat(product.priceTtcSubCategoryCodePromoted)
-      );
-      const priceCat = toNumOrNull(
-        typeof product.priceTtcCategoryCodePromoted === "number"
-          ? product.priceTtcCategoryCodePromoted
-          : parseFloat(product.priceTtcCategoryCodePromoted)
-      );
+      // Promo par code catégorie (si présent côté produit)
 
-      // --- Prix affiché selon la priorité ---
-      let displayPrice = null;
-      if (priceSubCat != null) {
-        displayPrice = priceSubCat;
-      } else if (priceCat != null) {
-        displayPrice = priceCat;
-      } else if (hasProductPromo) {
-        displayPrice = Number.isFinite(promoted) ? promoted : computedPromo;
-      } else {
-        displayPrice = priceRef;
-      }
+      const priceCat = (() => {
 
-      // Produit considéré “en promo” si le prix affiché < prix de référence
-      const hasAnyPromo = displayPrice < priceRef - 1e-6;
+        const priceTtcSubCategoryCodePromoted = product?.priceTtcSubCategoryCodePromoted;
+        const priceTtcCategoryCodePromoted    = product?.priceTtcCategoryCodePromoted;
+        const priceTtcPromoted                = product?.priceTtcPromoted;
 
+        let dPrice = null;
+        if (priceTtcSubCategoryCodePromoted !== null) dPrice = priceTtcSubCategoryCodePromoted;
+        if (priceTtcCategoryCodePromoted !== null && priceTtcSubCategoryCodePromoted == null) dPrice = priceTtcCategoryCodePromoted;
+        if (priceTtcPromoted !== null && priceTtcCategoryCodePromoted == null && priceTtcSubCategoryCodePromoted == null) dPrice = priceTtcPromoted;
+
+        const v = toNumOrNull(dPrice);
+        return Number.isFinite(v) ? v : null;
+      })();
+
+      const displayPrice =
+        priceCat ?? (hasProductPromo ? (Number.isFinite(promoted) ? promoted : computedPromo) : priceRef);
+
+      const hasAnyPromo = priceCat != null || hasProductPromo;
+
+      // % de réduction EFFECTIVE
       const discountRate = priceRef > 0 ? (priceRef - displayPrice) / priceRef : 0;
+      const discountPct  = +(discountRate * 100).toFixed(2);
+
       const creationTs = (() => {
         const d = parseDate(product?.creationDate);
         return d ? d.getTime() : 0;
@@ -118,14 +137,13 @@ export const Promotion = () => {
         priceRef,
         displayPrice,
         hasAnyPromo,
-        discountRate,     // 0..1
+        discountRate,
+        discountPct,
         creationTs
       };
-    })
-    .filter(a => a.hasAnyPromo); // <- seulement les produits en promo (inclut SOUS-CAT)
-  }, [products]);
+    });
+  }, [subCategoryProducts]);
 
-  // Recherche + tri
   const filteredSorted = useMemo(() => {
     const q = search.trim().toLowerCase();
     let list = augmented.filter((a) => a.name.toLowerCase().includes(q));
@@ -156,22 +174,19 @@ export const Promotion = () => {
         list.sort((a, b) => b.creationTs - a.creationTs);
         break;
       case "promo-first":
+        list.sort((a, b) =>
+          (Number(b.hasAnyPromo) - Number(a.hasAnyPromo)) ||
+          (b.discountRate - a.discountRate) ||
+          (b.creationTs - a.creationTs)
+        );
+        break;
       case "discount-desc":
         list.sort((a, b) => (b.discountRate - a.discountRate) || (b.creationTs - a.creationTs));
         break;
-      case "": // placeholder : pas de tri
-      default:
-        break;
+      case "": default: break; // pas de tri (placeholder)
     }
     return list;
   }, [augmented, search, sortKey]);
-
-  // Bannière (essaie de prendre l’image du 1er produit en promo, sinon placeholder)
-  const bannerUrl = useMemo(() => {
-    const firstPromo = filteredSorted[0]?.product;
-    if (firstPromo) return getProductImage(firstPromo.id);
-    return "/Images/placeholder.jpg";
-  }, [filteredSorted, images]);
 
   /* ---------- Modal “ajouté au panier” ---------- */
   const [showAdded, setShowAdded] = useState(false);
@@ -181,15 +196,17 @@ export const Promotion = () => {
 
   return (
     <div className="category-page">
-      {/* BANNIÈRE — noir & blanc via CSS (::before + --hero-url) */}
-      <section className="category-hero" style={{ "--hero-url": `url("${bannerUrl}")` }}>
-        <h1 className="category-hero__title">Promotions</h1>
+      {/* BANNIÈRE (réutilise le même style que Category) */}
+      <section className="category-hero" style={{ "--hero-url": `url("${subCategoryBannerUrl}")` }}>
+        <h1 className="category-hero__title">
+          {currentSubCategory?.name || currentSubCategory?.title || "Sous-catégorie"}
+        </h1>
         <div className="category-hero__count">
           {filteredSorted.length} produit{filteredSorted.length > 1 ? "s" : ""}
         </div>
       </section>
 
-      {/* BARRE D'OUTILS : recherche + tri (centrés) */}
+      {/* BARRE D'OUTILS : recherche + tri (identique au composant Category) */}
       <div className="category-toolbar">
         <input
           className="form-control category-search"
@@ -218,14 +235,14 @@ export const Promotion = () => {
         </select>
       </div>
 
-      {/* GRILLE PRODUITS (style “Nouveautés”) */}
-      <section className="new-section" id="promo-products">
+      {/* GRILLE PRODUITS */}
+      <section className="new-section" id="subcategory-products">
         <div className="new-grid">
           {filteredSorted.length === 0 && (
-            <div style={{ padding: "2rem 0" }}>Aucun produit en promotion pour le moment.</div>
+            <div style={{ padding: "2rem 0" }}>Aucun produit ne correspond à votre recherche.</div>
           )}
 
-          {filteredSorted.map(({ product, name, priceRef, displayPrice }) => {
+          {filteredSorted.map(({ product, name, priceRef, displayPrice, hasAnyPromo }) => {
             const img = getProductImage(product.id);
             const [euros, cents] = displayPrice.toFixed(2).split(".");
 
@@ -244,7 +261,7 @@ export const Promotion = () => {
                     <img src={img} alt={name} />
                   </Link>
 
-                  <span className="promo-pill">Promotion</span>
+                  {hasAnyPromo && <span className="promo-pill">Promotion</span>}
 
                   <div className="thumb-overlay" aria-hidden="true" />
                   <button
@@ -265,7 +282,7 @@ export const Promotion = () => {
                   </button>
                 </div>
 
-                <h3 className="product-name">{(product.brand || "") + " " + (product.model || name)}</h3>
+                <h3 className="product-name">{product.brand + " " + product.model}</h3>
 
                 <div className="new-price-row">
                   <span className={`card-stock ${stockCls}`}>
@@ -273,11 +290,13 @@ export const Promotion = () => {
                     {stockLabel}
                   </span>
 
-                  <div className="price-stack has-promo">
-                    <span className="price-old">
-                      {priceRef.toLocaleString("fr-FR", { style: "currency", currency: "EUR" })}
-                    </span>
-                    <div className="product-price product-price--promo">
+                  <div className={`price-stack ${hasAnyPromo ? "has-promo" : ""}`}>
+                    {hasAnyPromo && (
+                      <span className="price-old">
+                        {priceRef.toLocaleString("fr-FR", { style: "currency", currency: "EUR" })}
+                      </span>
+                    )}
+                    <div className={`product-price ${hasAnyPromo ? "product-price--promo" : ""}`}>
                       <span className="euros">{euros}€</span>
                       <sup className="cents">{cents}</sup>
                     </div>

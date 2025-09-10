@@ -18,35 +18,52 @@ import { getPromotionCodesRequest } from '../lib/actions/PromotionCodeActions';
 import { useNavigate } from 'react-router-dom';
 import { logout } from '../lib/actions/AccountActions';
 
-// ... ton code existant ...
 
 
 export const Navbar = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
-  const [isOpen, setIsOpen] = useState(false);
-  const [adminOpen, setAdminOpen] = useState(false);
-  const [productsOpen, setProductsOpen] = useState(false);
-  const [accountOpen, setAccountOpen] = useState(false);
-
-
-  // Catégories
-  const categories = useSelector((s) => s.categories?.categories) || [];
+  // Store
+  const categories =
+    useSelector((s) => s.categories?.categories) || [];
+  const subCategories =
+    useSelector((s) => s.subCategories?.subCategories) || [];
 
   // Auth
-// ✅ récupère tout le slice, puis déstructure
-const { isAuth, user } = useSelector((s) => s.account) || { isAuth: false, user: null };
-  const userId = user?.id;
+  const { isAuth } = useSelector((s) => s.account) || { isAuth: false };
 
-  // Panier
+  // Cart
   const cartItems = useSelector((s) => s.items?.items) || [];
   const cartCount = cartItems.reduce(
     (acc, it) => acc + Number(it.qty ?? it.quantity ?? 1),
     0
   );
 
-  // petite anim badge
+  // UI state
+  const [isOpen, setIsOpen] = useState(false);
+  const [productsOpen, setProductsOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [adminOpen, setAdminOpen] = useState(false);
+
+  // flyout states
+  const [hoverCatId, setHoverCatId] = useState(null);
+
+  // map subcats by category id (robust to casing)
+  const subsByCat = useMemo(() => {
+    const m = {};
+    for (const sc of subCategories) {
+      const cid =
+        sc?.idCategory ?? sc?.IdCategory ?? sc?.categoryId ?? sc?.CategoryId;
+      if (cid == null) continue;
+      const k = String(cid);
+      if (!m[k]) m[k] = [];
+      m[k].push(sc);
+    }
+    return m;
+  }, [subCategories]);
+
+  // little bump on cart badge
   const [bump, setBump] = useState(false);
   useEffect(() => {
     if (cartCount <= 0) return;
@@ -59,6 +76,7 @@ const { isAuth, user } = useSelector((s) => s.account) || { isAuth: false, user:
     setAdminOpen(false);
     setProductsOpen(false);
     setAccountOpen(false);
+    setHoverCatId(null);
   };
 
   const toggleMenu = () => {
@@ -67,14 +85,13 @@ const { isAuth, user } = useSelector((s) => s.account) || { isAuth: false, user:
     if (!next) closeAllDropdowns();
   };
 
-  const toggleAdmin = () => {
-    if (window.innerWidth <= 900) {
-      setAdminOpen((v) => !v);
-      setProductsOpen(false);
-      setAccountOpen(false);
-    }
-  };
+  useEffect(() => {
+    const onResize = () => closeAllDropdowns();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
+  // helpers for mobile accordions
   const toggleProducts = () => {
     if (window.innerWidth <= 900) {
       setProductsOpen((v) => !v);
@@ -82,7 +99,6 @@ const { isAuth, user } = useSelector((s) => s.account) || { isAuth: false, user:
       setAccountOpen(false);
     }
   };
-
   const toggleAccount = () => {
     if (window.innerWidth <= 900) {
       setAccountOpen((v) => !v);
@@ -90,12 +106,13 @@ const { isAuth, user } = useSelector((s) => s.account) || { isAuth: false, user:
       setProductsOpen(false);
     }
   };
-
-  useEffect(() => {
-    const handleResize = () => closeAllDropdowns();
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
+  const toggleAdmin = () => {
+    if (window.innerWidth <= 900) {
+      setAdminOpen((v) => !v);
+      setProductsOpen(false);
+      setAccountOpen(false);
+    }
+  };
 
   return (
     <nav className="navbar-container">
@@ -107,37 +124,77 @@ const { isAuth, user } = useSelector((s) => s.account) || { isAuth: false, user:
           </Link>
         </div>
 
-        {/* Liens */}
+        {/* Links */}
         <div className={`navbar-links ${isOpen ? "active" : ""}`}>
-          {/* Tous nos produits */}
+          {/* ======= ALL PRODUCTS with 2-level flyout ======= */}
           <div
             className="navbar-dropdown"
-            onMouseEnter={() => window.innerWidth > 900 && setProductsOpen(true)}
-            onMouseLeave={() => window.innerWidth > 900 && setProductsOpen(false)}
+            onMouseEnter={() => {
+              if (window.innerWidth > 900) setProductsOpen(true);
+            }}
+            onMouseLeave={() => {
+              if (window.innerWidth > 900) {
+                setProductsOpen(false);
+                setHoverCatId(null);
+              }
+            }}
           >
             <button className="navbar-dropdown-toggle" onClick={toggleProducts}>
               Tous nos produits <span className={`arrow ${productsOpen ? "up" : "down"}`}>▾</span>
             </button>
+
             {productsOpen && (
-              <div className="navbar-dropdown-menu">
-                {categories.length > 0 ? (
-                  categories.map((cat) => (
-                    <Link
-                      key={cat.id}
-                      to={`/category/${cat.id}`}
-                      onClick={() => {
-                        setIsOpen(false);
-                        setProductsOpen(false);
-                      }}
-                    >
-                      {cat.name}
-                    </Link>
-                  ))
-                ) : (
-                  <span style={{ padding: "0.5rem 1rem", opacity: 0.8 }}>
-                    Aucune catégorie
-                  </span>
-                )}
+              <div className="flyout-root" /* main panel */>
+                {/* Invisible bridge so the menu doesn't close when moving the mouse
+                    from L1 to L2 */}
+                <div className="flyout-bridge" />
+
+                {/* Level 1: categories */}
+                <ul className="flyout-level1">
+                  {categories.map((cat) => {
+                    const hasSubs = (subsByCat[String(cat.id)] || []).length > 0;
+                    const active = String(hoverCatId) === String(cat.id);
+                    return (
+                      <li
+                        key={cat.id}
+                        className={`flyout-item ${active ? "is-active" : ""}`}
+                        onMouseEnter={() => setHoverCatId(cat.id)}
+                      >
+                        <Link
+                          to={`/category/${cat.id}`}
+                          className="flyout-link"
+                          onClick={() => {
+                            setIsOpen(false);
+                            setProductsOpen(false);
+                          }}
+                        >
+                          <span className="flyout-label">{cat.name}</span>
+                          {hasSubs && <span className="flyout-arrow">›</span>}
+                        </Link>
+
+                        {/* Level 2: subcategories (shown only if present) */}
+                        {hasSubs && active && (
+                          <ul className="flyout-level2">
+                            {subsByCat[String(cat.id)].map((sc) => (
+                              <li key={sc.id} className="flyout-subitem">
+                                <Link
+                                  to={`/subCategory/${sc.id}`}
+                                  className="flyout-sublink"
+                                  onClick={() => {
+                                    setIsOpen(false);
+                                    setProductsOpen(false);
+                                  }}
+                                >
+                                  {sc.name}
+                                </Link>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
               </div>
             )}
           </div>
@@ -145,7 +202,7 @@ const { isAuth, user } = useSelector((s) => s.account) || { isAuth: false, user:
           <Link to="/news" onClick={() => setIsOpen(false)}>Nouveautés</Link>
           <Link to="/promotion" onClick={() => setIsOpen(false)}>Soldes & promos</Link>
 
-          {/* Compte (menu dynamique) */}
+          {/* ======= Account ======= */}
           <div
             className="navbar-dropdown"
             onMouseEnter={() => window.innerWidth > 900 && setAccountOpen(true)}
@@ -156,7 +213,6 @@ const { isAuth, user } = useSelector((s) => s.account) || { isAuth: false, user:
               <span>Compte</span>
               <span className={`arrow ${accountOpen ? "up" : "down"}`}>▾</span>
             </button>
-
             {accountOpen && (
               <div className="navbar-dropdown-menu">
                 {!isAuth ? (
@@ -172,13 +228,13 @@ const { isAuth, user } = useSelector((s) => s.account) || { isAuth: false, user:
                   </Link>
                 ) : (
                   <>
-                  <Link
+                    <Link
                       to="/account"
                       onClick={() => { setIsOpen(false); setAccountOpen(false); }}
                     >
                       <i className="bi bi-person-circle" style={{ marginRight: 6 }} />
                       Mon compte
-                  </Link>
+                    </Link>
 
                     <button
                       className="logout-btn"
@@ -198,7 +254,7 @@ const { isAuth, user } = useSelector((s) => s.account) || { isAuth: false, user:
             )}
           </div>
 
-          {/* Panier + badge */}
+          {/* Cart */}
           <Link to="/cart" onClick={() => setIsOpen(false)} className="nav-cart-link">
             <span className="nav-cart-ico">
               <i className="bi bi-cart-fill nav-icon" aria-hidden="true" />
@@ -222,6 +278,7 @@ const { isAuth, user } = useSelector((s) => s.account) || { isAuth: false, user:
               <div className="navbar-dropdown-menu">
                 <Link to="/admin/products" onClick={() => setIsOpen(false)}>Produits</Link>
                 <Link to="/admin/categories" onClick={() => setIsOpen(false)}>Catégories</Link>
+                <Link to="/admin/subCategory" onClick={() => setIsOpen(false)}>Sous catégories</Link>
                 <Link to="/admin/customers" onClick={() => setIsOpen(false)}>Clients</Link>
                 <Link to="/admin/orders" onClick={() => setIsOpen(false)}>Commandes</Link>
                 <Link to="/admin/featureCategories" onClick={() => setIsOpen(false)}>Catégories des caractéristiques</Link>
@@ -253,11 +310,23 @@ const { isAuth, user } = useSelector((s) => s.account) || { isAuth: false, user:
   );
 };
 
-
 // //////////////////////// Product Table ////////////////////////
 export const ProductTable = () => {
   const productsFromStore   = useSelector((state) => state.products.products) || [];
   const categoriesFromStore = useSelector((state) => state.categories.categories) || [];
+
+  // 🔹 sous-catégories (plusieurs structures possibles -> fallback)
+  const subCategoriesFromStore =
+    useSelector((s) =>
+      s.subCategories?.subCategories ||
+      s.subCategories?.items ||
+      s.subcategories?.subcategories ||
+      s.subcategories?.items ||
+      s.subcategories ||
+      s.subCategories ||
+      []
+    ) || [];
+
   const packageProfils      = useSelector((s) => s.packageProfils?.packageProfils) || [];
   const dispatch = useDispatch();
 
@@ -279,8 +348,9 @@ export const ProductTable = () => {
     stock: 0,
     promotion: 'Non',
     main: false,
-    // nouveau : select package profil
-    packageProfilId: '', // string (id sélectionné)
+    packageProfilId: '',
+    // 🔹 nouveau
+    subCategoryId: '', // id de la sous-catégorie (optionnel)
   });
 
   useEffect(() => { dispatch(getProductUserRequest()); }, [dispatch]);
@@ -301,51 +371,21 @@ export const ProductTable = () => {
     };
   }, [showModal, selectedProduct]);
 
-  const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
-  };
-
-  const handleAddClick = () => {
-    setIsEditing(false);
-    setCurrentId(null);
-    setFormData({
-      id: undefined,
-      name: '',
-      brand: '',
-      model: '',
-      description: '',
-      price: '',
-      category: '',
-      image: '',
-      stock: 0,
-      promotion: 'Non',
-      main: false,
-      packageProfilId: '',
-    });
-    setShowModal(true);
-  };
-
-  // helpers id package profil
+  // ---------- Helpers ID souples ----------
   const getPkgIdFromProduct = (p) =>
-    p?.idPackageProfil ??
-    p?.IdPackageProfil ??
-    p?.packageProfilId ??
-    p?.PackageProfilId ??
-    p?.idPackageProfile ??
-    null;
+    p?.idPackageProfil ?? p?.IdPackageProfil ?? p?.packageProfilId ?? p?.PackageProfilId ?? p?.idPackageProfile ?? null;
 
   const getPkgIdFromCategory = (c) =>
-    c?.idPackageProfil ??
-    c?.IdPackageProfil ??
-    c?.packageProfilId ??
-    c?.PackageProfilId ??
-    c?.idPackageProfile ??
-    null;
+    c?.idPackageProfil ?? c?.IdPackageProfil ?? c?.packageProfilId ?? c?.PackageProfilId ?? c?.idPackageProfile ?? null;
+
+  const getSubCatIdFromProduct = (p) =>
+    p?.idSubCategory ?? p?.IdSubCategory ?? p?.subCategoryId ?? p?.SubCategoryId ?? null;
+
+  const getCatIdFromSubCategory = (sc) =>
+    sc?.idCategory ?? sc?.IdCategory ?? sc?.categoryId ?? sc?.CategoryId ?? null;
 
   const findCategoryForProduct = (p) => {
-    const pidCat =
-      p?.idCategory ?? p?.IdCategory ?? p?.categoryId ?? p?.CategoryId ?? null;
+    const pidCat = p?.idCategory ?? p?.IdCategory ?? p?.categoryId ?? p?.CategoryId ?? null;
     if (pidCat != null) {
       const byId = categoriesFromStore.find(
         (c) => String(c?.id ?? c?.Id) === String(pidCat)
@@ -368,10 +408,17 @@ export const ProductTable = () => {
     return m;
   }, [packageProfils]);
 
+  const subCategoriesById = useMemo(() => {
+    const m = new Map();
+    for (const sc of subCategoriesFromStore) {
+      const id = sc?.id ?? sc?.Id;
+      if (id != null) m.set(String(id), sc);
+    }
+    return m;
+  }, [subCategoriesFromStore]);
+
   const getPackageProfilNameForProduct = (p) => {
-    // 1) priorité : package profil du produit
     let pid = getPkgIdFromProduct(p);
-    // 2) fallback : package profil de la catégorie du produit
     if (pid == null) {
       const cat = findCategoryForProduct(p);
       pid = getPkgIdFromCategory(cat);
@@ -379,6 +426,44 @@ export const ProductTable = () => {
     if (pid == null) return '—';
     const pp = packageProfilsById.get(String(pid));
     return pp?.name ?? pp?.Name ?? `#${pid}`;
+  };
+
+  const getSubCategoryNameForProduct = (p) => {
+    const sid = getSubCatIdFromProduct(p);
+    if (sid == null) return '—';
+    const sc = subCategoriesById.get(String(sid));
+    return sc?.name ?? sc?.Name ?? `#${sid}`;
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setFormData((prev) => {
+      const next = { ...prev, [name]: type === 'checkbox' ? checked : value };
+      // si la catégorie change, on réinitialise la sous-catégorie
+      if (name === 'category') next.subCategoryId = '';
+      return next;
+    });
+  };
+
+  const handleAddClick = () => {
+    setIsEditing(false);
+    setCurrentId(null);
+    setFormData({
+      id: undefined,
+      name: '',
+      brand: '',
+      model: '',
+      description: '',
+      price: '',
+      category: '',
+      image: '',
+      stock: 0,
+      promotion: 'Non',
+      main: false,
+      packageProfilId: '',
+      subCategoryId: '',
+    });
+    setShowModal(true);
   };
 
   const handleEditClick = (product) => {
@@ -395,10 +480,14 @@ export const ProductTable = () => {
       main: !!product.main,
       stock: product.stocks?.quantity,
       idStock: product.stocks?.id,
-      // pré-sélection du package profil uniquement si le produit en a un
       packageProfilId: (() => {
         const pid = getPkgIdFromProduct(product);
-        return pid != null ? String(pid) : ''; // si null -> pas de préselection
+        return pid != null ? String(pid) : '';
+      })(),
+      // 🔹 préselection sous-catégorie si le produit en a une
+      subCategoryId: (() => {
+        const sid = getSubCatIdFromProduct(product);
+        return sid != null ? String(sid) : '';
       })(),
     });
     setShowModal(true);
@@ -410,13 +499,21 @@ export const ProductTable = () => {
     }
   };
 
+  // id de la catégorie sélectionnée (dans le formulaire)
   const idCategory = categoriesFromStore.find((cat) => cat.name === formData.category)?.id;
+  // sous-catégories filtrées par catégorie choisie
+  const filteredSubCategoriesForForm = useMemo(() => {
+    if (!idCategory) return [];
+    return subCategoriesFromStore.filter(
+      (sc) => String(getCatIdFromSubCategory(sc)) === String(idCategory)
+    );
+  }, [subCategoriesFromStore, idCategory]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // prépare IdPackageProfil si sélectionné
     const pkgId = formData.packageProfilId ? Number(formData.packageProfilId) : null;
+    const subCatId = formData.subCategoryId ? Number(formData.subCategoryId) : null;
 
     if (isEditing) {
       await dispatch(updateProductUserRequest({
@@ -429,7 +526,9 @@ export const ProductTable = () => {
         IdCategory: idCategory,
         Main: formData.main,
         Stock: formData.stock,
-        ...(pkgId != null ? { IdPackageProfil: pkgId, PackageProfilId: pkgId } : {}), // on envoie si choisi
+        ...(pkgId != null ? { IdPackageProfil: pkgId, PackageProfilId: pkgId } : {}),
+        // 🔹 envoi optionnel de la sous-catégorie
+        ...(subCatId != null ? { IdSubCategory: subCatId, SubCategoryId: subCatId } : {}),
       }));
     } else {
       await dispatch(addProductUserRequest({
@@ -441,6 +540,7 @@ export const ProductTable = () => {
         Stock: formData.stock,
         IdCategory: idCategory,
         ...(pkgId != null ? { IdPackageProfil: pkgId, PackageProfilId: pkgId } : {}),
+        ...(subCatId != null ? { IdSubCategory: subCatId, SubCategoryId: subCatId } : {}),
       }));
     }
     await dispatch(getProductUserRequest());
@@ -508,6 +608,8 @@ export const ProductTable = () => {
               <th>Prix (€)</th>
               <th>Prix TTC (€)</th>
               <th>Catégorie</th>
+              {/* 🔹 nouvelle colonne */}
+              <th>Sous-catégorie</th>
               <th>Profil de colis</th>
               <th>Stock</th>
               <th>Promotion</th>
@@ -533,6 +635,8 @@ export const ProductTable = () => {
                   <td>{prod.price}</td>
                   <td>{prod.priceTtc}</td>
                   <td>{prod.category}</td>
+                  {/* 🔹 affichage sous-catégorie */}
+                  <td>{getSubCategoryNameForProduct(prod)}</td>
                   <td>{getPackageProfilNameForProduct(prod)}</td>
                   <td>{prod.stocks?.quantity ? prod.stocks.quantity : "Rupture"}</td>
                   <td>{prod.promotions?.length > 0 ? "Oui" : "Non"}</td>
@@ -569,7 +673,7 @@ export const ProductTable = () => {
               ))
             ) : (
               <tr>
-                <td colSpan="15" className="text-center">Aucun produit trouvé.</td>
+                <td colSpan="16" className="text-center">Aucun produit trouvé.</td>
               </tr>
             )}
           </tbody>
@@ -624,6 +728,7 @@ export const ProductTable = () => {
                 <label>Prix (€)</label>
                 <input type="number" name="price" className="form-control" value={formData.price} onChange={handleInputChange} step="0.01" required />
               </div>
+
               <div className="mb-3">
                 <label>Catégorie</label>
                 <select name="category" className="form-select" value={formData.category} onChange={handleInputChange} required>
@@ -634,7 +739,26 @@ export const ProductTable = () => {
                 </select>
               </div>
 
-              {/* ✅ Nouveau : sélection Package Profil (sous Catégorie) */}
+              {/* 🔹 Sous-catégorie (optionnelle) */}
+              <div className="mb-3">
+                <label>Sous-catégorie <span className="text-muted">(optionnel)</span></label>
+                <select
+                  name="subCategoryId"
+                  className="form-select"
+                  value={formData.subCategoryId}
+                  onChange={handleInputChange}
+                  disabled={!idCategory}
+                >
+                  <option value="">— Aucune —</option>
+                  {filteredSubCategoriesForForm.map((sc) => (
+                    <option key={sc.id ?? sc.Id} value={String(sc.id ?? sc.Id)}>
+                      {sc.name ?? sc.Name ?? `#${sc.id ?? sc.Id}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Profil de colis */}
               <div className="mb-3">
                 <label>Profil de colis</label>
                 <select

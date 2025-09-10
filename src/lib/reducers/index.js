@@ -21,6 +21,8 @@ import deliveryAddressReducer from "./DeliveryAddressReducers";
 import orderCustomerProductReducer from "./OrderCustomerProductReducers";
 import shippingReducer from "./ShippingReducers";
 import packageprofilReducer from "./PackageProfilReducers";
+import subCategoryReducer from "./SubCategoryActions";
+import StripeReducer from "./StripeReducers";
 
 export default combineReducers({
     products : productReducer,
@@ -44,5 +46,7 @@ export default combineReducers({
     deliveryAddresses : deliveryAddressReducer,
     orderProducts : orderCustomerProductReducer,
     shipping : shippingReducer,
-    packageProfils : packageprofilReducer
+    packageProfils : packageprofilReducer,
+    subCategories : subCategoryReducer,
+    stripe : StripeReducer,
 })

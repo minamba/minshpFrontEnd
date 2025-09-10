@@ -11,6 +11,11 @@ export const actionsShipping = {
     GET_RELAYS_BY_ADDRESS_SUCCESS : "GET_RELAYS_BY_ADDRESS_SUCCESS",
     GET_RELAYS_BY_ADDRESS_FAILURE : "GET_RELAYS_BY_ADDRESS_FAILURE",
 
+
+    GET_CONTENT_CATEGORY_REQUEST : "GET_CONTENT_CATEGORY_REQUEST",
+    GET_CONTENT_CATEGORY_SUCCESS : "GET_CONTENT_CATEGORY_SUCCESS",
+    GET_CONTENT_CATEGORY_FAILURE : "GET_CONTENT_CATEGORY_FAILURE",
+
     CREATE_SHIPMENT_REQUEST : "CREATE_SHIPMENT_REQUEST",
     CREATE_SHIPMENT_SUCCESS : "CREATE_SHIPMENT_SUCCESS",
     CREATE_SHIPMENT_FAILURE : "CREATE_SHIPMENT_FAILURE"
@@ -59,10 +64,10 @@ export function getRelaysFailure(error) {
     }
 }
 
-export function createShipmentRequest(orderId, body) {
+export function createShipmentRequest(shipment) {
     return {
         type: actionsShipping.CREATE_SHIPMENT_REQUEST,
-        payload: { orderId, body },
+        payload: shipment,
     }
 
 
@@ -81,6 +86,10 @@ export function createShipmentFailure(error) {
         payload: error,
     }
 }
+
+
+
+
 
 export function getRelaysByAddressRequest(params) {
     return {
@@ -102,4 +111,31 @@ export function getRelaysByAddressFailure(error) {
         payload: error,
     }
 }
+
+
+
+
+
+
+export function getContentCategoryRequest(params) {
+    return {
+        type: actionsShipping.GET_CONTENT_CATEGORY_REQUEST,
+        payload: params,
+    }
+}
+
+export function getContentCategorySuccess(relays) {
+    return {
+        type: actionsShipping.GET_CONTENT_CATEGORY_SUCCESS,
+        payload: relays,
+    }
+}
+
+export function getContentCategoryFailure(error) {
+    return {
+        type: actionsShipping.GET_CONTENT_CATEGORY_FAILURE,
+        payload: error,
+    }
+}
+
 

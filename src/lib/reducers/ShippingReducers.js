@@ -17,6 +17,10 @@ const initial = {
   shipment: null,
   shipmentLoading: false,
   shipmentError: null,
+
+  contentCategories: [],
+  contentCategoriesLoading: false,
+  contentCategoriesError: null,
 };
 
 export default function shippingReducer(state = initial, action) {
@@ -52,6 +56,14 @@ export default function shippingReducer(state = initial, action) {
       return { ...state, relaysByAddressLoading: false, relaysByAddress: action.payload || [] };
     case actionsShipping.GET_RELAYS_BY_ADDRESS_FAILURE:
       return { ...state, relaysByAddressLoading: false, relaysByAddressError: action.payload, relaysByAddress: [] };
+
+    /** CONTENT CATEGORY **/
+    case actionsShipping.GET_CONTENT_CATEGORY_REQUEST:
+      return { ...state, contentCategoriesLoading: true, contentCategoriesError: null };
+    case actionsShipping.GET_CONTENT_CATEGORY_SUCCESS:
+      return { ...state, contentCategoriesLoading: false, contentCategories: action.payload || [] };
+    case actionsShipping.GET_CONTENT_CATEGORY_FAILURE:
+      return { ...state, contentCategoriesLoading: false, contentCategoriesError: action.payload, contentCategories: [] };
 
     default:
       return state;

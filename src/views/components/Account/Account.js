@@ -11,6 +11,7 @@ import { logout } from "../../../lib/actions/AccountActions";
 import { Link } from "react-router-dom";
 
 /* ===== Helpers ===== */
+
 const getId = (x) =>
   x?.id ?? x?.Id ?? x?.orderId ?? x?.OrderId ?? x?.orderID ?? null;
 
@@ -21,8 +22,6 @@ const getProductIdFromOP = (op) =>
   op?.idProduct ?? op?.productId ?? op?.ProductId ?? op?.IdProduct ?? null;
 
 const getQtyFromOP = (op) => Number(op?.quantity ?? op?.qty ?? op?.Quantity ?? 1);
-
-const unitPrice = (p) => Number(p?.priceTtc ?? p?.price ?? 0);
 
 const labelForProduct = (p) => {
   const brand = p?.brand || "";
@@ -58,6 +57,19 @@ const orderNumber = (o) =>
 
 const orderStatus = (o) => o?.status ?? o?.orderStatus ?? "—";
 
+/* === Normalisation pour tester "livré" (sans accent / insensible à la casse) === */
+const norm = (s) =>
+  String(s || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
+/* === Est-ce livré ? on couvre "livré", "delivré/delivre", et "delivered" === */
+const isDelivered = (status) => {
+  const n = norm(status);
+  return n.includes("livre") || n.includes("delivre") || n.includes("delivered");
+};
+
 /* ===== Component ===== */
 export const Account = () => {
   const navigate = useNavigate();
@@ -71,12 +83,17 @@ export const Account = () => {
 
   const uid = user?.id || null;
   const currentCustomer = customers.find((c) => c.idAspNetUser === uid);
-  const currentOrders = orders.filter((o) => o.customer.id === currentCustomer.id);
-  
+
+  const currentOrders = (orders || []).filter(
+    (o) => o?.customer?.id === currentCustomer?.id
+  );
+
+  /* Compteur des commandes en cours = hors "livré" */
+  const ongoingOrders = currentOrders.filter((o) => !isDelivered(orderStatus(o)));
   const [activeMenu, setActiveMenu] = useState("orders"); // "profile" | "orders" | "addresses"
   const [period, setPeriod] = useState("6m");
   const [openId, setOpenId] = useState(null);
-  const currentCount = currentOrders.length;
+  const currentCount = ongoingOrders.length;
 
   /* Maps utiles */
   const productsById = useMemo(() => {
@@ -124,20 +141,23 @@ export const Account = () => {
         const pid = String(getProductIdFromOP(l));
         const prod = productsById.get(pid);
         if (!prod) return null;
-        return { name: labelForProduct(prod), qty: getQtyFromOP(l), price: priceForItem(prod, order) };
+        // note: on pourrait retourner productId si tu veux lier au produit
+        return { name: labelForProduct(prod), qty: getQtyFromOP(l), productId: prod.id, price: priceForItem(prod, order) };
       })
       .filter(Boolean);
   };
 
-  /* Montant: priorité à o.amount, sinon somme des lignes pivot */
+  /* Montant: priorité à o.amount, sinon 0 (on peut additionner les lignes si besoin) */
   const amountForOrder = (order) => {
     if (order?.amount != null) return Number(order.amount);
     return 0;
   };
 
   const priceForItem = (item, order) => {
-    
-    const unitPriceWhenOrder = orderProducts.find((op) => op.productId === item.id && op.orderId === order.id).productUnitPrice;
+    const line = orderProducts.find(
+      (op) => op.productId === item.id && op.orderId === order.id
+    );
+    const unitPriceWhenOrder = line?.productUnitPrice;
     return unitPriceWhenOrder ?? 0;
   };
 
@@ -273,34 +293,45 @@ export const Account = () => {
                     </div>
 
                     {open && (
-                        <div className="order-details">
-                          {items.map((it, i) => (
-                            <div key={i} className="order-item">
-                              <span>
-                                <Link to={`/product/${it.productId}`}>{it.name}</Link>
-                              </span>
-                              <span className="text-dark fw-bold">{fmtPrice(it.price * it.qty)}</span>
-                              <span>x{it.qty}</span>
-                            </div>
-                          ))}
-
-                          {/* ✅ pas de .order-details imbriqué ici */}
-                          <div className="order-item order-item--shipping">
-                            <span className="shipping-label">Prix de Livraison</span>
-                            <span className="text-dark fw-bold">
-                              {fmtPrice(Number(o?.deliveryAmount ?? o?.shippingAmount ?? o?.shipping ?? 0))}
+                      <div className="order-details">
+                        {items.map((it, i) => (
+                          <div key={i} className="order-item">
+                            <span>
+                              <Link to={`/product/${it.productId}`}>{it.name}</Link>
                             </span>
-                            {/* on garde un 3e span vide pour l’alignement */}
-                            <span className="order-item__qty" aria-hidden="true">&nbsp;</span>
+                            <span className="text-dark fw-bold">{fmtPrice(it.price * it.qty)}</span>
+                            <span>x{it.qty}</span>
                           </div>
+                        ))}
 
-                          <div className="order-actions">
-                            <button className="gbtn gbtn--light">Télécharger la facture</button>
-                            <button className="gbtn gbtn--primary">Commander à nouveau</button>
-                          </div>
+                        <div className="order-item order-item--shipping">
+                          <span className="shipping-label">Prix de Livraison</span>
+                          <span className="text-dark fw-bold">
+                            {fmtPrice(Number(o?.deliveryAmount ?? o?.shippingAmount ?? o?.shipping ?? 0))}
+                          </span>
+                          <span className="order-item__qty" aria-hidden="true">&nbsp;</span>
                         </div>
-                      )}
 
+                        <div className="order-item order-item--shipping">
+                          <span className="shipping-label">N° de suivi</span>
+                          <span className="text-dark fw-bold">
+                            <a
+                              href={o?.trackingLink}
+                              target="_blank"
+                              rel=""
+                            >
+                              {o?.trackingNumber}
+                            </a>
+                          </span>
+                          <span className="order-item__qty" aria-hidden="true">&nbsp;</span>
+                        </div>
+
+                        <div className="order-actions">
+                          <button className="gbtn gbtn--light">Télécharger la facture</button>
+                          <button className="gbtn gbtn--primary">Commander à nouveau</button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -310,7 +341,17 @@ export const Account = () => {
 
         {activeMenu === "profile" && <UserInformation user={user} />}
 
-        {activeMenu === "addresses" && <Address user={user} />}
+        {/* ✅ On passe des props à Address :
+            - enableAddressAutocomplete : pour activer l’auto-complétion dans la popup (à implémenter dans Address.jsx)
+            - preservePhoneOnFavorite   : pour que la bascule d’adresse préférée n’écrase pas le Phone (mise à jour minimale)
+         */}
+        {activeMenu === "addresses" && (
+          <Address
+            user={user}
+            enableAddressAutocomplete={true}
+            preservePhoneOnFavorite={true}
+          />
+        )}
 
         {["carts", "credits", "settings"].includes(activeMenu) && (
           <div className="account-placeholder">

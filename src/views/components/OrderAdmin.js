@@ -43,19 +43,55 @@ const getOcpId = (op) =>
 const normStr = (v) => (v == null ? "" : String(v));
 const safeLower = (s) => normStr(s).toLowerCase();
 const clamp = (n, min = 1, max = 999) => Math.max(min, Math.min(max, n || 1));
-const unitPrice = (p) => 
-  { 
-    let price = 0;
-    if(p.priceTtcCategoryCodePromoted != null)  return price=p.priceTtcCategoryCodePromoted;
-    if(p.priceTtcPromoted != null && p.priceTtcCategoryCodePromoted == null) return price=p.priceTtcPromoted;
-    if(p.priceTtc != null && p.priceTtcPromoted == null && p.priceTtcCategoryCodePromoted == null) return price=p.priceTtc;
-    return price;
-  };
 const fmtMoney = (n) =>
   new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(Number(n || 0));
-
-/* helpers async */
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/* ───────── Helpers prix (corrigés) ───────── */
+const toNum = (v) => (typeof v === "number" ? v : parseFloat(v));
+const parseDate = (val) => {
+  if (!val) return null;
+  const d = new Date(val);
+  return Number.isNaN(d.getTime()) ? null : d;
+};
+
+// Prix promo “produit” si la promo est ACTIVE, sinon null
+const getActiveProductPromoPrice = (p) => {
+  const priceRef = Number(toNum(p?.priceTtc ?? p?.price)) || 0;
+  const promo = p?.promotions?.[0];
+  if (!promo) return null;
+
+  const pct = Number(promo?.purcentage) || 0;
+  if (pct <= 0) return null;
+
+  const start = parseDate(promo?.startDate);
+  const end   = parseDate(promo?.endDate);
+  const now   = new Date();
+  const endOfDay = end ? new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59, 999) : null;
+
+  if (start && start > now) return null;
+  if (endOfDay && endOfDay < now) return null;
+
+  const promotedVal = Number(toNum(p?.priceTtcPromoted));
+  if (Number.isFinite(promotedVal)) return promotedVal;
+
+  return +(priceRef * (1 - pct / 100)).toFixed(2);
+};
+
+// Prix unitaire affiché/ utilisé pour la modale
+// Priorité : sous-cat code → cat code → promo produit active → prix de base
+const unitPrice = (p) => {
+  const subCatCode = Number(toNum(p?.priceTtcSubCategoryCodePromoted));
+  if (Number.isFinite(subCatCode)) return subCatCode;
+
+  const catCode = Number(toNum(p?.priceTtcCategoryCodePromoted));
+  if (Number.isFinite(catCode)) return catCode;
+
+  const prodPromo = getActiveProductPromoPrice(p);
+  if (prodPromo != null) return prodPromo;
+
+  return Number(toNum(p?.priceTtc ?? p?.price)) || 0;
+};
 
 export const OrderAdmin = () => {
   const dispatch = useDispatch();
@@ -105,6 +141,8 @@ export const OrderAdmin = () => {
   const computeTotal = (order) => {
     const oid = String(getId(order));
     const lines = opByOrder.get(oid) || [];
+    // NB: on utilise le prix enregistré sur la ligne (historique),
+    // pas le prix recalculé dynamiquement.
     return lines.reduce((sum, l) => {
       const pid = String(getProductIdFromOP(l));
       const prod = productsById.get(pid);
@@ -381,7 +419,6 @@ export const OrderAdmin = () => {
   /* ───────── Attente de l'ID commande créé (polling store) ───────── */
   const waitForNewOrderId = async (customerId, beforeIdsSet, { attempts = 20, delay = 200 } = {}) => {
     for (let i = 0; i < attempts; i++) {
-      // rafraîchit la liste côté store (au cas où ton add ne pousse pas directement la success en reducer)
       await dispatch(getOrderRequest?.());
       await sleep(delay);
 
@@ -393,13 +430,11 @@ export const OrderAdmin = () => {
         return String(cid ?? "") === String(customerId ?? "");
       });
 
-      // IDs actuels pour ce client
       const currentIds = afterForCustomer
         .map((o) => getId(o))
         .filter((x) => x != null)
         .map(String);
 
-      // cherche un ID qui n'existait pas avant
       const newOne = currentIds.find((id) => !beforeIdsSet.has(String(id)));
       if (newOne) return newOne;
     }
@@ -422,7 +457,6 @@ export const OrderAdmin = () => {
       return;
     }
 
-    // snapshot des IDs de commandes EXISTANTS pour ce client
     const beforeOrdersForCustomer = orders.filter((o) => {
       const cid =
         o?.idCustomer ?? o?.customerId ?? o?.CustomerId ?? o?.customer?.id ?? null;
@@ -432,14 +466,12 @@ export const OrderAdmin = () => {
       beforeOrdersForCustomer.map((o) => String(getId(o))).filter(Boolean)
     );
 
-    // montant prévu (pour l’order)
     const amount = Array.from(chosen).reduce((sum, pid) => {
       const p = productsById.get(String(pid));
       const qty = clamp(quantities.get(String(pid)) ?? 1);
       return sum + unitPrice(p) * qty;
     }, 0);
 
-    // 1) créer l’order (ne retourne pas l’id côté composant)
     await dispatch(
       addOrderRequest({
         CustomerId: Number(selectedCustomer),
@@ -449,7 +481,6 @@ export const OrderAdmin = () => {
       })
     );
 
-    // 2) attendre l’apparition de la nouvelle commande dans le store
     const newOrderId = await waitForNewOrderId(Number(selectedCustomer), beforeIdsSet, {
       attempts: 25,
       delay: 200,
@@ -460,7 +491,6 @@ export const OrderAdmin = () => {
       return;
     }
 
-    // 3) ajouter les lignes avec l’ID détecté
     for (const pid of Array.from(chosen)) {
       const qty = clamp(quantities.get(String(pid)) ?? 1);
       await dispatch(
@@ -469,7 +499,6 @@ export const OrderAdmin = () => {
           CustomerId: Number(selectedCustomer),
           ProductId: Number(pid),
           Quantity: qty,
-          // fallbacks
           IdOrder: Number(newOrderId),
           IdProduct: Number(pid),
         })
@@ -559,10 +588,20 @@ export const OrderAdmin = () => {
       const prods = productsListForOrder(o);
       const date = new Date(o.date).toLocaleDateString();
       const amount = o?.amount;
+      const trackingNumber = o?.trackingNumber ?? "—";
+      const trackingLink = o?.trackingLink ?? "—";
 
-      return { _raw: o, oid, email, num, pay, st, total, prods, date, amount };
+      return { _raw: o, oid, email, num, pay, st, total, prods, date, amount, trackingNumber, trackingLink };
     });
   }, [orders, customersById, computeTotal, productsListForOrder]);
+
+
+  const normUrl = (u) => {
+    if (!u) return null;
+    const s = String(u).trim();
+    if (!s) return null;
+    return /^https?:\/\//i.test(s) ? s : `https://${s}`;
+  };
 
   /* ───────── UI ───────── */
   return (
@@ -579,7 +618,9 @@ export const OrderAdmin = () => {
           <thead className="table-dark">
             <tr>
               <th>Client (email)</th>
+              <th>Id interne</th>
               <th>N° commande</th>
+              <th>N° de suivi</th>
               <th>Paiement</th>
               <th>Statut</th>
               <th>Montant</th>
@@ -597,7 +638,20 @@ export const OrderAdmin = () => {
               rows.map((r) => (
                 <tr key={r.oid}>
                   <td>{r.email}</td>
+                  <td>{r.oid}</td>
                   <td>{r.num}</td>
+                  <td>
+                    {(() => {
+                      const href = normUrl(r.trackingLink);
+                      if (!href) return "—";
+                      const label = (r.trackingNumber && String(r.trackingNumber).trim()) || "Suivre";
+                      return (
+                        <a href={href} target="_blank" rel="noopener noreferrer">
+                          {label}
+                        </a>
+                      );
+                    })()}
+                  </td>
                   <td>{r.pay}</td>
                   <td>{r.st}</td>
                   <td className="text-success fw-bold">{fmtMoney(r.amount)}</td>
@@ -748,7 +802,7 @@ export const OrderAdmin = () => {
                     const pid   = String(getId(p));
                     const checked = selectedProducts.has(pid);
                     const qty   = quantities.get(pid) ?? 1;
-                    const u     = unitPrice(p);
+                    const u     = unitPrice(p);                    // ✅ prix corrigé
                     const total = u * qty;
 
                     return (

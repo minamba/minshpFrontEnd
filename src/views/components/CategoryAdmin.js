@@ -17,6 +17,7 @@ export const CategoryAdmin = () => {
   const productsFromStore   = useSelector((s) => s.products.products) || [];
   const taxesFromStore      = useSelector((s) => s.taxes?.taxes) || [];
   const packageProfils      = useSelector((s) => s.packageProfils?.packageProfils) || [];
+  const contentCategories   = useSelector((s) => s.shipping?.contentCategories) || [];
   const dispatch = useDispatch();
 
   const [showModal, setShowModal]                   = useState(false);
@@ -25,18 +26,18 @@ export const CategoryAdmin = () => {
   const [formData, setFormData]                     = useState({ name: '' });
   const [idImage, setIdImage]                       = useState('');
   const [selectedProductId, setSelectedProductId]   = useState('');
-  const [selectedTaxIds, setSelectedTaxIds]         = useState([]); // string[]
+  const [selectedTaxIds, setSelectedTaxIds]         = useState([]);       // string[]
   const [selectedPackageProfilId, setSelectedPackageProfilId] = useState(''); // string
+  const [selectedContentCode, setSelectedContentCode]         = useState(''); // string (id du code produit)
+  const [contentCodeQuery, setContentCodeQuery]               = useState(''); // 🔎 recherche Code produit
 
   useEffect(() => {
     dispatch(getCategoryRequest());
     dispatch(getImageRequest());
     dispatch(getProductUserRequest());
     dispatch(getTaxeRequest());
-    // Si besoin: dispatch(getPackageProfilRequest());  // seulement si tu as l'action
   }, [dispatch]);
 
-  // bloque scroll + ESC quand la modale est ouverte
   useEffect(() => {
     document.body.classList.toggle('no-scroll', showModal);
     const onKey = (e) => { if (e.key === 'Escape') setShowModal(false); };
@@ -61,13 +62,21 @@ export const CategoryAdmin = () => {
       .map((t) => t.trim())
       .filter(Boolean);
 
-  // id du package profil dans une catégorie (multi variantes possibles)
+  // id package profil dans catégorie
   const getPkgIdFromCategory = (cat) =>
     cat?.idPackageProfil ??
     cat?.IdPackageProfil ??
     cat?.packageProfilId ??
     cat?.PackageProfilId ??
     cat?.idPackageProfile ??
+    null;
+
+  // id content code (code produit) dans catégorie
+  const getContentCodeIdFromCategory = (cat) =>
+    cat?.contentCode ??
+    cat?.ContentCode ??
+    cat?.idContentCode ??
+    cat?.IdContentCode ??
     null;
 
   const packageProfilsById = useMemo(() => {
@@ -79,6 +88,33 @@ export const CategoryAdmin = () => {
     return m;
   }, [packageProfils]);
 
+  // Toujours obtenir un tableau de codes produit
+  const allCodeCategories = useMemo(() => {
+    if (Array.isArray(contentCategories?.allCodeCategories)) {
+      return contentCategories.allCodeCategories;
+    }
+    if (Array.isArray(contentCategories)) return contentCategories;
+    return [];
+  }, [contentCategories]);
+
+  // Index id -> label
+  const contentCodeLabelById = useMemo(() => {
+    const m = new Map();
+    for (const cc of allCodeCategories) {
+      if (cc?.id != null) m.set(String(cc.id), cc?.label ?? '');
+    }
+    return m;
+  }, [allCodeCategories]);
+
+  // 🔎 Liste filtrée selon la recherche
+  const filteredCodeCategories = useMemo(() => {
+    const q = normalize(contentCodeQuery);
+    if (!q) return allCodeCategories;
+    return allCodeCategories.filter(
+      (cc) => normalize(cc.label).includes(q) || String(cc.id).includes(q)
+    );
+  }, [allCodeCategories, contentCodeQuery]);
+
   const getPackageProfilName = (cat) => {
     const pid = getPkgIdFromCategory(cat);
     if (pid == null) return '—';
@@ -86,12 +122,17 @@ export const CategoryAdmin = () => {
     return pp?.name ?? pp?.Name ?? `#${pid}`;
   };
 
+  const getContentCodeLabel = (cat) => {
+    const contentCategory = contentCategories.allCodeCategories.find((cc) => cc.id === String(cat.contentCode));
+    const label = contentCategory?.label;
+    return label || '—';
+  };
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Taxes ↔ IDs (depuis noms CSV potentiels en base)
   const extractTaxIdsFromCategory = (cat, taxesList) => {
     if (!cat) return [];
     const rawNames = String(cat.taxes ?? cat.taxeName ?? '').trim();
@@ -99,7 +140,7 @@ export const CategoryAdmin = () => {
     const tokens = csvToArray(rawNames);
     const ids = tokens
       .map((tok) => {
-        if (/^\d+$/.test(tok)) return tok; // déjà un id
+        if (/^\d+$/.test(tok)) return tok;
         const t = taxesList.find((x) => normalize(x.name) === normalize(tok));
         return t ? String(t.id) : '';
       })
@@ -116,6 +157,8 @@ export const CategoryAdmin = () => {
     setSelectedProductId('');
     setSelectedTaxIds([]);
     setSelectedPackageProfilId('');
+    setSelectedContentCode('');
+    setContentCodeQuery('');
     setShowModal(true);
   };
 
@@ -124,9 +167,13 @@ export const CategoryAdmin = () => {
     setCurrentId(category.id);
     setFormData({ id: category.id, name: category.name });
 
-    // Pré-sélection du package profil
+    // Pré-sélections
     const pkgId = getPkgIdFromCategory(category);
     setSelectedPackageProfilId(pkgId != null ? String(pkgId) : '');
+
+    const ccId = getContentCodeIdFromCategory(category);
+    setSelectedContentCode(ccId != null ? String(ccId) : '');
+    setContentCodeQuery(''); // reset recherche quand on ouvre
 
     // Image liée
     const img = imagesFromStore.find((i) => Number(i.idCategory) === Number(category.id));
@@ -175,14 +222,16 @@ export const CategoryAdmin = () => {
     const idsTaxesCsv = selectedTaxIds.join(',');
     const pkgIdNum =
       selectedPackageProfilId !== '' ? Number(selectedPackageProfilId) : null;
+    // On envoie UNIQUEMENT l'id du “code produit”
+    const contentCodeId = selectedContentCode !== '' ? Number(selectedContentCode) : null;
 
     if (isEditing) {
       await dispatch(updateCategoryRequest({
         id: currentId,
         name: formData.name,
-        idTaxe: idsTaxesCsv,             // adapte si besoin côté API
-        idPackageProfil: pkgIdNum,       // ✅ envoi de l’id package profil
-        IdPackageProfil: pkgIdNum,       // (fallback si casse différente)
+        idTaxe: idsTaxesCsv,
+        IdPackageProfil: pkgIdNum,
+        ContentCode: contentCodeId, 
       }));
       if (idImage) {
         await dispatch(updateImageRequest({ id: Number(idImage), idCategory: Number(currentId) }));
@@ -191,16 +240,13 @@ export const CategoryAdmin = () => {
       const addPayload = {
         name: formData.name,
         idsTaxes: idsTaxesCsv,
-        idPackageProfil: pkgIdNum,
         IdPackageProfil: pkgIdNum,
+        ContentCode: contentCodeId,
       };
       await dispatch(addCategoryRequest(addPayload));
       await dispatch(getCategoryRequest());
 
-      // retrouve l'id créé si nécessaire, puis lie l'image choisie
-      const created = [...categoriesFromStore]
-        .reverse()
-        .find((c) => c.name === formData.name);
+      const created = [...categoriesFromStore].reverse().find((c) => c.name === formData.name);
       if (idImage && created?.id) {
         await dispatch(updateImageRequest({ id: Number(idImage), idCategory: Number(created.id) }));
       }
@@ -275,7 +321,8 @@ export const CategoryAdmin = () => {
               <th>Image</th>
               <th>Nom</th>
               <th>Taxes</th>
-              <th>Package profil</th>{/* ✅ nouvelle colonne */}
+              <th>Code produit</th>
+              <th>Package profil</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -285,7 +332,8 @@ export const CategoryAdmin = () => {
                 <td><img src={getCategoryImage(cat.id)} width={100} alt={cat.name} /></td>
                 <td>{cat.name}</td>
                 <td>{getCategoryTaxNames(cat)}</td>
-                <td>{getPackageProfilName(cat)}</td>{/* ✅ affichage du nom */}
+                <td>{getContentCodeLabel(cat)}</td>
+                <td>{getPackageProfilName(cat)}</td>
                 <td>
                   <button
                     className='btn btn-sm btn-warning me-2'
@@ -336,7 +384,7 @@ export const CategoryAdmin = () => {
                 />
               </div>
 
-              {/* ✅ Sélecteur Package profil (toujours AVANT les images) */}
+              {/* Package profil (avant images) */}
               <div className="mb-3">
                 <label>Package profil</label>
                 <select
@@ -353,7 +401,30 @@ export const CategoryAdmin = () => {
                 </select>
               </div>
 
-              {/* Taxes associées (checkbox) */}
+              {/* Code produit : recherche + liste filtrée */}
+              <div className="mb-3">
+                <label>Code produit</label>
+                <input
+                  className="form-control mt-2"
+                  placeholder="Rechercher un code produit (label ou id)…"
+                  value={contentCodeQuery}
+                  onChange={(e) => setContentCodeQuery(e.target.value)}
+                />
+                <select
+                  className="form-select mt-2"
+                  value={selectedContentCode}
+                  onChange={(e) => setSelectedContentCode(e.target.value)}
+                >
+                  <option value="">— Sélectionner —</option>
+                  {filteredCodeCategories.map((cc) => (
+                    <option key={cc.id} value={String(cc.id)}>
+                      {cc.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Taxes associées */}
               <div className="mb-3">
                 <label>Taxes associées</label>
                 <div className="d-flex flex-wrap gap-3 mt-2">
@@ -385,7 +456,7 @@ export const CategoryAdmin = () => {
                 </div>
               </div>
 
-              {/* Sélection d'images (inchangé, juste déplacé après le package profil) */}
+              {/* Images (inchangé) */}
               {isEditing ? (
                 <>
                   <div className="mb-3">
