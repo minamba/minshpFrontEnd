@@ -6,7 +6,5 @@ export const createCheckoutSession = (payload) => {
   
 
   export const confirmCheckout = (sessionId) => {
-    return axios.get("/payments/confirm", {
-      params: { session_id: sessionId },
-    });
+    return axios.get(`/payments/confirm?session_id=${sessionId}`);
   };

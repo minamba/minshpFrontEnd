@@ -55,20 +55,22 @@ const initialState = {
           confirming: true,
           confirmed: false,
           confirmError: null,
+          sessionId: action.sessionId || null,
           // on peut garder les anciens IDs si tu veux afficher “en cours…”
         };
   
-      case actionsStripe.CONFIRM_CHECKOUT_SUCCESS:
-        return {
-          ...state,
-          confirming: false,
-          confirmed: true,
-          confirmError: null,
-          orderId: action.payload?.orderId ?? null,
-          orderNumber: action.payload?.orderNumber ?? null,
-          shipmentId: action.payload?.shipmentId ?? null,
-          trackingNumber: action.payload?.trackingNumber ?? null,
-        };
+        case actionsStripe.CONFIRM_CHECKOUT_SUCCESS:
+          return {
+            ...state,
+            confirming: false,
+            confirmed: true,
+            confirmError: null,
+            orderId: action.payload?.orderId ?? null,
+            orderNumber: action.payload?.orderNumber ?? null,
+            shipmentId: action.payload?.shipmentId ?? null,
+            trackingNumber: action.payload?.trackingNumber ?? null,
+            sessionId: null,
+          };
   
       case actionsStripe.CONFIRM_CHECKOUT_FAILURE:
         return {

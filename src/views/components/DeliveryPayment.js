@@ -1,22 +1,16 @@
 // src/pages/checkout/DeliveryPayment.jsx
 import React, { useEffect, useMemo, useState } from "react";
-import { useDispatch, useSelector, useStore } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { useLocation } from "react-router-dom";
 import "bootstrap-icons/font/bootstrap-icons.css";
 import "../../App.css";
 
-import { getOrderRequest, addOrderRequest } from "../../lib/actions/OrderActions";
-import {
-  addOrderCustomerProductRequest,
-  getOrderCustomerProductRequest,
-} from "../../lib/actions/OrderCustomerProductActions";
 import { saveCartRequest } from "../../lib/actions/CartActions";
 
 // Shipping
 import {
   getShippingRatesRequest,
   getRelaysByAddressRequest,
-  createShipmentRequest,
 } from "../../lib/actions/ShippingActions";
 
 // Delivery addresses
@@ -33,12 +27,17 @@ import {
   addBillingAddressRequest,
 } from "../../lib/actions/BillingAddressActions";
 
-//stripe 
-import { createCheckoutSessionRequest, confirmCheckoutSessionRequest } from "../../lib/actions/StripeActions";
+// Stripe (création de session + confirmation UI)
+import {
+  createCheckoutSessionRequest,
+  confirmCheckoutSessionRequest,
+} from "../../lib/actions/StripeActions";
 
 /* ------------------------------------------------------------------ */
 /* --------------------------- Helpers & UI -------------------------- */
 /* ------------------------------------------------------------------ */
+
+
 
 const carrierToOperator = (carrier, fallbackNetwork) => {
   const s = String(carrier || "").toLowerCase();
@@ -51,7 +50,14 @@ const carrierToOperator = (carrier, fallbackNetwork) => {
 };
 
 const normalizeRelay = (r) => {
-  const id = r?.id ?? r?.code ?? r?.pickupPointCode ?? r?.PUDO_ID ?? r?.ident ?? r?.pickupCode ?? "";
+  const id =
+    r?.id ??
+    r?.code ??
+    r?.pickupPointCode ??
+    r?.PUDO_ID ??
+    r?.ident ??
+    r?.pickupCode ??
+    "";
   return {
     id: String(id),
     code: String(id),
@@ -68,7 +74,9 @@ const normalizeRelay = (r) => {
 };
 
 const fmt = (n) =>
-  new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(Number(n) || 0);
+  new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(
+    Number(n) || 0
+  );
 
 const readLsItems = () => {
   try {
@@ -101,7 +109,9 @@ const getActiveProductPromoPrice = (product) => {
   const start = parseDate(promo?.startDate);
   const end = parseDate(promo?.endDate);
   const now = new Date();
-  const endOfDay = end ? new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59, 999) : null;
+  const endOfDay = end
+    ? new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59, 999)
+    : null;
   if (start && start > now) return null;
   if (endOfDay && endOfDay < now) return null;
   const base = Number(toNum(product?.priceTtc ?? product?.price)) || 0;
@@ -121,37 +131,6 @@ const getProductUnitPrice = (it, productsFromStore) => {
   const activePromo = getActiveProductPromoPrice(product);
   if (activePromo != null) return activePromo;
   return Number(toNum(product?.priceTtc ?? product?.price)) || 0;
-};
-
-const getOrderEntityId = (o) => o?.id ?? o?.Id ?? o?.orderId ?? null;
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const waitForNewOrderId = async (
-  dispatch,
-  store,
-  customerId,
-  beforeIds,
-  { attempts = 25, delay = 200 } = {}
-) => {
-  const beforeSet = new Set((beforeIds || []).map(String));
-  for (let i = 0; i < attempts; i++) {
-    await dispatch(getOrderRequest?.());
-    await new Promise((r) => setTimeout(r, delay));
-    const state = store.getState();
-    const allOrders = state?.orders?.orders || [];
-    let newId = null;
-    const order = allOrders.find((o) => {
-      const cid = String(
-        o?.idCustomer ?? o?.customerId ?? o?.CustomerId ?? o?.customer?.id ?? ""
-      );
-      if (cid !== String(customerId)) return false;
-      const id = String(getOrderEntityId(o) || "");
-      if (!id || beforeSet.has(id)) return false;
-      newId = id;
-      return true;
-    });
-    if (newId) return { newId, orderNumber: order?.orderNumber };
-  }
-  return null;
 };
 
 const relayCode = { MondialRelay: "MONR", Ups: "UPSE", Chronopost: "CHRP", LaPoste: "POFR" };
@@ -181,7 +160,14 @@ export function parseRelayAddress(input, defaults = { countryIso: "FR" }) {
       postalCode: undefined,
       countryIsoCode: defaults.countryIso,
     };
-  const countryMap = { fr: "FR", france: "FR", be: "BE", belgique: "BE", ch: "CH", suisse: "CH" };
+  const countryMap = {
+    fr: "FR",
+    france: "FR",
+    be: "BE",
+    belgique: "BE",
+    ch: "CH",
+    suisse: "CH",
+  };
   const mCountry = s.match(/\b(france|fr|belgique|be|suisse|ch)\b/i);
   let countryIso = defaults.countryIso;
   if (mCountry) {
@@ -196,7 +182,10 @@ export function parseRelayAddress(input, defaults = { countryIso: "FR" }) {
   const number = mNum ? mNum[1] : undefined;
   if (number) s = s.replace(mNum[0], "").trim();
   let street, city, state;
-  const parts = s.split(",").map((x) => x.trim()).filter(Boolean);
+  const parts = s
+    .split(",")
+    .map((x) => x.trim())
+    .filter(Boolean);
   if (parts.length >= 2) {
     street = parts.slice(0, -1).join(", ");
     city = parts[parts.length - 1];
@@ -251,7 +240,10 @@ function PhoneInputWithCountry({ valueDial, valueLocal, onChange }) {
         placeholder="Numéro (ex: 6 12 34 56 78)"
         value={valueLocal || ""}
         onChange={(e) =>
-          onChange({ dial: valueDial || DEFAULT_DIAL, local: cleanPhoneLocal(e.target.value) })
+          onChange({
+            dial: valueDial || DEFAULT_DIAL,
+            local: cleanPhoneLocal(e.target.value),
+          })
         }
       />
     </div>
@@ -259,11 +251,6 @@ function PhoneInputWithCountry({ valueDial, valueLocal, onChange }) {
 }
 
 /* ----------------------- Address autocomplete (BAN) ---------------------- */
-/**
- * Autocomplétion :
- * - active uniquement pendant la saisie et si l'input est focus
- * - se ferme dès la sélection
- */
 function AddressAutocomplete({
   value,
   onChangeText,
@@ -295,7 +282,9 @@ function AddressAutocomplete({
       if (abortRef.current) abortRef.current.abort();
       const ctrl = new AbortController();
       abortRef.current = ctrl;
-      const url = `https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(q)}&limit=8&autocomplete=1`;
+      const url = `https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(
+        q
+      )}&limit=8&autocomplete=1`;
       try {
         const res = await fetch(url, { signal: ctrl.signal });
         const json = await res.json();
@@ -329,8 +318,6 @@ function AddressAutocomplete({
     setItems([]);
     setHi(-1);
     setTyping(false);
-    // ne pas réécrire l'input si le parent gère la valeur;
-    // on appelle onSelect + onChangeText pour laisser le parent setter ce qu'il veut
     onChangeText?.(it.label);
     onSelect?.(it);
     if (inputRef.current) inputRef.current.blur();
@@ -424,7 +411,9 @@ function AddressAutocomplete({
 
 const PHONE_DEFAULT_COUNTRY_LABEL = "France (métropolitaine)";
 const makeStreetLine = (addr) =>
-  `${addr?.housenumber ? `${addr.housenumber} ` : ""}${addr?.street || addr?.name || ""}`.trim();
+  `${addr?.housenumber ? `${addr.housenumber} ` : ""}${
+    addr?.street || addr?.name || ""
+  }`.trim();
 
 const toForm = (a, currentCustomer) => {
   const phoneRaw =
@@ -467,7 +456,9 @@ const toForm = (a, currentCustomer) => {
 };
 
 const toPayload = (form, currentCustomer, type) => {
-  const fullPhone = `${form.phoneDial || DEFAULT_DIAL}${cleanPhoneLocal(form.phoneLocal)}`;
+  const fullPhone = `${form.phoneDial || DEFAULT_DIAL}${cleanPhoneLocal(
+    form.phoneLocal
+  )}`;
   const base = {
     Id: form.id ?? undefined,
     IdCustomer: currentCustomer?.id,
@@ -518,14 +509,27 @@ function SimpleModal({ open, title, children, onClose, footer }) {
           <button
             onClick={onClose}
             aria-label="Fermer"
-            style={{ border: 0, background: "transparent", cursor: "pointer", fontSize: 20, lineHeight: 1 }}
+            style={{
+              border: 0,
+              background: "transparent",
+              cursor: "pointer",
+              fontSize: 20,
+              lineHeight: 1,
+            }}
           >
             ×
           </button>
         </div>
         <div style={{ marginTop: 12 }}>{children}</div>
         {footer && (
-          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
+          <div
+            style={{
+              display: "flex",
+              gap: 10,
+              justifyContent: "flex-end",
+              marginTop: 16,
+            }}
+          >
             {footer}
           </div>
         )}
@@ -569,7 +573,10 @@ function AddressFormModal({
             <div style={{ marginBottom: 6, fontWeight: 700 }}>Civilité *</div>
             <div style={{ display: "flex", gap: 16 }}>
               {["M.", "Mme"].map((c) => (
-                <label key={c} style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+                <label
+                  key={c}
+                  style={{ display: "inline-flex", gap: 6, alignItems: "center" }}
+                >
                   <input
                     type="radio"
                     name={`civ-${type}`}
@@ -606,10 +613,8 @@ function AddressFormModal({
               value={form.address1}
               onChangeText={(txt) => change("address1", txt)}
               onSelect={(addr) => {
-                // 👉 N° + rue seulement dans "Adresse"
                 const streetLine = makeStreetLine(addr);
                 change("address1", streetLine);
-                // remplir les autres champs
                 change("zip", addr.postcode || "");
                 change("city", addr.city || "");
                 change("country", addr.country || PHONE_DEFAULT_COUNTRY_LABEL);
@@ -628,14 +633,26 @@ function AddressFormModal({
           </Field>
 
           <Field label="Code postal *">
-            <input className="form-control" value={form.zip} onChange={(e) => change("zip", e.target.value)} />
+            <input
+              className="form-control"
+              value={form.zip}
+              onChange={(e) => change("zip", e.target.value)}
+            />
           </Field>
           <Field label="Ville *">
-            <input className="form-control" value={form.city} onChange={(e) => change("city", e.target.value)} />
+            <input
+              className="form-control"
+              value={form.city}
+              onChange={(e) => change("city", e.target.value)}
+            />
           </Field>
 
           <Field label="Pays *">
-            <select className="form-control" value={form.country} onChange={(e) => change("country", e.target.value)}>
+            <select
+              className="form-control"
+              value={form.country}
+              onChange={(e) => change("country", e.target.value)}
+            >
               <option>France (métropolitaine)</option>
               <option>Belgique</option>
               <option>Suisse</option>
@@ -674,11 +691,19 @@ function AddressFormModal({
 function AddressBookModal({ open, addresses, onChoose, onEdit, onClose }) {
   return (
     <SimpleModal open={open} onClose={onClose} title="Carnet d’adresses">
-      {addresses.length === 0 && <div style={{ color: "#6b7280" }}>Aucune adresse de livraison.</div>}
+      {addresses.length === 0 && (
+        <div style={{ color: "#6b7280" }}>Aucune adresse de livraison.</div>
+      )}
       <div style={{ display: "grid", gap: 12 }}>
         {addresses.map((a, idx) => (
           <div key={idx} style={addressCard}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
               <div style={{ fontWeight: 800, marginBottom: 6 }}>
                 {a.firstName} {a.lastName}
               </div>
@@ -708,7 +733,11 @@ function AddressBookModal({ open, addresses, onChoose, onEdit, onClose }) {
                 style={primaryBtn}
                 onClick={() => onChoose(idx)}
                 disabled={a.favorite === true}
-                title={a.favorite ? "Déjà l’adresse préférée" : "Définir comme préférée"}
+                title={
+                  a.favorite
+                    ? "Déjà l’adresse préférée"
+                    : "Définir comme préférée"
+                }
               >
                 Choisir
               </button>
@@ -734,26 +763,13 @@ function Field({ label, children }) {
 /* ------------------------------------------------------------------ */
 
 export const DeliveryPayment = () => {
-  // Snapshot du panier
-  const [products] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem("items") || "[]");
-    } catch {
-      return [];
-    }
-  });
-
   const dispatch = useDispatch();
-  const store = useStore();
-
   const location = useLocation();
   const { state } = location;
 
-  // Lecture directe du slice payment
+  // Lecture slice payment
   const payment = useSelector((s) => s?.payment) || {};
   const paymentConfirmed = !!payment.confirmed;
-  const totalCents = state?.totalCents ?? 0;
-  const totalFromState = totalCents / 100;
 
   const productsFromStore = useSelector((s) => s?.products?.products) || [];
   const { user } = useSelector((s) => s.account);
@@ -762,19 +778,20 @@ export const DeliveryPayment = () => {
   const currentCustomer = customers.find((c) => c.idAspNetUser === uid);
 
   // 📦 Adresses
-  const billingAddresses = useSelector((s) => s?.billingAddresses?.billingAddresses || []);
-  const deliveryAddresses = useSelector((s) => s?.deliveryAddresses?.deliveryAddresses || []);
+  const billingAddresses =
+    useSelector((s) => s?.billingAddresses?.billingAddresses || []) || [];
+  const deliveryAddresses =
+    useSelector((s) => s?.deliveryAddresses?.deliveryAddresses || []) || [];
 
   const deliveryLst = (deliveryAddresses || []).filter(
     (a) => a?.idCustomer === currentCustomer?.id
   );
   const deliveryFavoriteAddress = deliveryLst.find((a) => a?.favorite);
-  const billingAddress = billingAddresses.find((a) => a?.idCustomer === currentCustomer?.id);
+  const billingAddress = billingAddresses.find(
+    (a) => a?.idCustomer === currentCustomer?.id
+  );
 
-  // Charger données nécessaires
-  useEffect(() => {
-    dispatch(getOrderRequest?.());
-  }, [dispatch]);
+  // Charger adresses
   useEffect(() => {
     dispatch(getDeliveryAddressRequest?.());
   }, [dispatch]);
@@ -782,15 +799,14 @@ export const DeliveryPayment = () => {
     dispatch(getBillingAddressRequest?.());
   }, [dispatch]);
 
-  // Déclenche la confirmation Stripe si on revient avec session_id
-    useEffect(() => {
+  // Déclenche la confirmation Stripe si on revient avec session_id (affichage uniquement)
+  useEffect(() => {
     const params = new URLSearchParams(location.search);
     const sessionId = params.get("session_id");
     if (sessionId) {
       dispatch(confirmCheckoutSessionRequest(sessionId));
     }
   }, [location.search, dispatch]);
-
 
   // Shipping slice
   const {
@@ -810,7 +826,16 @@ export const DeliveryPayment = () => {
   const [deliveryMode, setDeliveryMode] = useState("home"); // "home" | "relay"
   const [selectedRelay, setSelectedRelay] = useState(null);
 
-  // -------------------- PREFILL: une ligne depuis la favorite --------------------
+  // Snapshot du panier
+  const [products] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("items") || "[]");
+    } catch {
+      return [];
+    }
+  });
+
+  // PREFILL: une ligne depuis la favorite
   const preferredRelayAddress = useMemo(() => {
     if (!deliveryFavoriteAddress) return "";
     const parts = [];
@@ -835,8 +860,15 @@ export const DeliveryPayment = () => {
   const [selectedRateCode, setSelectedRateCode] = useState(null);
 
   // Totaux
+  const totalCents = state?.totalCents ?? 0;
+  const totalFromState = totalCents / 100;
+
   const lsItemsAmount = useMemo(
-    () => readLsItems().reduce((s, it) => s + Number(it?.price ?? it?.priceTtc ?? 0) * getQty(it), 0),
+    () =>
+      readLsItems().reduce(
+        (s, it) => s + Number(it?.price ?? it?.priceTtc ?? 0) * getQty(it),
+        0
+      ),
     []
   );
   const baseTotal = totalFromState > 0 ? totalFromState : lsItemsAmount;
@@ -870,7 +902,7 @@ export const DeliveryPayment = () => {
     [products]
   );
 
-  /* === 1) Tarifs domicile === */
+  /* === 1) Tarifs domicile (auto) === */
   const depZip = deliveryFavoriteAddress?.postalCode || billingAddress?.postalCode || null;
   const depCountry = (deliveryFavoriteAddress?.country || "FR").slice(0, 2).toUpperCase();
   const depCity = deliveryFavoriteAddress?.city || billingAddress?.city || null;
@@ -891,7 +923,8 @@ export const DeliveryPayment = () => {
     () =>
       (rates || []).map((r) => ({
         ...r,
-        isRelay: r?.isRelay ?? String(r?.deliveryTypeCode).toUpperCase() === "PICKUP_POINT",
+        isRelay:
+          r?.isRelay ?? String(r?.deliveryTypeCode).toUpperCase() === "PICKUP_POINT",
         operator: r?.operator || r?.carrierCode || null,
         carrier: r?.carrier || r?.labelCarrier || r?.label || "",
         priceTtc: Number(r?.priceTtc ?? r?.price ?? 0),
@@ -939,19 +972,15 @@ export const DeliveryPayment = () => {
         (r) =>
           (r.operator && String(r.operator).toUpperCase() === upper) ||
           (r.carrier &&
-            r.carrier
-              .toLowerCase()
-              .includes(
-                upper === "MONR"
-                  ? "mondial"
-                  : upper === "CHRP"
-                  ? "chrono"
-                  : upper === "UPSE"
-                  ? "ups"
-                  : upper === "POFR"
-                  ? "laposte"
-                  : ""
-              ))
+            r.carrier.toLowerCase().includes(
+              upper === "MONR"
+                ? "mondial"
+                : upper === "CHRP"
+                ? "chrono"
+                : upper === "UPSE"
+                ? "ups"
+                : "poste"
+            ))
       ) || relayRates[0]
     );
   }, [relayRates, relayOperator]);
@@ -972,7 +1001,11 @@ export const DeliveryPayment = () => {
     if (!id) return;
 
     await dispatch(
-      updateDeliveryAddressRequest({ Id: id, IdCustomer: currentCustomer?.id, Favorite: true })
+      updateDeliveryAddressRequest({
+        Id: id,
+        IdCustomer: currentCustomer?.id,
+        Favorite: true,
+      })
     );
     await dispatch(getDeliveryAddressRequest());
 
@@ -990,7 +1023,6 @@ export const DeliveryPayment = () => {
   };
 
   /* ------------------------ Edition & sauvegarde ------------------------ */
-
   const startEditShipping = (idx) => setEditShipIdx(idx);
 
   const deliveryEditInitial =
@@ -1014,181 +1046,43 @@ export const DeliveryPayment = () => {
     }
   };
 
-  /* ---- Création de la commande + lignes + shipment ---- */
-  const orders = useSelector((s) => s?.orders?.orders) || [];
-  const handleOrderAfterPayment = async (paymentMethodLabel) => {
-    const currentCustomerId = currentCustomer?.id;
-    if (!currentCustomerId) {
-      alert("Veuillez vous connecter pour finaliser votre commande.");
-      return;
-    }
-    if (deliveryMode === "relay" && !selectedRelay) {
-      alert("Choisissez un point relais avant de continuer.");
-      return;
-    }
+  const chosenRate =
+  deliveryMode === "relay"
+    ? selectedRelayRate || relayRates[0] || null
+    : homeRates.find((r) => r.code === selectedRateCode) || homeRates[0] || null;
 
-    const beforeIds = (orders || [])
-      .filter(
-        (o) =>
-          String(
-            o?.idCustomer ?? o?.customerId ?? o?.CustomerId ?? o?.customer?.id ?? ""
-          ) === String(currentCustomerId)
-      )
-      .map(getOrderEntityId)
-      .filter(Boolean);
+
+const operatorCode = carrierToOperator(chosenRate?.carrier, selectedRelay?.network);
+const serviceCode = chosenRate?.code || "";
+const shippingCodesMissing = !operatorCode || !serviceCode;
+
+const today = new Date().toISOString().slice(0, 10);
+const toIsRelay = deliveryMode === "relay";
+const toAddressLine = deliveryFavoriteAddress?.address || "";
+const toZip = String(deliveryFavoriteAddress?.postalCode || "");
+const toCity = deliveryFavoriteAddress?.city || "";
+const toCountry = "FR";
+
+const pickupPointCode = toIsRelay ? String(selectedRelay?.id || "") : null;
+const declaredValue = Number(baseTotal) || 0;
+
+
+  /* --------------------------------- STRIPE -------------------------------- */
+
+  const buildCheckoutPayload = () => {
+
+  const currentCustomerId = currentCustomer?.id;
+  if (!currentCustomerId) {
+    alert("Veuillez vous connecter pour finaliser votre commande.");
+    return null;
+  }
+
 
     const chosenRate =
       deliveryMode === "relay"
         ? selectedRelayRate || relayRates[0] || null
         : homeRates.find((r) => r.code === selectedRateCode) || homeRates[0] || null;
 
-    if (chosenRate != null) {
-      await dispatch(
-        addOrderRequest({
-          CustomerId: Number(currentCustomerId),
-          PaymentMethod: paymentMethodLabel,
-          Status: "En attente",
-          Amount: Number(grandTotal),
-          DeliveryAmount: Number(shippingPrice),
-          DeliveryMode: deliveryMode,
-          DeliveryCarrier: chosenRate?.carrier || "Boxtal",
-          DeliveryMethodCode: chosenRate?.code || "",
-          DeliveryPointId: deliveryMode === "relay" ? selectedRelay?.id ?? null : null,
-          DeliveryPointLabel: deliveryMode === "relay" ? selectedRelay?.name ?? null : null,
-          ServiceCode: chosenRate?.dropOffPointCodes?.[0] || "",
-        })
-      );
-    } else {
-      alert("Veuillez choisir un mode de livraison !");
-      return;
-    }
-
-    const res = await waitForNewOrderId(dispatch, store, currentCustomerId, beforeIds);
-    if (!res?.newId) {
-      alert("Commande créée mais identifiant introuvable pour l’instant. Réessayez ou actualisez.");
-      return;
-    }
-    const newOrderId = res.newId;
-
-    const items = readLsItems();
-    for (const it of items) {
-      const pid = getPid(it);
-      const qty = getQty(it);
-      const unitPriceWhenOrder = getProductUnitPrice(it, productsFromStore);
-      if (!pid || qty <= 0) continue;
-
-      await dispatch(
-        addOrderCustomerProductRequest({
-          OrderId: Number(newOrderId),
-          CustomerId: Number(currentCustomerId),
-          ProductId: Number(pid),
-          Quantity: Number(qty),
-          IdOrder: Number(newOrderId),
-          IdProduct: Number(pid),
-          ProductUnitPrice: unitPriceWhenOrder,
-        })
-      );
-    }
-
-    const today = new Date().toISOString().slice(0, 10);
-
-    const shipmentPackages =
-      packages && packages.length > 0
-        ? packages
-        : [
-            {
-              Type: "PARCEL",
-              PackageWeight: String(cartWeightKg || 0.25),
-              PackageLonger: "20",
-              PackageWidth: "15",
-              PackageHeight: "10",
-              PackageValue: parseFloat(baseTotal || 0) || 0,
-              PackageStackable: true,
-            },
-          ];
-
-    const operatorCode = carrierToOperator(chosenRate?.carrier, selectedRelay?.network);
-    const serviceCode = chosenRate?.code || "";
-    if (!operatorCode || !serviceCode) {
-      console.warn("V1: operator/service manquants", { operatorCode, serviceCode, chosenRate, selectedRelay });
-      alert("Impossible de déterminer l’opérateur ou le service pour l’expédition.");
-      return;
-    }
-
-    const toIsRelay = deliveryMode === "relay";
-    const toAddressLine = deliveryFavoriteAddress?.address || "";
-    const toZip = String(deliveryFavoriteAddress?.postalCode || "");
-    const toCity = deliveryFavoriteAddress?.city || "";
-    const toCountry = "FR";
-
-    const pickupPointCode = toIsRelay ? String(selectedRelay?.id || "") : null;
-
-    const defaultDropOffForShopToShop = "CHRP-736BX";
-    const dropOffPointCode = defaultDropOffForShopToShop || null;
-
-    const declaredValue = Number(baseTotal) || 0;
-
-    try {
-      const body = {
-        OperatorCode: operatorCode,
-        ServiceCode: serviceCode,
-        IsRelay: toIsRelay,
-        DropOffPointCode: dropOffPointCode,
-        PickupPointCode: pickupPointCode,
-        ContentDescription: "Montres connectées",
-        DeclaredValue: declaredValue,
-        Packages: shipmentPackages,
-        // Destinataire
-        ToType: "particulier",
-        ToCivility: currentCustomer?.civility || null,
-        ToLastName: currentCustomer?.lastName || "",
-        ToFirstName: currentCustomer?.firstName || "",
-        ToEmail: user?.email || null,
-        ToPhone: currentCustomer?.phone || null,
-        ToAddress: toAddressLine,
-        ToZip: toZip,
-        ToCity: toCity,
-        ToCountry: toCountry,
-        // Expéditeur
-        FromType: "entreprise",
-        FromCivility: "M",
-        FromCompany: "Mins Shop",
-        FromLastName: "Camara",
-        FromFirstName: "Minamba",
-        FromEmail: "minamba.c@gmail.com",
-        FromPhone: "+33624957558",
-        FromAddress: "2 Rue jules vallès",
-        FromZip: "91000",
-        FromCity: "Evry-courcouronnes",
-        FromCountry: "FR",
-        TakeOverDate: today,
-        ExternalOrderId: String(newOrderId),
-      };
-      dispatch(createShipmentRequest(body));
-    } catch (e) {
-      console.error("Create shipment error:", e);
-    }
-
-    await Promise.all([dispatch(getOrderRequest?.()), dispatch(getOrderCustomerProductRequest?.())]);
-    await dispatch(saveCartRequest([]));
-    localStorage.setItem("items", "[]");
-    alert("Votre commande a été enregistrée.");
-  };
-
-  //----------------------------------------STRIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIPE-----------------------------------------------------------------
-
-  const buildCheckoutPayload = () => {
-    const currentCustomerId = currentCustomer?.id;
-    if (!currentCustomerId) {
-      alert("Veuillez vous connecter pour finaliser votre commande.");
-      return null;
-    }
-  
-    const chosenRate =
-      deliveryMode === "relay"
-        ? (selectedRelayRate || relayRates[0] || null)
-        : (homeRates.find((r) => r.code === selectedRateCode) || homeRates[0] || null);
-  
     if (!chosenRate) {
       alert("Veuillez choisir un mode de livraison.");
       return null;
@@ -1197,97 +1091,67 @@ export const DeliveryPayment = () => {
       alert("Choisissez un point relais.");
       return null;
     }
-  
+
     return {
-      amount: Math.round(grandTotal * 100),
-      currency: "eur",
-      customerId: currentCustomerId,
-      userEmail: user?.email,
-      shipping: {
-        mode: deliveryMode,
-        price: shippingPrice,
-        rateCode: chosenRate?.code,
-        carrier: chosenRate?.carrier,
-        relay:
-          deliveryMode === "relay"
-            ? {
-                id: selectedRelay?.id,
-                name: selectedRelay?.name,
-                address: selectedRelay?.address,
-                zip: selectedRelay?.zip,
-                city: selectedRelay?.city,
-                network: selectedRelay?.network,
-              }
-            : null,
-        homeAddress: deliveryFavoriteAddress
-          ? {
-              address: deliveryFavoriteAddress.address,
-              zip: deliveryFavoriteAddress.postalCode,
-              city: deliveryFavoriteAddress.city,
-              country: "FR",
-            }
-          : null,
-      },
-      basket: readLsItems().map((it) => ({
-        productId: getPid(it),
-        qty: getQty(it),
-        unitPriceTtc: getProductUnitPrice(it, productsFromStore),
+
+      //creation de la commande
+      CustomerId: currentCustomerId,
+      Amount: Number(grandTotal),
+      DeliveryAmount: shippingPrice,
+      PaymentMethod: "carte",
+      DeliveryMode: deliveryMode,
+
+      //creation de orderProduct
+      OperatorCode: operatorCode,
+      ServiceCode: serviceCode,
+      IsRelay: toIsRelay,
+      PickupPointCode: pickupPointCode,
+      DropOffPointCode: chosenRate?.dropOffPointCodes?.[0] || null,
+      ContentDescription: "Object high tech",
+      DeclaredValue: declaredValue,
+      Packages: packages,
+      
+      // Destinataire
+      ToType: "particulier",
+      ToCivility: currentCustomer?.civilite || null,
+      ToLastName: currentCustomer?.lastName || "",
+      ToFirstName: currentCustomer?.firstName || "",
+      ToEmail: user?.email || null,
+      ToPhone: currentCustomer?.phoneNumber || null,
+      ToAddress: toAddressLine,
+      ToZip: toZip,
+      ToCity: toCity,
+      ToCountry: toCountry,
+      
+      TakeOverDate: today,
+
+      OrderCustomerProducts: readLsItems().map((it) => ({
+        ProductId: getPid(it),
+        CustomerId: Number(currentCustomerId),
+        Quantity: getQty(it),
+        ProductUnitPrice: getProductUnitPrice(it, productsFromStore),
       })),
-      shipment: { packages, cartWeightKg, baseTotal },
     };
   };
 
-/** ───────── Fonction unique de paiement que ce soit par carte ou paypal ─────────
- * method: "CARTE" | "paypal"
- */
-const pay = async (method) => {
-  if (method === "carte") {
+  const handleStripePay = () => {
+    if (shippingCodesMissing) {
+      console.warn("V1: operator/service manquants", { operatorCode, serviceCode, chosenRate, selectedRelay });
+      alert("Impossible de déterminer l’opérateur ou le service pour l’expédition.");
+      return;
+    }
     const payload = buildCheckoutPayload();
     if (!payload) return;
-    // 👉 action en camelCase
     dispatch(createCheckoutSessionRequest(payload));
-    return;
-  }
+  };
 
-  if (method === "paypal") {
-    // PayPal : on exécute directement ton flux existant
-    await handleOrderAfterPayment("PayPal");
-    return;
-  }
-
-  console.warn("Méthode de paiement inconnue:", method);
-};
-
-
-// Effet: ne finalise la commande que pour STRIPE + si confirmé. TODO IMPLEMENT PAYPAL
-const [hasFinalized, setHasFinalized] = useState(false);
-useEffect(() => {
-  const params = new URLSearchParams(location.search);
-  const sessionId = params.get("session_id");   // présent uniquement au retour Stripe
-  if (!sessionId) return;                        // => pas Stripe, ne rien faire ici
-
-  if (payment?.confirmed && !hasFinalized) {
-    (async () => {
-      try {
-        await handleOrderAfterPayment("Carte");
-        setHasFinalized(true);
-
-        // optionnel: nettoyer l'URL pour éviter tout retrigger visuel
-        const clean = new URL(window.location.href);
-        clean.searchParams.delete("session_id");
-        window.history.replaceState({}, "", clean.toString());
-      } catch (e) {
-        console.error("Erreur dans la finalisation du paiement stripe :", e);
-      }
-    })();
-  }
-}, [payment?.confirmed, hasFinalized, location.search]);
-
-
-    //----------------------------------------STRIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIPE-----------------------------------------------------------------
-
-    const handleStripePay = () => pay("carte");
-    const handlePayPal = () => pay("paypal");
+  // vider le panier côté front si payment.confirmed (webhook a déjà tout fait côté back)
+  useEffect(() => {
+    if (paymentConfirmed) {
+      dispatch(saveCartRequest([]));
+      localStorage.setItem("items", "[]");
+    }
+  }, [paymentConfirmed, dispatch]);
 
   /* ===== Hauteur étendue pour la liste de relais ===== */
   const RELAY_LIST_MIN_HEIGHT = 340;
@@ -1312,11 +1176,23 @@ useEffect(() => {
 
       <div
         className="new-grid"
-        style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 18 }}
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: 16,
+          marginBottom: 18,
+        }}
       >
         {/* ----- À domicile ----- */}
         <section className="category-card" style={{ padding: 16 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              marginBottom: 8,
+            }}
+          >
             <input
               type="radio"
               name="deliv"
@@ -1347,11 +1223,15 @@ useEffect(() => {
                   </div>
                   <div>{deliveryFavoriteAddress.country}</div>
                   {deliveryFavoriteAddress.phone && (
-                    <div style={{ color: "#6b7280" }}>{deliveryFavoriteAddress.phone}</div>
+                    <div style={{ color: "#6b7280" }}>
+                      {deliveryFavoriteAddress.phone}
+                    </div>
                   )}
                 </>
               ) : (
-                <div style={{ color: "#6b7280" }}>Aucune adresse de livraison préférée.</div>
+                <div style={{ color: "#6b7280" }}>
+                  Aucune adresse de livraison préférée.
+                </div>
               )}
             </div>
 
@@ -1365,9 +1245,13 @@ useEffect(() => {
 
           {/* Offres domicile */}
           <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
-            {ratesLoading && <div style={{ color: "#6b7280" }}>Chargement des offres…</div>}
+            {ratesLoading && (
+              <div style={{ color: "#6b7280" }}>Chargement des offres…</div>
+            )}
             {!ratesLoading && uniqueHomeRates.length === 0 && (
-              <div style={{ color: "#6b7280" }}>Aucune offre disponible pour cette adresse.</div>
+              <div style={{ color: "#6b7280" }}>
+                Aucune offre disponible pour cette adresse.
+              </div>
             )}
             {!ratesLoading &&
               uniqueHomeRates.map((o, i) => (
@@ -1389,7 +1273,14 @@ useEffect(() => {
 
         {/* ----- En point relais ----- */}
         <section className="category-card" style={{ padding: 16 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              marginBottom: 8,
+            }}
+          >
             <input
               type="radio"
               name="deliv"
@@ -1400,7 +1291,14 @@ useEffect(() => {
             <span style={chipMuted}>Adresse en une ligne</span>
           </div>
 
-          <div style={{ color: "#2563eb", fontWeight: 800, fontSize: 12, marginBottom: 6 }}>
+          <div
+            style={{
+              color: "#2563eb",
+              fontWeight: 800,
+              fontSize: 12,
+              marginBottom: 6,
+            }}
+          >
             Recherche par adresse
           </div>
 
@@ -1414,10 +1312,15 @@ useEffect(() => {
           >
             <Field label="Adresse complète">
               <AddressAutocomplete
-                value=""
+                value={relayFullAddress}
                 onChangeText={setRelayFullAddress}
                 onSelect={(addr) => {
-                  const line = [makeStreetLine(addr), [addr.postcode, addr.city].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+                  const line = [
+                    makeStreetLine(addr),
+                    [addr.postcode, addr.city].filter(Boolean).join(" "),
+                  ]
+                    .filter(Boolean)
+                    .join(", ");
                   setRelayFullAddress(line);
                   const parsed = parseRelayAddress(line, { countryIso: "FR" });
                   setDeliveryMode("relay");
@@ -1444,7 +1347,9 @@ useEffect(() => {
           </div>
 
           {displayedRelaysLoading && (
-            <div style={{ color: "#6b7280", marginTop: 10 }}>Recherche des relais…</div>
+            <div style={{ color: "#6b7280", marginTop: 10 }}>
+              Recherche des relais…
+            </div>
           )}
 
           {!displayedRelaysLoading && displayedRelays.length > 0 && (
@@ -1525,7 +1430,10 @@ useEffect(() => {
       </div>
 
       {/* ==================== ADRESSE DE FACTURATION ==================== */}
-      <div className="category-card" style={{ padding: 16, marginBottom: 18, display: "grid", gap: 8 }}>
+      <div
+        className="category-card"
+        style={{ padding: 16, marginBottom: 18, display: "grid", gap: 8 }}
+      >
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <i className="bi bi-file-earmark-text" aria-hidden="true" />
           <div style={{ fontWeight: 800 }}>Votre adresse de facturation</div>
@@ -1536,16 +1444,22 @@ useEffect(() => {
             {billingAddress ? (
               <>
                 <div style={{ fontWeight: 800 }}>
-                  {currentCustomer.firstName} {currentCustomer.lastName} — {billingAddress.address}
-                  {billingAddress.complementaryAddress ? `, ${billingAddress.complementaryAddress}` : ""}
+                  {currentCustomer.firstName} {currentCustomer.lastName} —{" "}
+                  {billingAddress.address}
+                  {billingAddress.complementaryAddress
+                    ? `, ${billingAddress.complementaryAddress}`
+                    : ""}
                 </div>
                 <div>
-                  {billingAddress.postalCode} {billingAddress.city} — {billingAddress.country}
+                  {billingAddress.postalCode} {billingAddress.city} —{" "}
+                  {billingAddress.country}
                 </div>
                 <div>{currentCustomer.phoneNumber}</div>
               </>
             ) : (
-              <div style={{ color: "#6b7280" }}>Aucune adresse de facturation.</div>
+              <div style={{ color: "#6b7280" }}>
+                Aucune adresse de facturation.
+              </div>
             )}
           </div>
 
@@ -1560,7 +1474,10 @@ useEffect(() => {
         Paiement
       </h2>
 
-      <div className="pay-grid" style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: 18 }}>
+      <div
+        className="pay-grid"
+        style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: 18 }}
+      >
         {/* Carte bancaire */}
         <section className="category-card" style={{ padding: 16 }}>
           <label className="pay-method" style={payMethodRow}>
@@ -1571,27 +1488,19 @@ useEffect(() => {
 
           <>
             <div style={stripeInfo}>
-              Paiement sécurisé via Stripe. Vous serez redirigé pour renseigner votre carte.
+              Paiement sécurisé via Stripe. Vous serez redirigé pour renseigner
+              votre carte.
             </div>
             <button className="dp-pay-btn" onClick={handleStripePay}>
               Payer ma commande
             </button>
           </>
 
-          <div style={{ height: 10 }} />
-
-          {/* PayPal */}
-          <label className="pay-method" style={payMethodRow}>
-            <input type="radio" name="pay2" readOnly />
-            <span style={{ fontWeight: 800 }}>PayPal</span>
-          </label>
-
-          <>
-            <div style={stripeInfo}>Vous serez redirigé vers PayPal pour finaliser le paiement.</div>
-            <button className="dp-pay-btn" onClick={handlePayPal}>
-              Payer avec PayPal
-            </button>
-          </>
+          {paymentConfirmed && (
+            <div style={{ marginTop: 10, color: "#16a34a", fontWeight: 700 }}>
+              ✅ Paiement confirmé. Votre commande est en cours de préparation !
+            </div>
+          )}
         </section>
 
         {/* Récapitulatif */}
@@ -1733,7 +1642,12 @@ const stripeInfo = {
   margin: "8px 0 12px",
   fontWeight: 600,
 };
-const payMethodRow = { display: "flex", alignItems: "center", gap: 10, marginBottom: 8 };
+const payMethodRow = {
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  marginBottom: 8,
+};
 const summaryCard = {
   background: "#fff",
   borderRadius: 12,

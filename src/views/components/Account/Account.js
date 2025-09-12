@@ -67,7 +67,7 @@ const norm = (s) =>
 /* === Est-ce livré ? on couvre "livré", "delivré/delivre", et "delivered" === */
 const isDelivered = (status) => {
   const n = norm(status);
-  return n.includes("livre") || n.includes("delivre") || n.includes("delivered");
+  return n.includes("livre") || n.includes("delivre") || n.includes("delivered") || n.includes("effectuee") ;
 };
 
 /* ===== Component ===== */

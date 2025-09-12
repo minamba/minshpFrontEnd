@@ -26,6 +26,9 @@ import {ApplicationAdmin} from './ApplicationAdmin';
 import {DeliveryPayment} from './DeliveryPayment';
 import {PackageProfilAdmin} from './PackageProfilAdmin';
 import {SubCategoryAdmin} from './SubCategoryAdmin';
+import {InvoiceAdmin} from './InvoiceAdmin';
+import Success from './Succes';
+import {Cancel} from './Cancel';
 import {Cart} from './Cart';
 import {News} from './News';
 import {FeatureCategoryAdmin} from './FeatureCategoryAdmin';
@@ -55,6 +58,7 @@ import {getOrderRequest} from '../../lib/actions/OrderActions';
 import {getPackageProfilRequest} from '../../lib/actions/PackageProfilActions';
 import {getSubCategoryRequest} from '../../lib/actions/SubCategoryActions';
 import {getContentCategoryRequest} from '../../lib/actions/ShippingActions';
+import {getInvoiceRequest} from '../../lib/actions/InvoiceActions';
 
 export const BaseApp = () => {
 
@@ -77,6 +81,7 @@ export const BaseApp = () => {
         dispatch(getPackageProfilRequest());
         dispatch(getSubCategoryRequest());
         dispatch(getContentCategoryRequest());
+        dispatch(getInvoiceRequest());
     }, []);
 
     useEffect(() => {
@@ -120,8 +125,11 @@ export const BaseApp = () => {
                         <Route path="/admin/billingAddress" element={<RequireAuth><BillingAddressAdmin/></RequireAuth>}/>
                         <Route path="/admin/deliveryAddress" element={<RequireAuth><DeliveryAddressAdmin/></RequireAuth>}/>
                         <Route path="/admin/orders" element={<RequireAuth><OrderAdmin/></RequireAuth>}/>
+                        <Route path="/admin/invoices" element={<RequireAuth><InvoiceAdmin/></RequireAuth>}/>
                         <Route path="/admin/packageProfil" element={<RequireAuth><PackageProfilAdmin/></RequireAuth>}/>
                         <Route path="/admin/subCategory" element={<RequireAuth><SubCategoryAdmin/></RequireAuth>}/>
+                        <Route path="/success" element={<Success/>}/>
+                        <Route path="/cancel" element={<Cancel/>}/>
                     </Routes>
                 </main>
                 <Footer/>

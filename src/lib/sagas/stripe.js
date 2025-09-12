@@ -18,10 +18,11 @@ function* createCheckoutSession(action) {
       const { error } = yield call([stripe, stripe.redirectToCheckout], { sessionId });
       if (error) throw error;
   
-      yield put(actions.actionsStripe.CREATE_CHECKOUT_SESSION_SUCCESS());
+      yield put(actions.createCheckoutSessionSuccess(response.data));
     } catch (error) {
+      console.error("Stripe error:", error);
       yield put(
-        actions.actionsStripe.CREATE_CHECKOUT_SESSION_FAILURE({
+        actions.createCheckoutSessionFailure({
           error: error?.response?.data || error.message,
         })
       );
@@ -35,20 +36,14 @@ function* createCheckoutSession(action) {
    */
   function* confirmCheckout(action) {
     try {
-      const response = yield call(api.confirmCheckout, action.sessionId);
+      const response = yield call(api.confirmCheckout, action.payload);
       console.log("Stripe confirm result:", response.data);
   
-      yield put(
-        actions.actionsStripe.CONFIRM_CHECKOUT_SUCCESS({
-          orderId: response.data?.orderId,
-          orderNumber: response.data?.orderNumber,
-          shipmentId: response.data?.shipmentId,
-          trackingNumber: response.data?.trackingNumber,
-        })
-      );
+      yield put(actions.confirmCheckoutSessionSuccess(response.data));
     } catch (error) {
+      console.error("Stripe error:", error.message);
       yield put(
-        actions.actionsStripe.CONFIRM_CHECKOUT_FAILURE({
+        actions.confirmCheckoutSessionFailure({
           error: error?.response?.data || error.message,
         })
       );

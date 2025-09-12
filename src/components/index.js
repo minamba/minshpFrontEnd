@@ -294,6 +294,7 @@ export const Navbar = () => {
                 <Link to="/admin/billingAddress" onClick={() => setIsOpen(false)}>Adresses de facturation</Link>
                 <Link to="/admin/deliveryAddress" onClick={() => setIsOpen(false)}>Adresses de livraison</Link>
                 <Link to="/admin/packageProfil" onClick={() => setIsOpen(false)}>Profils de colis</Link>
+                <Link to="/admin/invoices" onClick={() => setIsOpen(false)}>Factures</Link>
               </div>
             )}
           </div>

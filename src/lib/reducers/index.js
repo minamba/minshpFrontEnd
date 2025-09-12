@@ -23,6 +23,7 @@ import shippingReducer from "./ShippingReducers";
 import packageprofilReducer from "./PackageProfilReducers";
 import subCategoryReducer from "./SubCategoryActions";
 import StripeReducer from "./StripeReducers";
+import invoiceReducer from "./InvoiceReducers";
 
 export default combineReducers({
     products : productReducer,
@@ -49,4 +50,5 @@ export default combineReducers({
     packageProfils : packageprofilReducer,
     subCategories : subCategoryReducer,
     stripe : StripeReducer,
+    invoices : invoiceReducer,
 })

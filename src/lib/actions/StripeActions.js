@@ -10,9 +10,10 @@ export const actionsStripe = {
 
 
 //create 
-export function createCheckoutSessionRequest() {
+export function createCheckoutSessionRequest(payload) {
     return {
         type: actionsStripe.CREATE_CHECKOUT_SESSION_REQUEST,
+        payload: payload,
     }
 }
 
@@ -32,9 +33,10 @@ export function createCheckoutSessionFailure(error) {
 
 
 //confirm
-export function confirmCheckoutSessionRequest() {
+export function confirmCheckoutSessionRequest(sessionId) {
     return {
         type: actionsStripe.CONFIRM_CHECKOUT_REQUEST,
+        payload: sessionId,
     }
 }
 

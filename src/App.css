@@ -1073,6 +1073,115 @@ h1 { text-align: center; }
   pointer-events: none !important;
 }
 
+
+/* ====== CHECKOUT / SUCCESS (page) ====== */
+.success-page{
+  display: grid;
+  place-items: center;
+  padding: clamp(32px, 6vw, 64px) 16px;
+}
+
+.success-card{
+  position: relative;
+  width: min(1100px, 92vw);
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 16px 40px rgba(0,0,0,.08);
+  padding: clamp(24px, 3vw, 48px);
+  text-align: center;
+}
+
+/* badge vert (déjà défini plus bas chez toi) — on centre juste */
+.success-badge{
+  width:72px;height:72px;border-radius:9999px;
+  display:grid;place-items:center;
+  color:#fff;
+  background: linear-gradient(135deg,#22c55e,#16a34a);
+  box-shadow:0 12px 24px rgba(22,163,74,.25);
+  position: relative;              /* sert d’ancre au .ring */
+  margin: 0 auto 12px;  
+}
+.success-badge .bi{ font-size: 32px; }
+
+/* titres + texte */
+.success-title{
+  margin: 0 0 8px;
+  font-size: clamp(28px, 4vw, 48px);
+  font-weight: 900;
+}
+.success-text{
+  max-width: 940px;
+  margin: 0 auto 20px;
+  color: #374151;
+  font-size: clamp(16px, 1.3vw, 18px);
+  line-height: 1.6;
+}
+
+/* actions */
+.success-actions{ display:flex; justify-content:center; }
+.success-home-btn,
+.success-home-btn:visited{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 18px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #3b79ff, #2c5dff);
+  color: #fff;
+  font-weight: 800;
+  text-decoration: none;       /* pas de soulignement */
+  box-shadow: 0 10px 24px rgba(0,0,0,.08);
+}
+.success-home-btn:hover{
+  filter: brightness(.98);
+  transform: translateY(-1px);
+}
+.success-home-btn:focus-visible{
+  outline: 2px solid #93c5fd;
+  outline-offset: 3px;
+}
+
+/* CANCEL PAGE */
+.cancel-badge {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  margin: 0 auto 20px auto;
+}
+
+.cancel-page {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 80vh;
+  background-color: #f8f9fa;
+}
+
+.cancel-card {
+  background: #fff;
+  padding: 2rem;
+  border-radius: 12px;
+  text-align: center;
+  max-width: 500px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.cancel-title {
+  margin-top: 1rem;
+  font-size: 1.8rem;
+  color: #dc3545;
+}
+
+.cancel-text {
+  margin: 1rem 0;
+  color: #555;
+}
+
 /* ===================== RESPONSIVE ===================== */
 @media (max-width: 1200px){
   .product-main{
