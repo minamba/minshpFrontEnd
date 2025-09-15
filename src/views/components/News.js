@@ -4,6 +4,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { Link, useNavigate } from "react-router-dom";
 import { addToCartRequest, saveCartRequest } from "../../lib/actions/CartActions";
 import { GenericModal } from "../../components";
+import { calculPrice } from "../../lib/utils/Helpers";
 
 // Helpers
 const parseDate = (val) => {
@@ -82,7 +83,7 @@ export const News = () => {
         : (Number.isFinite(catCodeVal) ? catCodeVal : null);
 
       // ===== Prix affiché & drapeaux UI =====
-      const displayPrice = codePrice ?? productPromoPrice ?? priceRef;
+      let displayPrice = calculPrice(product);
       const hasAnyPromo  = (codePrice != null) || (productPromoPrice != null);
 
       const creationTs = parseDate(product?.creationDate)?.getTime() ?? 0;

@@ -51,11 +51,45 @@ function* deleteOrder(action) {
 }
 
 
+function* downloadInvoicePDF(action) {
+    try {
+      const orderId = action.payload;
+      const res = yield call(api.downloadInvoice, orderId); // blob
+  
+      // Essayer de lire le nom de fichier depuis l'en-tête
+      let filename = `invoice-${orderId}.pdf`;
+      const dispo = res.headers?.["content-disposition"];
+      if (dispo) {
+        const match = /filename\*?=(?:UTF-8'')?["']?([^"';]+)["']?/i.exec(dispo);
+        if (match?.[1]) filename = decodeURIComponent(match[1]);
+      }
+  
+      // Créer le blob et déclencher le téléchargement
+      const blob = new Blob([res.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename; // force le save
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+  
+      yield put(actions.downloadInvoiceSuccess(orderId));
+    } catch (error) {
+      yield put(
+        actions.downloadInvoiceFailure(error?.response?.data || error?.message || "Erreur téléchargement")
+      );
+    }
+  }
+
+
 function* watchGetOrders() {
     yield takeLatest(actions.actionsOrder.GET_ORDER_REQUEST, getOrders);
     yield takeLatest(actions.actionsOrder.ADD_ORDER_REQUEST, addOrder);
     yield takeLatest(actions.actionsOrder.UPDATE_ORDER_REQUEST, updateOrder);
     yield takeLatest(actions.actionsOrder.DELETE_ORDER_REQUEST, deleteOrder);
+    yield takeLatest(actions.actionsOrder.DOWNLOAD_ORDER_INVOICE_REQUEST, downloadInvoicePDF);
 }
 
 function* ordersSaga() {

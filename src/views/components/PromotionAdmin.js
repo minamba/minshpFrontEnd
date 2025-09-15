@@ -9,6 +9,7 @@ import {
 } from '../../lib/actions/PromotionActions';
 import { getProductUserRequest } from '../../lib/actions/ProductActions';
 import { updateCartRequest, getCartRequest } from '../../lib/actions/CartActions';
+import { calculPrice } from '../../lib/utils/Helpers';
 
 export const PromotionAdmin = () => {
   const promotionsFromStore = useSelector((state) => state.promotions.promotions) || [];
@@ -73,7 +74,7 @@ export const PromotionAdmin = () => {
   };
 
   const computePriceWithPromo = (product, promo) => {
-    const base = Number(product?.priceTtc ?? product?.price ?? 0);
+    const base = calculPrice(product);
     if (!promo || !isPromoActive(promo)) return base;
     const pct = Number(promo.purcentage) || 0;
     return +(base * (1 - pct / 100)).toFixed(2);
@@ -155,6 +156,7 @@ export const PromotionAdmin = () => {
         if (product) {
           const nextPromos = promotionsFromStore.filter(p => p.id !== id);
           const active = getActivePromoForProduct(productId, nextPromos);
+          product.priceTtcPromoted = null;
           const nextPrice = computePriceWithPromo(product, active); // si plus de promo active => prix TTC
           syncCartPrice(productId, nextPrice);
         }
@@ -184,6 +186,7 @@ export const PromotionAdmin = () => {
 
     // recalcul du prix : si la promo est expirée (end < today) => prix TTC
     const product = productsFromStore.find(p => String(p.id) === String(formData.idProduct));
+    let newPromo = null;
     if (product) {
       // on part de la liste actuelle, et on remplace/ajoute virtuellement la promo courante
       let projected = [...promotionsFromStore];
@@ -191,10 +194,12 @@ export const PromotionAdmin = () => {
         projected = projected.map(p => p.id === currentId ? { ...p, ...payload } : p);
       } else {
         projected = [{ ...payload, id: 'tmp' }, ...projected];
+        newPromo = projected.find(p => p.idProduct === String(product.id));
       }
 
       const active = getActivePromoForProduct(formData.idProduct, projected);
-      const nextPrice = computePriceWithPromo(product, active);
+      //const nextPrice = computePriceWithPromo(product, active);
+      const nextPrice = calculPrice(product) * (1 - Number(formData.purcentage) / 100);
       syncCartPrice(formData.idProduct, nextPrice);
     }
 

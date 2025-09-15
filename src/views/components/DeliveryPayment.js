@@ -1129,7 +1129,7 @@ const declaredValue = Number(baseTotal) || 0;
         ProductId: getPid(it),
         CustomerId: Number(currentCustomerId),
         Quantity: getQty(it),
-        ProductUnitPrice: getProductUnitPrice(it, productsFromStore),
+        ProductUnitPrice: it.price,
       })),
     };
   };

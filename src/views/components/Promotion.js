@@ -2,7 +2,12 @@ import React, { useMemo, useState, useEffect } from "react";
 import "../../App.css";
 import { useSelector, useDispatch } from "react-redux";
 import { Link, useNavigate } from "react-router-dom";
-import { addToCartRequest, saveCartRequest } from "../../lib/actions/CartActions";
+import {
+  addToCartRequest,
+  saveCartRequest,
+  updateCartRequest,
+  getCartRequest,
+} from "../../lib/actions/CartActions";
 import { GenericModal } from "../../components";
 
 /* ---------- Helpers ---------- */
@@ -16,6 +21,7 @@ const toNumOrNull = (v) => {
   const n = typeof v === "number" ? v : parseFloat(v);
   return Number.isFinite(n) ? n : null;
 };
+const nearlyEqual = (a, b, eps = 1e-3) => Math.abs(Number(a) - Number(b)) <= eps;
 
 /* ---------- Component ---------- */
 export const Promotion = () => {
@@ -27,7 +33,7 @@ export const Promotion = () => {
   const images   = useSelector((s) => s.images?.images)     || [];
   const items    = useSelector((s) => s.items?.items)       || [];
 
-  // Sauvegarde panier
+  // Sauvegarde panier Redux -> LS à chaque changement
   useEffect(() => { dispatch(saveCartRequest(items)); }, [items, dispatch]);
 
   // Image principale du produit
@@ -36,93 +42,146 @@ export const Promotion = () => {
     return productImages.length > 0 ? productImages[0].url : "/Images/placeholder.jpg";
   };
 
+  // ==== Calcul du prix affiché (même logique que la grille) ====
+  const computeDisplayPrice = (product) => {
+    if (!product) return 0;
+
+    const priceRef =
+      toNumOrNull(
+        typeof product.priceTtc === "number" ? product.priceTtc : parseFloat(product.priceTtc)
+      ) ?? 0;
+
+    const p0 = product?.promotions?.[0];
+    const hasProductPromo = (() => {
+      if (!p0) return false;
+      const pct = Number(p0.purcentage) || 0;
+      if (pct <= 0) return false;
+      const start = parseDate(p0.startDate);
+      const end   = parseDate(p0.endDate);
+      const now   = new Date();
+      const endOfDay = end ? new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59, 999) : null;
+      if (start && start > now) return false;
+      if (endOfDay && endOfDay < now) return false;
+      return true;
+    })();
+
+    const productPct    = hasProductPromo ? Number(p0?.purcentage) : 0;
+    const computedPromo = +(priceRef * (1 - productPct / 100)).toFixed(2);
+    const promoted      = toNumOrNull(
+      typeof product.priceTtcPromoted === "number"
+        ? product.priceTtcPromoted
+        : parseFloat(product.priceTtcPromoted)
+    );
+
+    const priceSubCat = toNumOrNull(
+      typeof product.priceTtcSubCategoryCodePromoted === "number"
+        ? product.priceTtcSubCategoryCodePromoted
+        : parseFloat(product.priceTtcSubCategoryCodePromoted)
+    );
+    const priceCat = toNumOrNull(
+      typeof product.priceTtcCategoryCodePromoted === "number"
+        ? product.priceTtcCategoryCodePromoted
+        : parseFloat(product.priceTtcCategoryCodePromoted)
+    );
+
+    let base = null;
+    if (priceSubCat != null) base = priceSubCat;
+    else if (priceCat != null) base = priceCat;
+    else if (hasProductPromo) base = Number.isFinite(promoted) ? promoted : computedPromo;
+    else base = priceRef;
+
+    const displayPrice = base * (product.tva / 100 + 1) + product.taxWithoutTvaAmount;
+    return +displayPrice.toFixed(2);
+  };
+
+  // ======= Sync LS + Redux quand les produits/promos changent =======
+  const writeCartPriceToLocalStorage = (productId, newPrice) => {
+    const ls = JSON.parse(localStorage.getItem("items") || "[]");
+    const next = (Array.isArray(ls) ? ls : []).map((it) =>
+      String(it.id) === String(productId) || String(it.productId) === String(productId)
+        ? { ...it, price: Number(newPrice) }
+        : it
+    );
+    localStorage.setItem("items", JSON.stringify(next));
+    return next;
+  };
+
+  const syncCartPrice = (productId, newPrice) => {
+    const inStore = (items || []).find(
+      (ci) => String(ci.id) === String(productId) || String(ci.productId) === String(productId)
+    );
+    const qty = inStore?.qty ?? 1;
+
+    if (inStore) {
+      const updated = { ...inStore, id: inStore.id ?? inStore.productId, price: Number(newPrice) };
+      dispatch(updateCartRequest(updated, qty));
+    }
+    writeCartPriceToLocalStorage(productId, newPrice);
+    dispatch(getCartRequest());
+  };
+
+  useEffect(() => {
+    // Recalcule tous les items du LS en fonction du store (produits/promos)
+    const ls = JSON.parse(localStorage.getItem("items") || "[]");
+    if (!Array.isArray(ls) || ls.length === 0) return;
+
+    ls.forEach((it) => {
+      const productId = it.productId ?? it.id;
+      const prod = products.find((p) => String(p.id) === String(productId));
+      if (!prod) return;
+
+      const newPrice = computeDisplayPrice(prod);
+      if (!nearlyEqual(it.price, newPrice)) {
+        syncCartPrice(productId, newPrice);
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [products]); // à chaque mise à jour produits/promos depuis le store
+
   /* ---------- Recherche + tri ---------- */
   const [search, setSearch]   = useState("");
   const [sortKey, setSortKey] = useState(""); // placeholder “Trier les produits”
 
   // Pré-calculs (prix/promo) puis filtre: on ne garde QUE les produits en promo
   const augmented = useMemo(() => {
-    return (products || []).map((product, index) => {
-      const name  =
-        product.name ||
-        product.title ||
-        `${product.brand || ""} ${product.model || ""}`.trim() ||
-        `Produit ${index + 1}`;
-      const brand = (product.brand || "").toString();
+    return (products || [])
+      .map((product, index) => {
+        const name  =
+          product.name ||
+          product.title ||
+          `${product.brand || ""} ${product.model || ""}`.trim() ||
+          `Produit ${index + 1}`;
+        const brand = (product.brand || "").toString();
 
-      const priceRef =
-        toNumOrNull(
-          typeof product.priceTtc === "number" ? product.priceTtc : parseFloat(product.priceTtc)
-        ) ?? 0;
+        const priceRef =
+          toNumOrNull(
+            typeof product.priceTtc === "number" ? product.priceTtc : parseFloat(product.priceTtc)
+          ) ?? 0;
 
-      // --- Promo produit (1re valide, dates inclusives jusqu'à 23:59:59) ---
-      const p0 = product?.promotions?.[0];
-      const hasProductPromo = (() => {
-        if (!p0) return false;
-        const pct = Number(p0.purcentage) || 0;
-        if (pct <= 0) return false;
-        const start = parseDate(p0.startDate);
-        const end   = parseDate(p0.endDate);
-        const now   = new Date();
-        const endOfDay = end ? new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59, 999) : null;
-        if (start && start > now) return false;
-        if (endOfDay && endOfDay < now) return false;
-        return true;
-      })();
+        // On réutilise le calcul unique pour le prix d’affichage
+        const displayPrice = computeDisplayPrice(product);
 
-      const productPct    = hasProductPromo ? Number(p0?.purcentage) : 0;
-      const computedPromo = +(priceRef * (1 - productPct / 100)).toFixed(2);
-      const promoted      = toNumOrNull(
-        typeof product.priceTtcPromoted === "number"
-          ? product.priceTtcPromoted
-          : parseFloat(product.priceTtcPromoted)
-      );
+        // Produit en promo si prix affiché < prix de référence
+        const hasAnyPromo = displayPrice < priceRef - 1e-6;
 
-      // --- Prix via codes (PRIORITÉ sous-cat -> cat) ---
-      const priceSubCat = toNumOrNull(
-        typeof product.priceTtcSubCategoryCodePromoted === "number"
-          ? product.priceTtcSubCategoryCodePromoted
-          : parseFloat(product.priceTtcSubCategoryCodePromoted)
-      );
-      const priceCat = toNumOrNull(
-        typeof product.priceTtcCategoryCodePromoted === "number"
-          ? product.priceTtcCategoryCodePromoted
-          : parseFloat(product.priceTtcCategoryCodePromoted)
-      );
+        const discountRate = priceRef > 0 ? (priceRef - displayPrice) / priceRef : 0;
+        const creationTs = (() => {
+          const d = parseDate(product?.creationDate);
+          return d ? d.getTime() : 0;
+        })();
 
-      // --- Prix affiché selon la priorité ---
-      let displayPrice = null;
-      if (priceSubCat != null) {
-        displayPrice = priceSubCat;
-      } else if (priceCat != null) {
-        displayPrice = priceCat;
-      } else if (hasProductPromo) {
-        displayPrice = Number.isFinite(promoted) ? promoted : computedPromo;
-      } else {
-        displayPrice = priceRef;
-      }
-
-      // Produit considéré “en promo” si le prix affiché < prix de référence
-      const hasAnyPromo = displayPrice < priceRef - 1e-6;
-
-      const discountRate = priceRef > 0 ? (priceRef - displayPrice) / priceRef : 0;
-      const creationTs = (() => {
-        const d = parseDate(product?.creationDate);
-        return d ? d.getTime() : 0;
-      })();
-
-      return {
-        product,
-        name,
-        brand,
-        priceRef,
-        displayPrice,
-        hasAnyPromo,
-        discountRate,     // 0..1
-        creationTs
-      };
-    })
-    .filter(a => a.hasAnyPromo); // <- seulement les produits en promo (inclut SOUS-CAT)
+        return {
+          product,
+          name,
+          brand,
+          priceRef,
+          displayPrice,
+          hasAnyPromo,
+          discountRate,     // 0..1
+          creationTs,
+        };
+      })
+      .filter((a) => a.hasAnyPromo); // seulement les produits en promo
   }, [products]);
 
   // Recherche + tri
@@ -255,7 +314,14 @@ export const Promotion = () => {
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      const payloadItem = { id: product.id, name, price: displayPrice, image: img, packageProfil: product.packageProfil, containedCode: product.containedCode };
+                      const payloadItem = {
+                        id: product.id,
+                        name,
+                        price: displayPrice,
+                        image: img,
+                        packageProfil: product.packageProfil,
+                        containedCode: product.containedCode
+                      };
                       dispatch(addToCartRequest(payloadItem, 1));
                       setLastAdded({ id: product.id, name });
                       setShowAdded(true);

@@ -4,6 +4,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { addToCartRequest, saveCartRequest } from "../../lib/actions/CartActions";
 import { GenericModal } from "../../components";
+import { calculPrice } from "../../lib/utils/Helpers";
 
 /* -------- Helpers communs -------- */
 const parseDate = (val) => {
@@ -116,8 +117,7 @@ export const SubCategory = () => {
         return Number.isFinite(v) ? v : null;
       })();
 
-      const displayPrice =
-        priceCat ?? (hasProductPromo ? (Number.isFinite(promoted) ? promoted : computedPromo) : priceRef);
+      let displayPrice = calculPrice(product);
 
       const hasAnyPromo = priceCat != null || hasProductPromo;
 

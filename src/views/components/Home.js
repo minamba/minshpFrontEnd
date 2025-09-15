@@ -4,6 +4,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { Link, useNavigate } from "react-router-dom";
 import { addToCartRequest, saveCartRequest } from '../../lib/actions/CartActions';
 import { GenericModal } from '../../components/index';
+import { calculPrice } from '../../lib/utils/Helpers';
 
 export const Home = () => {
   const products  = useSelector((state) => state.products.products) || [];
@@ -205,7 +206,7 @@ export const Home = () => {
               (Number.isFinite(catCodeVal) ? catCodeVal : null);
 
             // ==== Prix affiché & indicateurs UI ====
-            const displayPrice = (codePrice ?? productPromoPrice ?? priceRef);
+            const displayPrice = calculPrice(product);
             const hasAnyPromo  = (codePrice != null) || (productPromoPrice != null);
 
             const [euros, cents] = displayPrice.toFixed(2).split('.');

@@ -59,8 +59,12 @@ import {getPackageProfilRequest} from '../../lib/actions/PackageProfilActions';
 import {getSubCategoryRequest} from '../../lib/actions/SubCategoryActions';
 import {getContentCategoryRequest} from '../../lib/actions/ShippingActions';
 import {getInvoiceRequest} from '../../lib/actions/InvoiceActions';
+import useCartPriceSync from "../../hooks/useCartPriceSync";
 
 export const BaseApp = () => {
+
+
+    useCartPriceSync();
 
     const dispatch = useDispatch();
     useEffect(() => {

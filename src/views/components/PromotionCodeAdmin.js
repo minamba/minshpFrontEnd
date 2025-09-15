@@ -9,6 +9,7 @@ import {
 } from '../../lib/actions/PromotionCodeActions';
 import { getProductUserRequest } from '../../lib/actions/ProductActions';
 import { updateCartRequest, getCartRequest } from '../../lib/actions/CartActions';
+import { calculPrice } from '../../lib/utils/Helpers';
 
 export const PromotionCodeAdmin = () => {
   const dispatch = useDispatch();
@@ -89,7 +90,6 @@ export const PromotionCodeAdmin = () => {
   const syncCartPrice = (productId, price) => {
     const inStore = (cartItems || []).find(ci => String(ci.id) === String(productId));
     const qty = inStore?.qty ?? 1;
-
     if (inStore) {
       const updated = { ...inStore, price: Number(price) };
       dispatch(updateCartRequest(updated, qty));
@@ -98,8 +98,47 @@ export const PromotionCodeAdmin = () => {
     dispatch(getCartRequest());
   };
 
+  // ===== BULK SYNC selon Cat / Sous-cat (MAJEUR) =====
+  const getCategoryIdFromProduct = (p) => {
+    const direct =
+      p?.idCategory ?? p?.categoryId ?? p?.idCategorie ?? p?.categorieId ?? p?.category?.id;
+    if (direct != null && /^\d+$/.test(String(direct))) return String(direct);
+    const name = (p?.categoryName ?? p?.category ?? p?.categorie ?? p?.Category ?? '')
+      .toString().trim().toLowerCase();
+    if (name) {
+      const mapped = categoryNameToId.get(name);
+      if (mapped) return mapped;
+    }
+    return null;
+  };
+  const getSubCategoryIdFromProduct = (p) =>
+    p?.idSubCategory ?? p?.subCategoryId ?? p?.IdSubCategory ?? null;
+  const getCategoryIdFromSubCategory = (sc) =>
+    sc?.idCategory ?? sc?.IdCategory ?? sc?.categoryId ?? null;
+
+  const bulkSyncCartByCategoryOrSubcategory = ({ categoryId = null, subCategoryId = null }) => {
+    const ls = JSON.parse(localStorage.getItem('items') || '[]');
+    if (!Array.isArray(ls) || ls.length === 0) return;
+
+    const idsInCart = new Set(ls.map(it => String(it.id)));
+    const affected = productsFromStore.filter(p => {
+      if (!idsInCart.has(String(p.id))) return false;
+      if (subCategoryId) return String(getSubCategoryIdFromProduct(p)) === String(subCategoryId);
+      if (categoryId)    return String(getCategoryIdFromProduct(p)) === String(categoryId);
+      return false;
+    });
+
+    affected.forEach(p => {
+      const newPrice = calculPrice(p);
+      if (newPrice == null) return;
+      const current = ls.find(it => String(it.id) === String(p.id))?.price;
+      if (current == null || Math.abs(Number(current) - Number(newPrice)) > 0.001) {
+        syncCartPrice(p.id, newPrice);
+      }
+    });
+  };
+
   // ===== Id helpers robustes =====
-  // Map nom (ou title) de catégorie -> id (string)
   const categoryNameToId = useMemo(() => {
     const m = new Map();
     (categoriesFromStore || []).forEach(c => {
@@ -112,30 +151,15 @@ export const PromotionCodeAdmin = () => {
     return m;
   }, [categoriesFromStore]);
 
-  const getCategoryIdFromProduct = (p) => {
-    // 1) Id direct
-    const direct =
-      p?.idCategory ?? p?.categoryId ?? p?.idCategorie ?? p?.categorieId ?? p?.category?.id;
-    if (direct != null && /^\d+$/.test(String(direct))) {
-      return String(direct);
-    }
-    // 2) Nom -> id
-    const name = (p?.categoryName ?? p?.category ?? p?.categorie ?? p?.Category ?? '')
-      .toString()
-      .trim()
-      .toLowerCase();
-    if (name) {
-      const mapped = categoryNameToId.get(name);
-      if (mapped) return mapped;
-    }
-    return null;
+  // Fallbacks par idPromotionCode (édition)
+  const findCategoryIdForPromo = (promoId) => {
+    const cat = categoriesFromStore.find(c => String(c?.idPromotionCode) === String(promoId));
+    return cat?.id ?? cat?.Id ?? null;
   };
-
-  const getSubCategoryIdFromProduct = (p) =>
-    p?.idSubCategory ?? p?.subCategoryId ?? p?.IdSubCategory ?? null;
-
-  const getCategoryIdFromSubCategory = (sc) =>
-    sc?.idCategory ?? sc?.IdCategory ?? sc?.categoryId ?? null;
+  const findSubCategoryIdForPromo = (promoId) => {
+    const sc = subCategoriesFromStore.find(s => String(s?.idPromotionCode) === String(promoId));
+    return sc?.id ?? sc?.Id ?? null;
+  };
 
   // Maps rapides
   const categoriesById = useMemo(() => {
@@ -167,12 +191,11 @@ export const PromotionCodeAdmin = () => {
     dispatch(getCartRequest());
   }, [cartItems, dispatch]);
 
-  // Quand la liste des codes promo change, on recharge aussi les produits
   useEffect(() => {
     dispatch(getProductUserRequest());
   }, [promotionCodesFromStore, dispatch]);
 
-  // ======= 🔁 MAJ PRIX PANIER via priceTtcCategoryCodePromoted =======
+  // ======= 🔁 MAJ PRIX PANIER via calculPrice à chaque MAJ produits =======
   const toNumOrNull = (v) => {
     if (v === null || v === undefined) return null;
     if (String(v).toLowerCase() === 'null') return null;
@@ -188,7 +211,7 @@ export const PromotionCodeAdmin = () => {
       const prod = productsFromStore.find(p => String(p.id) === String(it.id));
       if (!prod) return;
 
-      const catPrice = toNumOrNull(prod?.priceTtcCategoryCodePromoted);
+      const catPrice = calculPrice(prod);
       if (catPrice == null) return;
 
       const current = toNumOrNull(it.price);
@@ -211,8 +234,6 @@ export const PromotionCodeAdmin = () => {
   }, [showModal]);
 
   // ===== Listes filtrées =====
-
-  // Sous-catégories en fonction de la catégorie choisie
   const filteredSubCategories = useMemo(() => {
     if (!selectedCategoryId) return subCategoriesFromStore;
     return subCategoriesFromStore.filter(
@@ -220,7 +241,6 @@ export const PromotionCodeAdmin = () => {
     );
   }, [subCategoriesFromStore, selectedCategoryId]);
 
-  // Produits (priorité sous-catégorie, sinon catégorie)
   const filteredProductsForModal = useMemo(() => {
     let base = productsFromStore;
 
@@ -251,7 +271,7 @@ export const PromotionCodeAdmin = () => {
     selectedCategoryId,
     selectedSubCategoryId,
     formData.idProduct,
-    categoryNameToId, // <= important si mapping nom->id change
+    categoryNameToId,
   ]);
 
   // Si la sous-cat sélectionnée n’appartient plus à la catégorie, on la reset
@@ -298,7 +318,6 @@ export const PromotionCodeAdmin = () => {
   const handleCategoryChange = (e) => {
     const catId = String(e.target.value);
     setSelectedCategoryId(catId);
-    // reset sous-cat & produit pour cohérence
     setSelectedSubCategoryId('');
     setFormData((prev) => ({ ...prev, idCategory: catId, idSubCategory: '', idProduct: '' }));
   };
@@ -306,7 +325,6 @@ export const PromotionCodeAdmin = () => {
   const handleSubCategoryChange = (e) => {
     const scId = String(e.target.value);
     setSelectedSubCategoryId(scId);
-    // reset produit quand on change de sous-cat
     setFormData((prev) => ({ ...prev, idSubCategory: scId, idProduct: '' }));
   };
 
@@ -341,27 +359,28 @@ export const PromotionCodeAdmin = () => {
     setCurrentId(promo.id);
 
     const prod = findProductByPromo(promo);
-    const subCatFromPromo = promo?.idSubCategory ?? '';
-    const subCatFromProd  = prod ? getSubCategoryIdFromProduct(prod) : '';
-    const scIdStr         = String(subCatFromPromo || subCatFromProd || '');
 
-    const catFromPromo    = promo?.idCategory ?? '';
-    let catFromSubCat     = '';
-    if (scIdStr) {
-      const sc = subCategoriesById.get(String(scIdStr));
-      catFromSubCat = sc ? getCategoryIdFromSubCategory(sc) : '';
-    }
-    const catFromProd     = prod ? getCategoryIdFromProduct(prod) : '';
-    const catIdStr        = String(catFromPromo || catFromSubCat || catFromProd || '');
+    const scFromPromo   = promo?.idSubCategory ?? '';
+    const scFromProd    = prod ? getSubCategoryIdFromProduct(prod) : '';
+    const scFromLink    = findSubCategoryIdForPromo(promo?.id);
+    const scId          = scFromPromo || scFromProd || scFromLink || '';
 
-    setSelectedCategoryId(catIdStr || '');
-    setSelectedSubCategoryId(scIdStr || '');
+    const catFromPromo  = promo?.idCategory ?? '';
+    const catFromSubCat = scId ? getCategoryIdFromSubCategory(subCategoriesById.get(String(scId))) : '';
+    const catFromProd   = prod ? getCategoryIdFromProduct(prod) : '';
+    const catFromLink   = findCategoryIdForPromo(promo?.id);
+    const catId         = catFromPromo || catFromSubCat || catFromProd || catFromLink || '';
+
+    const prodId        = prod ? String(prod.id) : (promo?.idProduct ? String(promo.idProduct) : '');
+
+    setSelectedCategoryId(catId ? String(catId) : '');
+    setSelectedSubCategoryId(scId ? String(scId) : '');
 
     setFormData({
       name: promo?.name ?? '',
-      idProduct: prod ? String(prod.id) : (promo?.idProduct ? String(promo.idProduct) : ''),
-      idCategory: catIdStr || '',
-      idSubCategory: scIdStr || '',
+      idProduct: prodId,
+      idCategory: catId ? String(catId) : '',
+      idSubCategory: scId ? String(scId) : '',
       purcentage: promo?.purcentage ?? 0,
       startDate: promo?.startDate ? String(promo.startDate).slice(0, 10) : '',
       endDate:   promo?.endDate   ? String(promo.endDate).slice(0, 10)   : '',
@@ -373,23 +392,20 @@ export const PromotionCodeAdmin = () => {
 
   const handleDeleteClick = async (id) => {
     const doomed = promotionCodesFromStore.find(p => p.id === id);
-    const productId = doomed?.idProduct;
 
     if (window.confirm('Supprimer cette promotion ?')) {
       await dispatch(deletePromotionCodeRequest(id));
-
-      if (productId) {
-        const product = productsFromStore.find(p => String(p.id) === String(productId));
-        if (product) {
-          const nextPromos = promotionCodesFromStore.filter(p => p.id !== id);
-          const active     = getActivePromoForProduct(productId, nextPromos);
-          const nextPrice  = computePriceWithPromo(product, active);
-          syncCartPrice(productId, nextPrice);
-        }
-      }
-
       await dispatch(getPromotionCodesRequest());
       await dispatch(getProductUserRequest());
+
+      // 🔁 MAJ panier selon la promo supprimée (sauf promo produit)
+      if (!doomed?.idProduct) {
+        if (doomed?.idSubCategory) {
+          bulkSyncCartByCategoryOrSubcategory({ subCategoryId: doomed.idSubCategory });
+        } else if (doomed?.idCategory) {
+          bulkSyncCartByCategoryOrSubcategory({ categoryId: doomed.idCategory });
+        }
+      }
     }
   };
 
@@ -403,12 +419,9 @@ export const PromotionCodeAdmin = () => {
     let idSubCategoryToSend = null;
 
     if (hasSub) {
-      // sous-catégorie prioritaire
       idSubCategoryToSend = String(selectedSubCategoryId);
-      idCategoryToSend    = null; // on neutralise la catégorie
-      // si pas de produit sélectionné, idProductToSend reste null
+      idCategoryToSend    = null;
     } else {
-      // pas de sous-cat → on cible la catégorie si fournie
       idSubCategoryToSend = null;
       idCategoryToSend    = selectedCategoryId || formData.idCategory || null;
     }
@@ -417,7 +430,7 @@ export const PromotionCodeAdmin = () => {
       id: currentId,
       name: formData.name,
       idProduct: idProductToSend,
-      idCategory: selectedCategoryId,
+      idCategory: idCategoryToSend,        // <-- FIX: on envoie bien la valeur calculée
       idSubCategory: idSubCategoryToSend,
       purcentage: Number(formData.purcentage) || 0,
       startDate: formData.startDate,
@@ -434,6 +447,19 @@ export const PromotionCodeAdmin = () => {
 
     await dispatch(getPromotionCodesRequest());
     await dispatch(getProductUserRequest());
+
+    // 🔁 MAJ panier après création/màj:
+    // - Si PRODUIT ciblé => pas de MAJ (sera appliqué via Cart quand l’utilisateur saisit le code)
+    // - Si SOUS-CAT ciblée => MAJ tous les items du panier appartenant à la sous-cat
+    // - Sinon si CAT ciblée => MAJ tous les items du panier appartenant à la cat
+    if (!idProductToSend) {
+      if (idSubCategoryToSend) {
+        bulkSyncCartByCategoryOrSubcategory({ subCategoryId: idSubCategoryToSend });
+      } else if (idCategoryToSend) {
+        bulkSyncCartByCategoryOrSubcategory({ categoryId: idCategoryToSend });
+      }
+    }
+
     setShowModal(false);
   };
 
@@ -452,7 +478,6 @@ export const PromotionCodeAdmin = () => {
   };
 
   const getRowSubCategoryName = (promo) => {
-
     const subCategory = subCategoriesFromStore.find(sc => sc.idPromotionCode === promo.id);
     if (subCategory) return subCategory.name
     else return "NONE";
@@ -513,8 +538,8 @@ export const PromotionCodeAdmin = () => {
                 style={{ cursor: 'pointer' }}
               >
                 <td className={getRowProductName(promo) !== 'NONE' ? 'fw-bold text-primary' : 'fw-bold text-danger'}>{getRowProductName(promo)}</td>
-                <td className='fw-bold text-muted'>{getRowCategoryName(promo)}</td>
-                <td className='fw-bold text-muted'>{getRowSubCategoryName(promo)}</td>
+                <td className={getRowCategoryName(promo) !== 'NONE' ? 'fw-bold text-primary' : 'fw-bold text-danger'}>{getRowCategoryName(promo)}</td>
+                <td className={getRowSubCategoryName(promo) !== 'NONE' ? 'fw-bold text-primary' : 'fw-bold text-danger'}>{getRowSubCategoryName(promo)}</td>
                 <td>{promo.name}</td>
                 <td>{promo.purcentage}%</td>
                 <td className='text-success fw-bold'>
@@ -617,7 +642,7 @@ export const PromotionCodeAdmin = () => {
                 </select>
               </div>
 
-              {/* Produit (filtré par sous-catégorie prioritairement, sinon catégorie) */}
+              {/* Produit */}
               <div className="mb-3">
                 <label>Produit (facultatif)</label>
                 <select

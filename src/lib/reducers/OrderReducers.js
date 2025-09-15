@@ -35,6 +35,9 @@ export default function orderReducer(state = initialState, action) {
         case actionsOrder.DELETE_ORDER_SUCCESS:
             return state.orders.filter(order => order.id !== action.payload.id)
 
+        case actionsOrder.DOWNLOAD_ORDER_INVOICE_FAILURE:
+            return { ...state, error: action.payload };
+
         default:
             return state
     }

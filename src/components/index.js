@@ -17,6 +17,7 @@ import { Badge } from 'react-bootstrap';
 import { getPromotionCodesRequest } from '../lib/actions/PromotionCodeActions';
 import { useNavigate } from 'react-router-dom';
 import { logout } from '../lib/actions/AccountActions';
+import { calculPrice } from '../lib/utils/Helpers';
 
 
 

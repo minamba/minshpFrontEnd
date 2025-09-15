@@ -15,3 +15,10 @@ export const updateOrder = (order) => {
 export const deleteOrder = (id) => {
     return axios.delete(`/order/${id}`);
 }
+
+export const downloadInvoice = (orderId) => {
+    return axios.get(`/order/${orderId}/invoice`, {
+      responseType: "blob",
+    });
+  };
+

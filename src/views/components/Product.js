@@ -133,6 +133,12 @@ export const Product = () => {
   // 2) Si priceTtcSubCategoryCodePromoted est défini => on l’affiche
   const priceFromSubCategoryCode = toNum(product?.priceTtcSubCategoryCodePromoted);
 
+  // 3) Si priceTtcPromoted est défini => on l’affiche
+  const priceTtcPromoted = toNum(product?.priceTtcPromoted);
+
+  // 4) Si price est défini => on l’affiche
+  const price = toNum(product?.price);
+
   // 2) Si purcentageCodePromoted est défini => le badge affiche ce pourcentage
   const pctFromCategoryCode = product?.purcentageCodePromoted != null && product.purcentageCodePromoted !== ''
     ? Number(product.purcentageCodePromoted)
@@ -151,9 +157,10 @@ export const Product = () => {
 
   // Prix affiché (priorité au prix de code catégorie s’il existe)
   const displayPrice = useMemo(() => {
-    if (priceFromSubCategoryCode != null) return priceFromSubCategoryCode;
-    if (priceFromCategoryCode != null && priceFromSubCategoryCode == null) return priceFromCategoryCode;
-    return discountedPriceProduct;
+    if (priceFromSubCategoryCode != null) return priceFromSubCategoryCode * (product?.tva / 100 + 1) + product?.taxWithoutTvaAmount;
+    else if (priceFromCategoryCode != null && priceFromSubCategoryCode == null) return priceFromCategoryCode * (product?.tva / 100 + 1) + product?.taxWithoutTvaAmount;
+    else if (priceTtcPromoted != null && priceFromSubCategoryCode == null && priceFromCategoryCode == null ) return priceTtcPromoted * (product?.tva / 100 + 1) + product?.taxWithoutTvaAmount;
+    else return price * (product?.tva / 100 + 1) + product?.taxWithoutTvaAmount
   }, [priceFromCategoryCode, discountedPriceProduct]);
 
   // Pourcentage affiché sur le badge (priorité au % de code catégorie s’il existe)
@@ -283,7 +290,7 @@ export const Product = () => {
                 )}
 
                 <p className="price-lead">
-                  <em>{product?.taxWithoutTvaAmount}</em>
+                  <em>{product?.taxWithoutTva}</em>
                 </p>
 
                 <p className="product-description">

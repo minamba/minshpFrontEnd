@@ -13,6 +13,7 @@ import {
 
 import { getOrderRequest } from "../../lib/actions/OrderActions";
 import { getCustomerRequest } from "../../lib/actions/CustomerActions";
+import { downloadInvoiceRequest } from "../../lib/actions/OrderActions";
 
 /* ===== Helpers robustes d'ID/labels ===== */
 const getId = (x) =>
@@ -216,6 +217,11 @@ export const InvoiceAdmin = () => {
     await dispatch(getInvoiceRequest?.());
   };
 
+  const getCustomerNumber = (cid) => {
+    const cust = customers.find((c) => c.id === cid);
+    return cust ? cust.clientNumber : "—";
+  };
+
   /* ===== UI ===== */
   return (
     <div className="container py-3">
@@ -246,19 +252,17 @@ export const InvoiceAdmin = () => {
               rows.map((r) => (
                 <tr key={r.id}>
                   <td>{r.invoiceNumber}</td>
-                  <td>{r.customerId ?? "—"}</td>
+                  <td>{getCustomerNumber(r.customerId)}</td>
                   <td>{r.orderNo ?? r.orderId ?? "—"}</td>
                   <td>
                     {r.pdfUrl ? (
-                      <a
-                        href={r.pdfUrl}
-                        target="_blank"
-                        rel="noreferrer"
+                      <button
+                        type="button"
                         className="btn btn-sm btn-outline-primary"
-                        onClick={(e) => e.stopPropagation()}
+                        onClick={() => dispatch(downloadInvoiceRequest(r.orderId))}
                       >
                         <i className="bi bi-download" /> Télécharger
-                      </a>
+                      </button>
                     ) : (
                       <span className="text-muted">—</span>
                     )}

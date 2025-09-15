@@ -8,6 +8,7 @@ import { Address } from "./Address";
 import { useSelector, useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { logout } from "../../../lib/actions/AccountActions";
+import { downloadInvoiceRequest } from "../../../lib/actions/OrderActions";
 import { Link } from "react-router-dom";
 
 /* ===== Helpers ===== */
@@ -327,8 +328,8 @@ export const Account = () => {
                         </div>
 
                         <div className="order-actions">
-                          <button className="gbtn gbtn--light">Télécharger la facture</button>
-                          <button className="gbtn gbtn--primary">Commander à nouveau</button>
+                          <button className="gbtn gbtn--primary" onClick={() => dispatch(downloadInvoiceRequest(o.id))}>Télécharger la facture</button>
+                          {/* <button className="gbtn gbtn--primary">Commander à nouveau</button> */}
                         </div>
                       </div>
                     )}

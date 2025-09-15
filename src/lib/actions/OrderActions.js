@@ -14,6 +14,10 @@ export const actionsOrder = {
     ADD_ORDER_REQUEST : "ADD_ORDER_REQUEST",
     ADD_ORDER_SUCCESS : "ADD_ORDER_SUCCESS",
     ADD_ORDER_FAILURE : "ADD_ORDER_FAILURE",
+
+    DOWNLOAD_ORDER_INVOICE_REQUEST : "DOWNLOAD_ORDER_INVOICE_REQUEST",
+    DOWNLOAD_ORDER_INVOICE_SUCCESS : "DOWNLOAD_ORDER_INVOICE_SUCCESS",
+    DOWNLOAD_ORDER_INVOICE_FAILURE : "DOWNLOAD_ORDER_INVOICE_FAILURE",
 }
 
 
@@ -103,6 +107,28 @@ export function addOrderSuccess(order) {
 export function addOrderFailure(error) {
     return {
         type: actionsOrder.ADD_ORDER_FAILURE,
+        payload: error,
+    }
+}
+
+//download invoice
+export function downloadInvoiceRequest(orderId) {
+    return {
+        type: actionsOrder.DOWNLOAD_ORDER_INVOICE_REQUEST,
+        payload: orderId,
+    }
+}
+
+export function downloadInvoiceSuccess(orderId) {
+    return {
+        type: actionsOrder.DOWNLOAD_ORDER_INVOICE_SUCCESS,
+        payload: orderId,
+    }
+}
+
+export function downloadInvoiceFailure(error) {
+    return {
+        type: actionsOrder.DOWNLOAD_ORDER_INVOICE_FAILURE,
         payload: error,
     }
 }

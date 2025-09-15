@@ -12,23 +12,38 @@ import {
 import { GenericModal } from "../../components";
 import { getPromotionCodesRequest } from "../../lib/actions/PromotionCodeActions"; // ✅ CHARGER LES CODES
 
-// ---------- helpers ----------
+/* ---------- helpers format/ids ---------- */
 const fmt = (n) =>
   new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" })
     .format(Number.isFinite(n) ? n : 0);
 
-const norm = (s) => String(s ?? "").trim().toUpperCase();
+// normalisation forte (espaces multiples, casse, unicode)
+const norm = (s) =>
+  String(s ?? "")
+    .normalize("NFKC")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toUpperCase();
+
+// parse date robuste: ISO, timestamp, ou DD/MM/YYYY
+const parseDateLoose = (v) => {
+  if (!v) return null;
+  if (typeof v === "string") {
+    const m = v.match(/^(\d{2})\/(\d{2})\/(\d{4})$/); // DD/MM/YYYY
+    if (m) {
+      const dd = Number(m[1]), mm = Number(m[2]), yyyy = Number(m[3]);
+      return new Date(yyyy, mm - 1, dd);
+    }
+  }
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? null : d;
+};
 
 // promo active : start <= now <= end(23:59:59)
 const isPromoActive = (p) => {
-  const toDate = (v) => {
-    if (!v) return null;
-    const d = new Date(v);
-    return Number.isNaN(d.getTime()) ? null : d;
-  };
-  const now = new Date();
-  const start = toDate(p?.startDate);
-  const end   = toDate(p?.endDate);
+  const now   = new Date();
+  const start = parseDateLoose(p?.startDate);
+  const end   = parseDateLoose(p?.endDate);
   const endOfDay = end ? new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59, 999) : null;
   if (start && start > now) return false;
   if (endOfDay && endOfDay < now) return false;
@@ -38,10 +53,10 @@ const isPromoActive = (p) => {
 const getCategoryIdFromProduct = (p) =>
   p?.idCategory ?? p?.categoryId ?? p?.idCategorie ?? p?.categorieId ?? p?.category?.id ?? p?.category ?? null;
 
-// ✅ helper sous-catégorie
 const getSubCategoryIdFromProduct = (p) =>
   p?.idSubCategory ?? p?.subCategoryId ?? p?.IdSubCategory ?? null;
 
+/* ---------- LocalStorage helpers ---------- */
 // MAJ prix d’un item dans le localStorage (items)
 const updateLsPrice = (productId, newPrice) => {
   let arr = [];
@@ -68,6 +83,7 @@ const readPromoMap = () => {
 const writePromoMap = (map) =>
   localStorage.setItem("promo_map", JSON.stringify(map));
 
+/* ---------- Component ---------- */
 export const Cart = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -196,6 +212,16 @@ export const Cart = () => {
     const code = norm(promoInput);
     if (!code) return;
 
+    // si les codes ne sont pas encore chargés, éviter faux négatif
+    if ((promotionCodes?.length ?? 0) === 0) {
+      setPromoModal({
+        open: true,
+        variant: "info",
+        message: "Chargement des codes en cours, réessayez dans un instant…"
+      });
+      return;
+    }
+
     // 🔒 Bloquer si ce code est déjà appliqué à AU MOINS un produit actuellement présent
     const alreadyAppliedSomewhere = items.some(it => promoAppliedMap[String(it.id)] === code);
     if (alreadyAppliedSomewhere) {
@@ -207,8 +233,14 @@ export const Cart = () => {
       return;
     }
 
-    // Trouver la promo par son nom (code)
-    const promo = promotionCodes.find(p => norm(p?.name) === code) || null;
+    // Trouver la promo par différents champs possibles (name/code/Code)
+    const promo =
+      promotionCodes.find(p =>
+        norm(p?.name) === code ||
+        norm(p?.code) === code ||
+        norm(p?.Code) === code
+      ) || null;
+
     if (!promo || !isPromoActive(promo)) {
       setAppliedCode(null);
       setPromoModal({ open: true, message: "Code promo invalide ou expiré.", variant: "warning" });
@@ -271,8 +303,9 @@ export const Cart = () => {
     for (const it of items) {
       if (!affectedProductIds.includes(String(it.id))) continue;
 
-      const base = Number(it.price) || 0; // empile les remises
-      const newPrice = +(base * (1 - pct / 100)).toFixed(2);
+      // 💸 applique le pourcentage du code sur le prix AFFICHÉ actuel de la ligne
+      const base = Number(it.price) || 0;
+      const newPrice = +((base * (1 - pct / 100))).toFixed(2);
 
       if (Math.abs((Number(it.price) || 0) - newPrice) < 0.001) continue;
 
@@ -313,7 +346,7 @@ export const Cart = () => {
       setPromoAppliedMap(nextMap);
       writePromoMap(nextMap);
 
-      // ❌ pas de IsUsed ici (on le fera au paiement)
+      // ❌ pas de IsUsed ici (à gérer au paiement si besoin)
     } else {
       setAppliedCode(null);
       setPromoModal({
@@ -350,8 +383,15 @@ export const Cart = () => {
           )}
 
           {items.map((it) => {
-            const { cls, label } = getStockUi(it.id);
+            const prod = products.find(p => String(p.id) === String(it.id));
+            const raw   = (prod?.stockStatus ?? "").trim();
+            const lower = raw.toLowerCase();
+            const isIn  = lower === "en stock";
+            const isOut = lower === "en rupture";
+            const cls   = isIn ? "in" : isOut ? "out" : "warn";
+            const label = lower.includes("plus que") ? "Bientôt en rupture" : raw || "Disponibilité limitée";
             const codeOnThis = promoAppliedMap[String(it.id)] || null;
+
             return (
               <div key={it.id} className="cart-line">
                 <div className="line-left">

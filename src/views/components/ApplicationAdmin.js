@@ -1,3 +1,4 @@
+// src/views/components/ApplicationAdmin.jsx
 import React, { useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
@@ -15,16 +16,26 @@ export const ApplicationAdmin = () => {
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [currentId, setCurrentId] = useState(null);
-  const [formData, setFormData] = useState({
+
+  const emptyForm = {
     displayNewProductNumber: 0,
     startDate: '',
-    endDate: ''
-  });
+    endDate: '',
+    // ↓↓↓ nouveaux champs ↓↓↓
+    defaultDropOffMondialRelay: '',
+    defaultDropOffChronoPost: '',
+    defaultDropOffUps: '',
+    defaultDropLaposte: '',
+    societyName: '',
+    societyAddress: '',
+    societyZipCode: '',
+    societyCity: '',
+  };
+  const [formData, setFormData] = useState(emptyForm);
 
   // Helpers
   const toInputDate = (val) => {
     if (!val) return '';
-    // essai ISO → yyyy-MM-dd sinon tronque
     const d = new Date(val);
     return isNaN(d) ? String(val).slice(0, 10) : d.toISOString().slice(0, 10);
   };
@@ -35,9 +46,7 @@ export const ApplicationAdmin = () => {
   };
 
   // Chargement initial
-  useEffect(() => {
-    dispatch(getApplicationRequest());
-  }, [dispatch]);
+  useEffect(() => { dispatch(getApplicationRequest()); }, [dispatch]);
 
   // Bloque le scroll + ESC
   useEffect(() => {
@@ -63,23 +72,30 @@ export const ApplicationAdmin = () => {
   const handleAddClick = () => {
     setIsEditing(false);
     setCurrentId(null);
-    setFormData({
-      displayNewProductNumber: 0,
-      startDate: '',
-      endDate: ''
-    });
+    setFormData(emptyForm);
     setShowModal(true);
   };
 
   const handleEditClick = (app) => {
     setIsEditing(true);
     setCurrentId(app.id);
+
     setFormData({
-      id: app.id,
       displayNewProductNumber: Number(app.displayNewProductNumber ?? 0),
       startDate: toInputDate(app.startDate),
-      endDate: toInputDate(app.endDate)
+      endDate: toInputDate(app.endDate),
+
+      defaultDropOffMondialRelay: app.defaultDropOffMondialRelay ?? '',
+      defaultDropOffChronoPost:  app.defaultDropOffChronoPost ?? '',
+      defaultDropOffUps:         app.defaultDropOffUps ?? '',
+      defaultDropLaposte:        app.defaultDropLaposte ?? '',
+
+      societyName:    app.societyName ?? '',
+      societyAddress: app.societyAddress ?? '',
+      societyZipCode: app.societyZipCode ?? '',
+      societyCity:    app.societyCity ?? '',
     });
+
     setShowModal(true);
   };
 
@@ -93,7 +109,6 @@ export const ApplicationAdmin = () => {
   const handleChange = (e) => {
     const { name, value } = e.target;
     if (name === 'displayNewProductNumber') {
-      // garde un entier >= 0
       const n = Math.max(0, parseInt(value || '0', 10));
       setFormData((prev) => ({ ...prev, [name]: n }));
     } else {
@@ -108,10 +123,21 @@ export const ApplicationAdmin = () => {
       return;
     }
 
+    // Payload complet avec les nouveaux champs
     const payload = {
       displayNewProductNumber: Number(formData.displayNewProductNumber ?? 0),
       startDate: formData.startDate || null,
-      endDate: formData.endDate || null
+      endDate: formData.endDate || null,
+
+      defaultDropOffMondialRelay: formData.defaultDropOffMondialRelay || null,
+      defaultDropOffChronoPost:  formData.defaultDropOffChronoPost || null,
+      defaultDropOffUps:         formData.defaultDropOffUps || null,
+      defaultDropLaposte:        formData.defaultDropLaposte || null,
+
+      societyName:    formData.societyName || null,
+      societyAddress: formData.societyAddress || null,
+      societyZipCode: formData.societyZipCode || null,
+      societyCity:    formData.societyCity || null,
     };
 
     if (isEditing) {
@@ -138,9 +164,17 @@ export const ApplicationAdmin = () => {
         <table className="table table-striped table-hover shadow-sm">
           <thead className="table-dark">
             <tr>
-              <th>Nb nouveaux produits à afficher</th>
+              <th>Nb produits à afficher</th>
               <th>Date début</th>
               <th>Date fin</th>
+              <th>DropOff_mondialRelay</th>
+              <th>DropOff_chronoPost</th>
+              <th>DropOff_ups</th>
+              <th>DropOff_laposte</th>
+              <th>SocietyName</th>
+              <th>SocietyAddress</th>
+              <th>SocietyZipCode</th>
+              <th>SocietyCity</th>
               <th style={{ width: 140 }}>Actions</th>
             </tr>
           </thead>
@@ -154,6 +188,17 @@ export const ApplicationAdmin = () => {
                 <td>{app.displayNewProductNumber ?? '—'}</td>
                 <td className="text-muted">{app.startDate || '—'}</td>
                 <td className="text-muted">{app.endDate || '—'}</td>
+
+                <td>{app.defaultDropOffMondialRelay ?? '—'}</td>
+                <td>{app.defaultDropOffChronoPost ?? '—'}</td>
+                <td>{app.defaultDropOffUps ?? '—'}</td>
+                <td>{app.defaultDropLaposte ?? '—'}</td>
+
+                <td>{app.societyName ?? '—'}</td>
+                <td>{app.societyAddress ?? '—'}</td>
+                <td>{app.societyZipCode ?? '—'}</td>
+                <td>{app.societyCity ?? '—'}</td>
+
                 <td>
                   <button
                     className="btn btn-sm btn-warning me-2"
@@ -172,7 +217,7 @@ export const ApplicationAdmin = () => {
             ))}
             {sortedApplications.length === 0 && (
               <tr>
-                <td colSpan={4} className="text-center text-muted py-4">
+                <td colSpan={12} className="text-center text-muted py-4">
                   Aucune application.
                 </td>
               </tr>
@@ -193,51 +238,139 @@ export const ApplicationAdmin = () => {
             aria-modal="true"
             aria-labelledby="application-modal-title"
             onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: 920 }}
           >
             <h2 id="application-modal-title" className="mb-3">
               {isEditing ? 'Modifier l’application' : 'Ajouter une application'}
             </h2>
 
             <form onSubmit={handleSubmit}>
-              <div className="mb-3">
-                <label>Nb de produits à afficher</label>
-                <input
-                  type="number"
-                  name="displayNewProductNumber"
-                  min={0}
-                  className="form-control"
-                  value={formData.displayNewProductNumber}
-                  onChange={handleChange}
-                  required
-                />
+              {/* Ligne 1 : nombre + dates */}
+              <div className="row g-3">
+                <div className="col-md-4">
+                  <label className="form-label">Nb de produits à afficher</label>
+                  <input
+                    type="number"
+                    name="displayNewProductNumber"
+                    min={0}
+                    className="form-control"
+                    value={formData.displayNewProductNumber}
+                    onChange={handleChange}
+                    required
+                  />
+                </div>
+                <div className="col-md-4">
+                  <label className="form-label">Date début</label>
+                  <input
+                    type="date"
+                    name="startDate"
+                    className="form-control"
+                    value={formData.startDate}
+                    onChange={handleChange}
+                  />
+                </div>
+                <div className="col-md-4">
+                  <label className="form-label">Date fin</label>
+                  <input
+                    type="date"
+                    name="endDate"
+                    className="form-control"
+                    value={formData.endDate}
+                    min={formData.startDate || undefined}
+                    onChange={handleChange}
+                  />
+                </div>
               </div>
 
-              <div className="mb-3">
-                <label>Date début</label>
-                <input
-                  type="date"
-                  name="startDate"
-                  className="form-control"
-                  value={formData.startDate}
-                  onChange={handleChange}
-                  
-                />
+              <hr className="my-3" />
+
+              {/* Ligne 2 : DropOffs */}
+              <div className="row g-3">
+                <div className="col-md-6">
+                  <label className="form-label">DropOff Mondial Relay</label>
+                  <input
+                    name="defaultDropOffMondialRelay"
+                    className="form-control"
+                    placeholder="Ex: CODE_MR"
+                    value={formData.defaultDropOffMondialRelay}
+                    onChange={handleChange}
+                  />
+                </div>
+                <div className="col-md-6">
+                  <label className="form-label">DropOff Chronopost</label>
+                  <input
+                    name="defaultDropOffChronoPost"
+                    className="form-control"
+                    placeholder="Ex: CODE_CHRP"
+                    value={formData.defaultDropOffChronoPost}
+                    onChange={handleChange}
+                  />
+                </div>
+                <div className="col-md-6">
+                  <label className="form-label">DropOff UPS</label>
+                  <input
+                    name="defaultDropOffUps"
+                    className="form-control"
+                    placeholder="Ex: CODE_UPS"
+                    value={formData.defaultDropOffUps}
+                    onChange={handleChange}
+                  />
+                </div>
+                <div className="col-md-6">
+                  <label className="form-label">DropOff La Poste</label>
+                  <input
+                    name="defaultDropLaposte"
+                    className="form-control"
+                    placeholder="Ex: CODE_LAPOSTE"
+                    value={formData.defaultDropLaposte}
+                    onChange={handleChange}
+                  />
+                </div>
               </div>
 
-              <div className="mb-3">
-                <label>Date fin</label>
-                <input
-                  type="date"
-                  name="endDate"
-                  className="form-control"
-                  value={formData.endDate}
-                  min={formData.startDate || undefined}
-                  onChange={handleChange}
-                  
-                />
+              <hr className="my-3" />
+
+              {/* Ligne 3 : Société */}
+              <div className="row g-3">
+                <div className="col-md-6">
+                  <label className="form-label">Nom de la société</label>
+                  <input
+                    name="societyName"
+                    className="form-control"
+                    value={formData.societyName}
+                    onChange={handleChange}
+                  />
+                </div>
+                <div className="col-md-6">
+                  <label className="form-label">Adresse de la société</label>
+                  <input
+                    name="societyAddress"
+                    className="form-control"
+                    value={formData.societyAddress}
+                    onChange={handleChange}
+                  />
+                </div>
+                <div className="col-md-4">
+                  <label className="form-label">Code postal</label>
+                  <input
+                    name="societyZipCode"
+                    className="form-control"
+                    value={formData.societyZipCode}
+                    onChange={handleChange}
+                  />
+                </div>
+                <div className="col-md-8">
+                  <label className="form-label">Ville</label>
+                  <input
+                    name="societyCity"
+                    className="form-control"
+                    value={formData.societyCity}
+                    onChange={handleChange}
+                  />
+                </div>
               </div>
 
-              <div className="d-flex justify-content-end">
+              <div className="d-flex justify-content-end mt-3">
                 <button
                   type="button"
                   className="btn btn-secondary me-2"

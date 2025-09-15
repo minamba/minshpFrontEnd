@@ -4,6 +4,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { addToCartRequest, saveCartRequest } from "../../lib/actions/CartActions";
 import { GenericModal } from "../../components";
+import { calculPrice } from "../../lib/utils/Helpers";
 
 // ---------- Helpers ----------
 const parseDate = (val) => {
@@ -149,7 +150,7 @@ export const Category = () => {
       const codePrice = (subCatCodeVal ?? catCodeVal);
 
       // ==== Prix affiché & indicateurs UI ====
-      const displayPrice = (codePrice ?? productPromoPrice ?? priceRef);
+      let displayPrice = calculPrice(product);
       const hasAnyPromo  = (codePrice != null) || (productPromoPrice != null);
 
       // Pour les tris “remise” & “promo d’abord”

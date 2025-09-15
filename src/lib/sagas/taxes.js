@@ -1,6 +1,8 @@
 import {takeEvery, takeLatest, call, put, fork} from "redux-saga/effects";
 import * as actions from "../actions/TaxeActions";
+import * as actionsProduct from "../actions/ProductActions";
 import * as api from "../api/taxes";
+import * as apiProduct from "../api/products";
 
 
 
@@ -34,6 +36,8 @@ function* updateTaxe(action) {
         console.log("Taxe updated :",response.data);
         const taxes = yield call (api.getTaxes);
         yield put (actions.getTaxeSuccess({taxes : taxes.data}));
+        const products = yield call (apiProduct.getProducts);
+        yield put (actionsProduct.getProductUserSuccess({products : products.data}));
     }
     catch (error) {
         yield put (actions.updateTaxeFailure({error : error.response?.data || error.message}));
