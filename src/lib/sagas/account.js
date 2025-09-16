@@ -1,6 +1,8 @@
 import {takeEvery, takeLatest, call, put, fork} from "redux-saga/effects";
 import * as actions from "../actions/AccountActions";
+import * as actionsCustomers from "../actions/CustomerActions";
 import * as api from "../api/account";
+import * as apiCustomers from "../api/customers";
 import { getCustomerRequest } from "../actions/CustomerActions";
 import { decodeJwt } from "../utils/jwt";
 
@@ -93,6 +95,10 @@ function* Register(action) {
         localStorage.setItem("access_token", token);
         yield put(actions.loginSuccess({ response: tokenRes.data }));
       }
+
+      const customers = yield call (apiCustomers.getCustomers);
+      yield put (actionsCustomers.getCustomerSuccess({customers : customers.data}));
+
   
       // 3) navigation
       if (navigate) navigate("/", { replace: true }); // ou navigate("/login")

@@ -69,15 +69,15 @@ export const News = () => {
 
       const productPct     = hasProductPromo ? Number(p0?.purcentage) : 0;
       const computedPromo  = +(priceRef * (1 - productPct / 100)).toFixed(2);
-      const promotedFromBE = Number(toNum(product?.priceTtcPromoted));
+      const promotedFromBE = Number(toNum(product?.priceHtPromoted));
       const productPromoPrice = hasProductPromo
         ? (Number.isFinite(promotedFromBE) ? promotedFromBE : computedPromo)
         : null;
 
       // ===== Prix via CODES (priorité sous-cat → cat) =====
       // ⚠️ NE PAS inclure priceTtcPromoted ici (sinon on contourne la vérif de date)
-      const subCatCodeVal = Number(toNum(product?.priceTtcSubCategoryCodePromoted));
-      const catCodeVal    = Number(toNum(product?.priceTtcCategoryCodePromoted));
+      const subCatCodeVal = Number(toNum(product?.priceHtSubCategoryCodePromoted));
+      const catCodeVal    = Number(toNum(product?.priceHtCategoryCodePromoted));
       const codePrice = Number.isFinite(subCatCodeVal)
         ? subCatCodeVal
         : (Number.isFinite(catCodeVal) ? catCodeVal : null);

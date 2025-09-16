@@ -60,11 +60,14 @@ import {getSubCategoryRequest} from '../../lib/actions/SubCategoryActions';
 import {getContentCategoryRequest} from '../../lib/actions/ShippingActions';
 import {getInvoiceRequest} from '../../lib/actions/InvoiceActions';
 import useCartPriceSync from "../../hooks/useCartPriceSync";
+import useAuthSync from "../../hooks/useAuthSync";
+import { getPromotionRequest } from "../../lib/actions/PromotionActions";
 
 export const BaseApp = () => {
 
 
     useCartPriceSync();
+    useAuthSync({ tokenKeys: ["access_token"] });
 
     const dispatch = useDispatch();
     useEffect(() => {
@@ -75,6 +78,7 @@ export const BaseApp = () => {
         dispatch(getImageRequest());
         dispatch(getVideoRequest());
         dispatch(getFeatureCategoryRequest());
+        dispatch(getPromotionRequest());
         dispatch(getPromotionCodesRequest());
         dispatch(getApplicationRequest());
         dispatch(getCustomerRequest());

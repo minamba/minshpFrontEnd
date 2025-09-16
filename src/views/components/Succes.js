@@ -16,6 +16,7 @@ export default function Success() {
       await dispatch(confirmCheckoutSessionRequest(sessionId));
       await dispatch(saveCartRequest([]));
       localStorage.setItem("items", "[]");
+      localStorage.removeItem("promo_map");
     })();
   }, [sessionId, dispatch]);
 

@@ -161,7 +161,8 @@ export const UserInformation = ({ user = {} }) => {
     if (currentCustomer) {
       if (currentCustomer.firstName != null) setFirstName(currentCustomer.firstName);
       if (currentCustomer.lastName != null) setLastName(currentCustomer.lastName);
-      if (currentCustomer.pseudo != null) setPseudo(currentCustomer.pseudo);
+      // ✅ resync pseudo même si null côté API
+      setPseudo(currentCustomer?.pseudo ?? "");
       if (currentCustomer.civilite != null) setCivility(currentCustomer.civilite);
 
       // 🔁 resync phone {dial, local} depuis currentCustomer.phoneNumber
@@ -172,14 +173,13 @@ export const UserInformation = ({ user = {} }) => {
     }
   }, [currentCustomer]);
 
-  // Validations
+  // Validations (pseudo optionnel)
   const profileValid = useMemo(() => {
     const hasNames = firstName.trim().length > 0 && lastName.trim().length > 0;
-    const hasPseudo = pseudo.trim().length > 0;
     const birthOk = birthdate ? !Number.isNaN(new Date(birthdate).getTime()) : true;
     const phoneOk = cleanDigits(phoneLocal).length > 0; // simple check
-    return hasNames && hasPseudo && birthOk && phoneOk;
-  }, [firstName, lastName, pseudo, birthdate, phoneLocal]);
+    return hasNames && birthOk && phoneOk; // pseudo NON requis
+  }, [firstName, lastName, birthdate, phoneLocal]);
 
   const passwordValid = useMemo(
     () => currentPassword.length >= 1 && newPassword.length >= 6,
@@ -226,7 +226,8 @@ export const UserInformation = ({ user = {} }) => {
       LastName: lastName.trim(),
       Email: email,
       BirthDate: birthdate || null,
-      Pseudo: pseudo.trim(),
+      // ✅ envoyer null si vide
+      Pseudo: (pseudo || "").trim() || null,
       Actif: true,
       Phone: phoneE164,
     };
@@ -354,7 +355,7 @@ export const UserInformation = ({ user = {} }) => {
             className="form-control"
             value={pseudo}
             onChange={(e) => setPseudo(e.target.value)}
-            placeholder="Votre pseudo"
+            placeholder="Votre pseudo (optionnel)"
           />
         </div>
 
@@ -382,7 +383,7 @@ export const UserInformation = ({ user = {} }) => {
         Changer de mot de passe
       </h3>
 
-      <form onSubmit={changePassword} className="grid-2 gap-12" aria-label="Formulaire changement mot de passe">
+      <form onSubmit={changePassword} className="grid-2 gap-12" aria-label="Formulaire changement de mot de passe">
         <div className="form-col">
           <span>
             Mot de passe actuel <span style={{ color: "#ef4444" }}>*</span>

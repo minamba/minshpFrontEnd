@@ -46,6 +46,7 @@ function* deleteCustomer(action) {
             yield put (actions.getCustomerSuccess({customers : response.data}));
     }
     catch (error) {
+        console.log("Customer deleted error :",error);
         yield put (actions.deleteCustomerFailure({error : error.response?.data || error.message}));
     }
 }

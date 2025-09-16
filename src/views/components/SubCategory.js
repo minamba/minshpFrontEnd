@@ -95,23 +95,23 @@ export const SubCategory = () => {
       const productPct    = hasProductPromo ? Number(p0.purcentage) : 0;
       const computedPromo = +(priceRef * (1 - productPct / 100)).toFixed(2);
       const promoted      = toNumOrNull(
-        typeof product.priceTtcPromoted === "number"
-          ? product.priceTtcPromoted
-          : parseFloat(product.priceTtcPromoted)
+        typeof product.priceHtPromoted === "number"
+          ? product.priceHtPromoted
+          : parseFloat(product.priceHtPromoted)
       );
 
       // Promo par code catégorie (si présent côté produit)
 
       const priceCat = (() => {
 
-        const priceTtcSubCategoryCodePromoted = product?.priceTtcSubCategoryCodePromoted;
-        const priceTtcCategoryCodePromoted    = product?.priceTtcCategoryCodePromoted;
-        const priceTtcPromoted                = product?.priceTtcPromoted;
+        const priceHtSubCategoryCodePromoted = product?.priceHtSubCategoryCodePromoted;
+        const priceHtCategoryCodePromoted    = product?.priceHtCategoryCodePromoted;
+        const priceHtPromoted                = product?.priceHtPromoted;
 
         let dPrice = null;
-        if (priceTtcSubCategoryCodePromoted !== null) dPrice = priceTtcSubCategoryCodePromoted;
-        if (priceTtcCategoryCodePromoted !== null && priceTtcSubCategoryCodePromoted == null) dPrice = priceTtcCategoryCodePromoted;
-        if (priceTtcPromoted !== null && priceTtcCategoryCodePromoted == null && priceTtcSubCategoryCodePromoted == null) dPrice = priceTtcPromoted;
+        if (priceHtSubCategoryCodePromoted !== null) dPrice = priceHtSubCategoryCodePromoted;
+        if (priceHtCategoryCodePromoted !== null && priceHtSubCategoryCodePromoted == null) dPrice = priceHtCategoryCodePromoted;
+        if (priceHtPromoted !== null && priceHtCategoryCodePromoted == null && priceHtSubCategoryCodePromoted == null) dPrice = priceHtPromoted;
 
         const v = toNumOrNull(dPrice);
         return Number.isFinite(v) ? v : null;

@@ -1,5 +1,5 @@
 // src/pages/auth/LoginPage.jsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import "bootstrap-icons/font/bootstrap-icons.css";
 import "../../../App.css";
 import { useNavigate } from "react-router-dom";
@@ -9,35 +9,50 @@ import { loginRequest } from "../../../lib/actions/AccountActions";
 const FORGOT_URL = "https://localhost:7183/api/auth/forgot-password"; // <-- adapte l'URL si besoin
 
 export default function LoginPage() {
-  const dispatch = useDispatch();
-  const navigate = useNavigate();
+  const dispatch  = useDispatch();
+  const navigate  = useNavigate();
 
-  const [email, setEmail]       = useState("");
-  const [password, setPassword] = useState("");
-  const [remember, setRemember] = useState(true);
-  const [showPwd, setShowPwd]   = useState(false);
+  // ---------- Login state ----------
+  const [email, setEmail]         = useState("");
+  const [password, setPassword]   = useState("");
+  const [remember, setRemember]   = useState(true);
+  const [showPwd, setShowPwd]     = useState(false);
 
-  // --- Forgot modal state
-  const [forgotOpen, setForgotOpen] = useState(false);
-  const [forgotEmail, setForgotEmail] = useState("");
+  // ---------- Forgot modal state ----------
+  const [forgotOpen, setForgotOpen]       = useState(false);
+  const [forgotEmail, setForgotEmail]     = useState("");
   const [forgotLoading, setForgotLoading] = useState(false);
-  const [forgotError, setForgotError] = useState("");
-  const [forgotDone, setForgotDone] = useState(false);
+  const [forgotError, setForgotError]     = useState("");
+  const [forgotDone, setForgotDone]       = useState(false);
 
-  // Redux
+  // ---------- Redux ----------
   const { loading, error, isAuth } = useSelector((s) => s.account);
 
+  // Prefill email from localStorage
   useEffect(() => {
     const saved = localStorage.getItem("remember_email");
-    if (saved) setEmail(saved);
+    if (saved) {
+      setEmail(saved);
+      setRemember(true);
+    }
   }, []);
 
+  // Redirect if already authenticated
   useEffect(() => {
     if (isAuth) navigate("/", { replace: true });
   }, [isAuth, navigate]);
 
+  // Basic validation
+  const emailOk    = useMemo(() => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email), [email]);
+  const canSubmit  = emailOk && password.length > 0 && !loading;
+
   const handleLogin = (e) => {
     e.preventDefault();
+
+    // persist/clear remembered email
+    if (remember) localStorage.setItem("remember_email", email);
+    else localStorage.removeItem("remember_email");
+
     dispatch(loginRequest({ email, password, remember, navigate }));
   };
 
@@ -49,6 +64,7 @@ export default function LoginPage() {
     setForgotEmail(email || "");
     setForgotOpen(true);
   };
+
   const closeForgot = () => {
     setForgotOpen(false);
     setForgotLoading(false);
@@ -69,26 +85,26 @@ export default function LoginPage() {
 
     setForgotLoading(true);
     try {
-      // Appel API simple – adapte l’URL et le payload selon ton backend
       const res = await fetch(FORGOT_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        // message neutre côté UX (ne pas révéler si l'email existe)
         body: JSON.stringify({ email: forgotEmail }),
       });
-      // On ne révèle pas si l'email existe : message générique
+      // On garde un message neutre même si l'API répond en erreur
       if (!res.ok) {
-        // on garde un message neutre
+        // no-op : on affiche le message générique ci-dessous
       }
       setForgotDone(true);
     } catch {
-      // message neutre aussi en cas d’erreur réseau
+      // message générique même si erreur réseau
       setForgotDone(true);
     } finally {
       setForgotLoading(false);
     }
   };
 
-  // Fermer la modale sur ESC
+  // Close modal on ESC
   useEffect(() => {
     if (!forgotOpen) return;
     const onKey = (e) => e.key === "Escape" && closeForgot();
@@ -101,7 +117,7 @@ export default function LoginPage() {
       <div className="auth-card" role="dialog" aria-labelledby="login-title">
         <h1 id="login-title" className="auth-title">Connexion</h1>
 
-        <form onSubmit={handleLogin} className="auth-form">
+        <form onSubmit={handleLogin} className="auth-form" noValidate>
           <label className="auth-field">
             <span>Email</span>
             <input
@@ -112,8 +128,16 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               required
               autoComplete="username"
+              aria-invalid={email.length > 0 && !emailOk}
+              aria-describedby="login-email-hint"
             />
+            {!emailOk && email.length > 0 && (
+              <small id="login-email-hint" style={{ color: "#dc2626", fontWeight: 600 }}>
+                Adresse email invalide.
+              </small>
+            )}
           </label>
+
           <label className="auth-field">
             <span>Mot de passe</span>
             <div className="auth-pass-wrap">
@@ -147,15 +171,18 @@ export default function LoginPage() {
               <span>Se souvenir de moi</span>
             </label>
 
-            {/* lien -> ouverture modale */}
             <a href="#" className="auth-link" onClick={openForgot}>
               Mot de passe oublié&nbsp;?
             </a>
           </div>
 
-          {error && <div className="auth-error" role="alert">{error}</div>}
+          {error && (
+            <div className="auth-error" role="alert">
+              {error}
+            </div>
+          )}
 
-          <button type="submit" className="auth-btn" disabled={loading}>
+          <button type="submit" className="auth-btn" disabled={!canSubmit}>
             {loading ? <span className="btn-spinner" aria-hidden="true" /> : "Se connecter"}
           </button>
         </form>
@@ -167,11 +194,7 @@ export default function LoginPage() {
 
       {/* --------- MODALE "Mot de passe oublié" --------- */}
       {forgotOpen && (
-        <div
-          className="gmodal-backdrop"
-          role="presentation"
-          onClick={closeForgot}
-        >
+        <div className="gmodal-backdrop" role="presentation" onClick={closeForgot}>
           <div
             className="gmodal-panel"
             role="dialog"
@@ -180,7 +203,14 @@ export default function LoginPage() {
             onClick={(e) => e.stopPropagation()}
             style={{ maxWidth: 560, textAlign: "left" }}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 6,
+              }}
+            >
               <h3 id="forgot-title" className="gmodal-title" style={{ margin: 0 }}>
                 Réinitialisation du mot de passe
               </h3>
@@ -194,27 +224,28 @@ export default function LoginPage() {
               </button>
             </div>
 
-            <form onSubmit={sendForgot}>
+            <form onSubmit={sendForgot} noValidate>
               <div style={{ marginTop: 10 }}>
                 <label className="auth-field">
                   <span>Email</span>
                   <input
                     className="auth-input"
                     type="email"
-                    placeholder="Email"
+                    placeholder="vous@exemple.com"
                     value={forgotEmail}
                     onChange={(e) => setForgotEmail(e.target.value)}
                     required
                     autoFocus
+                    aria-invalid={forgotEmail.length > 0 && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(forgotEmail)}
                   />
                 </label>
 
                 <p style={{ margin: "8px 0 14px", color: "#374151" }}>
-                  Saisissez l’adresse email que vous avez utilisée pour créer votre compte client afin
-                  de recevoir un lien de réinitialisation de mot de passe.
+                  Saisissez l’adresse email que vous avez utilisée pour créer votre compte
+                  afin de recevoir un lien de réinitialisation.
                 </p>
 
-                {/* Petit placeholder style "captcha" */}
+                {/* Placeholder "captcha" visuel */}
                 <div
                   style={{
                     borderRadius: 6,
@@ -238,6 +269,7 @@ export default function LoginPage() {
                     {forgotError}
                   </div>
                 )}
+
                 {forgotDone && (
                   <div
                     role="status"

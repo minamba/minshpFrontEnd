@@ -179,9 +179,9 @@ export const Home = () => {
             const discountPct   = hasProductPromo ? Number(p0.purcentage) : 0;
             const computedPromo = +(priceRef * (1 - discountPct / 100)).toFixed(2);
             const promotedVal   = Number(
-              typeof product.priceTtcPromoted === 'number'
-                ? product.priceTtcPromoted
-                : parseFloat(product.priceTtcPromoted)
+              typeof product.priceHtPromoted === 'number'
+                ? product.priceHtPromoted
+                : parseFloat(product.priceHtPromoted)
             );
 
             // Prix promo “produit” uniquement si la promo est ACTIVE
@@ -191,14 +191,14 @@ export const Home = () => {
 
             // ==== PROMO PAR CODES (priorité sous-cat puis cat) ====
             const subCatCodeVal = Number(
-              typeof product.priceTtcSubCategoryCodePromoted === 'number'
-                ? product.priceTtcSubCategoryCodePromoted
-                : parseFloat(product.priceTtcSubCategoryCodePromoted)
+              typeof product.priceHtSubCategoryCodePromoted === 'number'
+                ? product.priceHtSubCategoryCodePromoted
+                : parseFloat(product.priceHtSubCategoryCodePromoted)
             );
             const catCodeVal = Number(
-              typeof product.priceTtcCategoryCodePromoted === 'number'
-                ? product.priceTtcCategoryCodePromoted
-                : parseFloat(product.priceTtcCategoryCodePromoted)
+              typeof product.priceHtCategoryCodePromoted === 'number'
+                ? product.priceHtCategoryCodePromoted
+                : parseFloat(product.priceHtCategoryCodePromoted)
             );
 
             const codePrice =

@@ -45,7 +45,7 @@ const initialState = {
         return {
           ...state,
           creatingSession: false,
-          createError: action.error || "Erreur Stripe",
+          createError: action.payload || "Erreur Stripe",
         };
   
       // --- Confirm Checkout (depuis page /success ou via webhook feedback) ---
@@ -55,7 +55,7 @@ const initialState = {
           confirming: true,
           confirmed: false,
           confirmError: null,
-          sessionId: action.sessionId || null,
+          sessionId: action.payload || null,
           // on peut garder les anciens IDs si tu veux afficher “en cours…”
         };
   
@@ -77,7 +77,7 @@ const initialState = {
           ...state,
           confirming: false,
           confirmed: false,
-          confirmError: action.error || "Erreur de confirmation",
+          confirmError: action.payload || "Erreur de confirmation",
         };
   
       default:

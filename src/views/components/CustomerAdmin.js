@@ -9,9 +9,12 @@ import {
 
 import {
   updateUserRequest,     // PUT /account/{id} (IDP) -> propage vers /customer (API)
-  registerRequest,       // POST /account/register (IDP) -> crée user + customer
-  deleteUserRequest,
+  registerRequest,       // POST /account/register (IDP) -> crée user + customer,
 } from "../../lib/actions/AccountActions";
+
+import {
+  deleteCustomerRequest,
+} from "../../lib/actions/CustomerActions";
 
 export const CustomerAdmin = () => {
   const dispatch = useDispatch();
@@ -119,11 +122,12 @@ export const CustomerAdmin = () => {
   };
 
   const handleDelete = async (c) => {
+    console.log("Customer poouuuuuf deleted :",c);
     if (!c) return;
     if (window.confirm(`Supprimer le client "${c?.lastName ?? ""} ${c?.firstName ?? ""}" ?`)) {
       const id = c?.idAspNetUser ?? c?.Id;
       if (id != null) {
-        await dispatch(deleteUserRequest(id));
+        await dispatch(deleteCustomerRequest(c.id));
         await dispatch(getCustomerRequest());
       }
     }

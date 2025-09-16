@@ -758,6 +758,17 @@ function Field({ label, children }) {
   );
 }
 
+function getPromoMapArray() {
+  try {
+    const raw = localStorage.getItem('promo_map') || '{}';
+    const obj = JSON.parse(raw); // ex: { "1":"PRO10", "2954":"SS10" }
+    // -> [{ idPromo: "1", value: "PRO10" }, { idPromo: "2954", value: "SS10" }]
+    return Object.entries(obj).map(([Id, Name]) => ({ Id, Name }));
+  } catch {
+    return [];
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /* ------------------------ Page principale -------------------------- */
 /* ------------------------------------------------------------------ */
@@ -766,6 +777,9 @@ export const DeliveryPayment = () => {
   const dispatch = useDispatch();
   const location = useLocation();
   const { state } = location;
+
+  const promoUseCodes = getPromoMapArray();
+  console.log("zoba",promoUseCodes);
 
   // Lecture slice payment
   const payment = useSelector((s) => s?.payment) || {};
@@ -835,6 +849,10 @@ export const DeliveryPayment = () => {
     }
   });
 
+
+
+
+
   // PREFILL: une ligne depuis la favorite
   const preferredRelayAddress = useMemo(() => {
     if (!deliveryFavoriteAddress) return "";
@@ -901,6 +919,9 @@ export const DeliveryPayment = () => {
       ),
     [products]
   );
+
+
+
 
   /* === 1) Tarifs domicile (auto) === */
   const depZip = deliveryFavoriteAddress?.postalCode || billingAddress?.postalCode || null;
@@ -1092,6 +1113,7 @@ const declaredValue = Number(baseTotal) || 0;
       return null;
     }
 
+
     return {
 
       //creation de la commande
@@ -1110,6 +1132,7 @@ const declaredValue = Number(baseTotal) || 0;
       ContentDescription: "Object high tech",
       DeclaredValue: declaredValue,
       Packages: packages,
+      UseCodes: promoUseCodes,
       
       // Destinataire
       ToType: "particulier",

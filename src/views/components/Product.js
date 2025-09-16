@@ -128,13 +128,13 @@ export const Product = () => {
 
   // ---- RÈGLE DEMANDÉE ----
   // 1) Si priceTtcCategoryCodePromoted est défini => on l’affiche
-  const priceFromCategoryCode = toNum(product?.priceTtcCategoryCodePromoted);
+  const priceFromCategoryCode = toNum(product?.priceHtCategoryCodePromoted);
 
   // 2) Si priceTtcSubCategoryCodePromoted est défini => on l’affiche
-  const priceFromSubCategoryCode = toNum(product?.priceTtcSubCategoryCodePromoted);
+  const priceFromSubCategoryCode = toNum(product?.priceHtSubCategoryCodePromoted);
 
   // 3) Si priceTtcPromoted est défini => on l’affiche
-  const priceTtcPromoted = toNum(product?.priceTtcPromoted);
+  const priceHtPromoted = toNum(product?.priceHtPromoted);
 
   // 4) Si price est défini => on l’affiche
   const price = toNum(product?.price);
@@ -150,7 +150,7 @@ export const Product = () => {
   // Prix si promo produit uniquement
   const discountedPriceProduct = useMemo(() => {
     if (!activePromo) return priceRef;
-    const p = toNum(product?.priceTtcPromoted);
+    const p = toNum(product?.priceHtPromoted);
     if (p != null) return p;
     return +(priceRef * (1 - productPromoPct / 100)).toFixed(2);
   }, [activePromo, product, priceRef, productPromoPct]);
@@ -159,7 +159,7 @@ export const Product = () => {
   const displayPrice = useMemo(() => {
     if (priceFromSubCategoryCode != null) return priceFromSubCategoryCode * (product?.tva / 100 + 1) + product?.taxWithoutTvaAmount;
     else if (priceFromCategoryCode != null && priceFromSubCategoryCode == null) return priceFromCategoryCode * (product?.tva / 100 + 1) + product?.taxWithoutTvaAmount;
-    else if (priceTtcPromoted != null && priceFromSubCategoryCode == null && priceFromCategoryCode == null ) return priceTtcPromoted * (product?.tva / 100 + 1) + product?.taxWithoutTvaAmount;
+    else if (priceHtPromoted != null && priceFromSubCategoryCode == null && priceFromCategoryCode == null ) return priceHtPromoted * (product?.tva / 100 + 1) + product?.taxWithoutTvaAmount;
     else return price * (product?.tva / 100 + 1) + product?.taxWithoutTvaAmount
   }, [priceFromCategoryCode, discountedPriceProduct]);
 

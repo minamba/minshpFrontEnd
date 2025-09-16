@@ -68,20 +68,20 @@ export const Promotion = () => {
     const productPct    = hasProductPromo ? Number(p0?.purcentage) : 0;
     const computedPromo = +(priceRef * (1 - productPct / 100)).toFixed(2);
     const promoted      = toNumOrNull(
-      typeof product.priceTtcPromoted === "number"
-        ? product.priceTtcPromoted
-        : parseFloat(product.priceTtcPromoted)
+      typeof product.priceHtPromoted === "number"
+        ? product.priceHtPromoted
+        : parseFloat(product.priceHtPromoted)
     );
 
     const priceSubCat = toNumOrNull(
-      typeof product.priceTtcSubCategoryCodePromoted === "number"
-        ? product.priceTtcSubCategoryCodePromoted
-        : parseFloat(product.priceTtcSubCategoryCodePromoted)
+      typeof product.priceHtSubCategoryCodePromoted === "number"
+        ? product.priceHtSubCategoryCodePromoted
+        : parseFloat(product.priceHtSubCategoryCodePromoted)
     );
     const priceCat = toNumOrNull(
-      typeof product.priceTtcCategoryCodePromoted === "number"
-        ? product.priceTtcCategoryCodePromoted
-        : parseFloat(product.priceTtcCategoryCodePromoted)
+      typeof product.priceHtCategoryCodePromoted === "number"
+        ? product.priceHtCategoryCodePromoted
+        : parseFloat(product.priceHtCategoryCodePromoted)
     );
 
     let base = null;
