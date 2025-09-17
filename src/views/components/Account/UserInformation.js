@@ -130,7 +130,7 @@ export const UserInformation = ({ user = {} }) => {
   const [civility, setCivility] = useState(currentCustomer?.civilite ?? "Mme");
   const [firstName, setFirstName] = useState(currentCustomer?.firstName ?? "");
   const [lastName, setLastName] = useState(currentCustomer?.lastName ?? "");
-  const [email] = useState(currentCustomer?.email ?? "");
+  const [email, setEmail] = useState(currentCustomer?.email ?? "");
   const [birthdate, setBirthdate] = useState(initialBirth);
   const [pseudo, setPseudo] = useState(currentCustomer?.pseudo ?? "");
 
@@ -164,6 +164,9 @@ export const UserInformation = ({ user = {} }) => {
       // ✅ resync pseudo même si null côté API
       setPseudo(currentCustomer?.pseudo ?? "");
       if (currentCustomer.civilite != null) setCivility(currentCustomer.civilite);
+
+      // ✅ resync email si chargé après coup
+      if (currentCustomer.email != null) setEmail(currentCustomer.email);
 
       // 🔁 resync phone {dial, local} depuis currentCustomer.phoneNumber
       const p = currentCustomer.phoneNumber ?? "";
@@ -337,7 +340,14 @@ export const UserInformation = ({ user = {} }) => {
           <span>
             Email <span style={{ color: "#ef4444" }}>*</span>
           </span>
-          <input className="form-control" value={email} readOnly aria-readonly="true" />
+          <input
+            className="form-control"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="votre@email.com"
+            required
+          />
 
           <span>
             Date de naissance <span style={{ color: "#ef4444" }}>*</span>
@@ -374,7 +384,7 @@ export const UserInformation = ({ user = {} }) => {
 
       <p style={{ color: "#6b7280", fontSize: ".9rem", marginTop: 10 }}>
         Les informations recueillies servent à la gestion de votre compte client et peuvent être utilisées
-        pour la relation client-prospect.{" "}
+        pour la relation client-prospect{" "}
         <a href="#" className="auth-link">En savoir plus sur la gestion des vos données et vos droits</a>.
       </p>
 

@@ -6,7 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { loginRequest } from "../../../lib/actions/AccountActions";
 
-const FORGOT_URL = "https://localhost:7183/api/auth/forgot-password"; // <-- adapte l'URL si besoin
+const FORGOT_URL = "https://localhost:7183/account/forgot-password"; // <-- adapte l'URL si besoin
 
 export default function LoginPage() {
   const dispatch  = useDispatch();

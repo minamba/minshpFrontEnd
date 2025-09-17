@@ -18,12 +18,20 @@ import { getPromotionCodesRequest } from '../lib/actions/PromotionCodeActions';
 import { useNavigate } from 'react-router-dom';
 import { logout } from '../lib/actions/AccountActions';
 import { calculPrice } from '../lib/utils/Helpers';
+import { getUserRoles } from '../lib/utils/jwt';
+import { RequireRole } from '../views/components/Authentication/RequireRole';
 
 
 
 export const Navbar = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const token = localStorage.getItem("access_token");
+  const roles = getUserRoles(token);
+
+  const isAdmin = roles
+  .map(r => String(r).toLowerCase())
+  .includes("admin");
 
   // Store
   const categories =
@@ -272,10 +280,12 @@ export const Navbar = () => {
             onMouseEnter={() => window.innerWidth > 900 && setAdminOpen(true)}
             onMouseLeave={() => window.innerWidth > 900 && setAdminOpen(false)}
           >
+            {isAdmin && (
             <button className="navbar-dropdown-toggle" onClick={toggleAdmin}>
               Admin <span className={`arrow ${adminOpen ? "up" : "down"}`}>▾</span>
             </button>
-            {adminOpen && (
+            )}
+            {adminOpen &&  (
               <div className="navbar-dropdown-menu">
                 <Link to="/admin/products" onClick={() => setIsOpen(false)}>Produits</Link>
                 <Link to="/admin/categories" onClick={() => setIsOpen(false)}>Catégories</Link>

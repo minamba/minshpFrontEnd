@@ -60,10 +60,22 @@ const initialState = {
   loadingUpdatePassword: false,
   errorUpdatePassword: null,
   successUpdatePassword: false,
+
+  // --- add role ---
+  loadingAddRole: false,
+  errorAddRole: null,
+  successAddRole: false,
+
+  // --- delete role ---
+  loadingDeleteRole: false,
+  errorDeleteRole: null,
+  successDeleteRole: false,
 };
 
 export default function AccountReducer(state = initialState, action) {
   switch (action.type) {
+
+    //LOGIN
     case actionsAccount.LOGIN_SUCCESS:
       return { ...state, isAuth: true, user: action.payload.user, error: null };
 
@@ -75,6 +87,8 @@ export default function AccountReducer(state = initialState, action) {
       localStorage.removeItem("remember_email");
       return { ...state, isAuth: false, user: null };
 
+
+    //REGISTER
     case actionsAccount.REGISTER_REQUEST:
       return { ...state, loadingRegister: true, errorRegister: null, successRegister: false };
     case actionsAccount.REGISTER_SUCCESS:
@@ -97,12 +111,15 @@ export default function AccountReducer(state = initialState, action) {
           loadingUpdate: false 
         };
 
-
+    //DELETE
     case actionsAccount.DELETE_USER_SUCCESS:
       return { ...state, loadingDelete: false, successDelete: true };
     case actionsAccount.DELETE_USER_FAILURE:
       return { ...state, loadingDelete: false, errorDelete: action.payload.error || "Échec de la suppression" };
 
+      
+
+    //UPDATE PASSWORD
     case actionsAccount.UPDATE_USER_PASSWORD_REQUEST:
       return { ...state, loadingUpdatePassword: true, errorUpdatePassword: null, successUpdatePassword: false };
     case actionsAccount.UPDATE_USER_PASSWORD_SUCCESS:
@@ -117,6 +134,21 @@ export default function AccountReducer(state = initialState, action) {
           errorUpdatePassword: null, 
           loadingUpdatePassword: false 
         };
+
+
+
+        //ROLES
+        case actionsAccount.ADD_USER_ROLE_REQUEST:
+            return { ...state, loadingAddRole: true, errorAddRole: null, successAddRole: false };
+        case actionsAccount.ADD_USER_ROLE_SUCCESS:
+            return { ...state, loadingAddRole: false, successAddRole: true };
+        case actionsAccount.ADD_USER_ROLE_FAILURE:
+            return { ...state, loadingAddRole: false, errorAddRole: action.payload.error || "Échec de l'ajout du role" };
+
+        case actionsAccount.REMOVE_USER_ROLE_SUCCESS:
+            return { ...state, loadingRemoveRole: false, successRemoveRole: true };
+        case actionsAccount.REMOVE_USER_ROLE_FAILURE:
+            return { ...state, loadingRemoveRole: false, errorRemoveRole: action.payload.error || "Échec de la suppression du role" };
 
     default:
       return state;

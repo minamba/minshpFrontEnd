@@ -85,3 +85,29 @@ export function updateUserPassword(data) {
   });
 }
 
+
+
+
+//role
+
+export function addUserRole(data) {
+    return idp.post(`/role/add`, data, {
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeader(),
+      },
+      withCredentials: false,
+    });
+  }
+
+  export function removeUserRole(data) {
+    return idp.post(`/role/remove`, data, {
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeader(),        // Bearer <token>
+      },
+      withCredentials: false,   // SPA: pas de cookies nécessaires
+    });
+  }
+
+

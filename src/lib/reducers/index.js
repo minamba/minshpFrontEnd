@@ -24,6 +24,7 @@ import packageprofilReducer from "./PackageProfilReducers";
 import subCategoryReducer from "./SubCategoryActions";
 import StripeReducer from "./StripeReducers";
 import invoiceReducer from "./InvoiceReducers";
+import roleReducer from "./RoleReducers";
 
 export default combineReducers({
     products : productReducer,
@@ -51,4 +52,5 @@ export default combineReducers({
     subCategories : subCategoryReducer,
     stripe : StripeReducer,
     invoices : invoiceReducer,
+    roles : roleReducer,
 })

@@ -143,6 +143,28 @@ function* Register(action) {
       }
     }
 
+    //Add role
+    function* AddRole(action) {
+      try {
+        const res = yield call(api.addUserRole, action.payload);
+        yield put(actions.addRoleSuccess(res.data));
+        yield put(getCustomerRequest());
+      } catch (err) {
+        console.log(err);
+        yield put(actions.addRoleFailure({ error: problemToText(err) }));
+      }
+    }
+
+    //Remove role
+    function* RemoveRole(action) {
+      try {
+        const res = yield call(api.removeUserRole, action.payload);
+        yield put(actions.removeRoleSuccess(res.data));
+        yield put(getCustomerRequest());
+      } catch (err) {
+        yield put(actions.removeRoleFailure({ error: problemToText(err) }));
+      }
+    }
 
 
     function* watchAccount() {
@@ -151,6 +173,8 @@ function* Register(action) {
         yield takeLatest(actions.actionsAccount.UPDATE_USER_REQUEST, Update);
         yield takeLatest(actions.actionsAccount.DELETE_USER_REQUEST, Delete);
         yield takeLatest(actions.actionsAccount.UPDATE_USER_PASSWORD_REQUEST, UpdatePassword);
+        yield takeLatest(actions.actionsAccount.ADD_USER_ROLE_REQUEST, AddRole);
+        yield takeLatest(actions.actionsAccount.REMOVE_USER_ROLE_REQUEST, RemoveRole);
     }
 
     function* accountSaga() {

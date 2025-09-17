@@ -102,6 +102,9 @@ export const OrderAdmin = () => {
   const orderProducts = useSelector((s) => s?.orderProducts?.orderProducts) || [];
   const customers     = useSelector((s) => s?.customers?.customers) || [];
   const orders        = useSelector((s) => s?.orders?.orders) || [];
+  const invoices      = useSelector((s) => s?.invoices?.invoices) || [];
+
+  console.log("ffffffffffffffffffffffffffffff", invoices);
 
   useEffect(() => {
     dispatch(getOrderRequest?.());
@@ -559,6 +562,11 @@ export const OrderAdmin = () => {
     ]);
   };
 
+  const getInvoiceNumber = (id) => {
+    const invoice = invoices.find((i) => i?.orderId === Number(id));
+    return invoice?.invoiceNumber ?? "—";
+  };
+
   /* ───────── Lignes du tableau (email corrigé) ───────── */
   const rows = useMemo(() => {
     return [...orders].map((o) => {
@@ -621,6 +629,7 @@ export const OrderAdmin = () => {
               <th>Id interne</th>
               <th>N° commande</th>
               <th>N° de suivi</th>
+              <th>N° Facture</th>
               <th>Paiement</th>
               <th>Statut</th>
               <th>Montant</th>
@@ -652,6 +661,7 @@ export const OrderAdmin = () => {
                       );
                     })()}
                   </td>
+                  <td>{getInvoiceNumber(r.oid)}</td>
                   <td>{r.pay}</td>
                   <td>{r.st}</td>
                   <td className="text-success fw-bold">{fmtMoney(r.amount)}</td>

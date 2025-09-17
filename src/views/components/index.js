@@ -45,6 +45,7 @@ import { getBillingAddressRequest } from "../../lib/actions/BillingAddressAction
 import { getDeliveryAddressRequest } from "../../lib/actions/DeliveryAddressActions";
 import {Product} from './Product';
 import { getFeaturesCategoryByProductRequest } from "../../lib/actions/FeatureCategoryActions";
+import { getRolesRequest } from "../../lib/actions/RoleActions";
 import {PromotionCodeAdmin} from './PromotionCodeAdmin';
 import { getPromotionCodesRequest } from "../../lib/actions/PromotionCodeActions";
 import { getApplicationRequest } from "../../lib/actions/ApplicationActions";
@@ -62,6 +63,10 @@ import {getInvoiceRequest} from '../../lib/actions/InvoiceActions';
 import useCartPriceSync from "../../hooks/useCartPriceSync";
 import useAuthSync from "../../hooks/useAuthSync";
 import { getPromotionRequest } from "../../lib/actions/PromotionActions";
+import  ResetPassword  from "./Account/ResetPassword";
+import RequireRole from './Authentication/RequireRole';
+import {Notfound} from './Maintenance/Notfound';
+import {Maintenance} from './Maintenance/Maintenance';
 
 export const BaseApp = () => {
 
@@ -104,40 +109,48 @@ export const BaseApp = () => {
                 <main>
                     <Routes>
                         <Route path="/" element={<Home/>} />
-                        <Route path="/admin/products" element={<ProductAdmin/>} />
-                        <Route path="/admin/categories" element={<CategoryAdmin/>} />
-                        <Route path="/admin/customers" element={<CustomerAdmin/>} />
-                        <Route path="/admin/stocks" element={<StockAdmin/>} />
-                        <Route path="/admin/promotions" element={<PromotionAdmin/>} />
-                        <Route path="/admin/features" element={<FeatureAdmin/>} />
-                        <Route path="/admin/featureProducts" element={<FeatureProductAdmin/>} />
-                        <Route path="/admin/images" element={<ImageAdmin/>} />
-                        <Route path="/admin/videos" element={<VideoAdmin/>} />
+
+                        {/* Admin */}
+                        <Route element={<RequireRole allowed={["Admin"]} />}>
+                            <Route path="/admin/products" element={<ProductAdmin/>} />
+                            <Route path="/admin/categories" element={<CategoryAdmin/>} />
+                            <Route path="/admin/customers" element={<CustomerAdmin/>} />
+                            <Route path="/admin/stocks" element={<StockAdmin/>} />
+                            <Route path="/admin/promotions" element={<PromotionAdmin/>} />
+                            <Route path="/admin/features" element={<FeatureAdmin/>} />
+                            <Route path="/admin/featureProducts" element={<FeatureProductAdmin/>} />
+                            <Route path="/admin/images" element={<ImageAdmin/>} />
+                            <Route path="/admin/videos" element={<VideoAdmin/>} />
+                            <Route path="/admin/featureCategories" element={<FeatureCategoryAdmin/>} />
+                            <Route path="/admin/taxes" element={<TaxesAdmin/>}/>
+                            <Route path="/admin/promotionCodes" element={<PromotionCodeAdmin/>}/>
+                            <Route path="/admin/application" element={<ApplicationAdmin/>}/>
+                            <Route path="/admin/billingAddress" element={<RequireAuth><BillingAddressAdmin/></RequireAuth>}/>
+                            <Route path="/admin/deliveryAddress" element={<RequireAuth><DeliveryAddressAdmin/></RequireAuth>}/>
+                            <Route path="/admin/orders" element={<RequireAuth><OrderAdmin/></RequireAuth>}/>
+                            <Route path="/admin/invoices" element={<RequireAuth><InvoiceAdmin/></RequireAuth>}/>
+                            <Route path="/admin/packageProfil" element={<RequireAuth><PackageProfilAdmin/></RequireAuth>}/>
+                            <Route path="/admin/subCategory" element={<RequireAuth><SubCategoryAdmin/></RequireAuth>}/>
+                        </Route>
+
+                        {/* Other page */}
                         <Route path="/product/:id" element={<Product/>} />
-                        <Route path="/admin/featureCategories" element={<FeatureCategoryAdmin/>} />
                         <Route path="/cart" element={<Cart/>}/>
-                        <Route path="/admin/taxes" element={<TaxesAdmin/>}/>
-                        <Route path="/admin/promotionCodes" element={<PromotionCodeAdmin/>}/>
                         <Route path="/category/:id" element={<Category/>}/>
                         <Route path="/promotion" element={<Promotion/>}/>
                         <Route path="/news" element={<News/>}/>
-                        <Route path="/admin/application" element={<ApplicationAdmin/>}/>
                         <Route path="/login" element={<LoginPage/>}/>
                         <Route path="/deliveryPayment" element={<RequireAuth><DeliveryPayment/></RequireAuth>}/>
                         <Route path="/userInformation" element={<RequireAuth><UserInformation/></RequireAuth>}/>
                         <Route path="/address" element={<RequireAuth><Address/></RequireAuth>}/>
                         <Route path="/register" element={<Register/>}/>
                         <Route path="/subCategory/:id" element={<SubCategory/>}/>
-                        {/* <Route path="/account/:id" element={<RequireAuth><Account/></RequireAuth>}/> */}
                         <Route path="/account" element={ <RequireAuth><Account /></RequireAuth> } /> fallback si pas d'id
-                        <Route path="/admin/billingAddress" element={<RequireAuth><BillingAddressAdmin/></RequireAuth>}/>
-                        <Route path="/admin/deliveryAddress" element={<RequireAuth><DeliveryAddressAdmin/></RequireAuth>}/>
-                        <Route path="/admin/orders" element={<RequireAuth><OrderAdmin/></RequireAuth>}/>
-                        <Route path="/admin/invoices" element={<RequireAuth><InvoiceAdmin/></RequireAuth>}/>
-                        <Route path="/admin/packageProfil" element={<RequireAuth><PackageProfilAdmin/></RequireAuth>}/>
-                        <Route path="/admin/subCategory" element={<RequireAuth><SubCategoryAdmin/></RequireAuth>}/>
                         <Route path="/success" element={<Success/>}/>
                         <Route path="/cancel" element={<Cancel/>}/>
+                        <Route path="/reset-password" element={<ResetPassword/>}/>
+                        <Route path="*" element={<Notfound/>}/>
+                        <Route path="/maintenance" element={<Maintenance/>}/>
                     </Routes>
                 </main>
                 <Footer/>

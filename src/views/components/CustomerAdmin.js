@@ -2,51 +2,53 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import "../../App.css";
+import { getUserRoles } from "../../lib/utils/jwt";
 
-import {
-  getCustomerRequest,
-} from "../../lib/actions/CustomerActions";
+import { getCustomerRequest, deleteCustomerRequest } from "../../lib/actions/CustomerActions";
+import { updateUserRequest, registerRequest, addRoleRequest, removeRoleRequest } from "../../lib/actions/AccountActions";
 
-import {
-  updateUserRequest,     // PUT /account/{id} (IDP) -> propage vers /customer (API)
-  registerRequest,       // POST /account/register (IDP) -> crée user + customer,
-} from "../../lib/actions/AccountActions";
-
-import {
-  deleteCustomerRequest,
-} from "../../lib/actions/CustomerActions";
+// helper: pause async
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+// ajuste si besoin
+const ROLE_CHANGE_DELAY_MS = 1000;
 
 export const CustomerAdmin = () => {
   const dispatch = useDispatch();
   const customers = useSelector((s) => s?.customers?.customers) || [];
 
+  // ⚠️ Désormais une liste de chaînes pour eviter d'exposer les rôles dans le network
+  const roles = ["Admin", "Manager", "Customer"];
+
+  const token = localStorage.getItem("access_token");
+
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
 
+  // ---- Modal rôles ----
+  const [showRoleModal, setShowRoleModal] = useState(false);
+  const [roleUser, setRoleUser] = useState(null);               // customer ciblé
+  const [selectedRoleName, setSelectedRoleName] = useState(""); // radio sélectionnée
+
   const [formData, setFormData] = useState({
-    id: null,        // id customer local si besoin
-    aspId: null,     // IdAspNetUser (pour l’update IDP)
-    civility: "M",   // "M" | "Mme"
+    id: null,
+    aspId: null,
+    civility: "M",
     lastName: "",
     firstName: "",
     phone: "",
     email: "",
-    birthDate: "",   // "YYYY-MM-DD"
+    birthDate: "",
     pseudo: "",
-    actif: true,     // ✅ nouveau
+    actif: true,
   });
 
-  useEffect(() => {
-    dispatch(getCustomerRequest());
-  }, [dispatch]);
+  useEffect(() => { dispatch(getCustomerRequest()); }, [dispatch]);
 
-  // Empêche le scroll quand la modale est ouverte
   useEffect(() => {
-    document.body.classList.toggle("no-scroll", showModal);
+    document.body.classList.toggle("no-scroll", showModal || showRoleModal);
     return () => document.body.classList.remove("no-scroll");
-  }, [showModal]);
+  }, [showModal, showRoleModal]);
 
-  // Map d’une ligne vers le formulaire
   const toForm = (c) => ({
     id: c?.id ?? c?.customerId ?? c?.Id ?? null,
     aspId: c?.idAspNetUser ?? c?.IdAspNetUser ?? null,
@@ -57,7 +59,7 @@ export const CustomerAdmin = () => {
     email: c?.email ?? "",
     birthDate: (c?.birthDate ?? c?.dateOfBirth ?? c?.naissance ?? "").slice(0, 10),
     pseudo: c?.pseudo ?? "",
-    actif: !!c?.actif, // ✅ map bool
+    actif: !!c?.actif,
   });
 
   const resetForm = () =>
@@ -74,18 +76,8 @@ export const CustomerAdmin = () => {
       actif: true,
     });
 
-  const openAdd = () => {
-    setIsEditing(false);
-    resetForm();
-    setShowModal(true);
-  };
-
-  const openEdit = (c) => {
-    setIsEditing(true);
-    setFormData(toForm(c));
-    setShowModal(true);
-  };
-
+  const openAdd = () => { setIsEditing(false); resetForm(); setShowModal(true); };
+  const openEdit = (c) => { setIsEditing(true); setFormData(toForm(c)); setShowModal(true); };
   const closeModal = () => setShowModal(false);
 
   const handleChange = (e) => {
@@ -95,10 +87,8 @@ export const CustomerAdmin = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    // Payload minimal
     const payload = {
-      Id: formData.aspId,                // pour UpdateUser côté IDP
+      Id: formData.aspId,
       Civility: formData.civility,
       LastName: formData.lastName,
       FirstName: formData.firstName,
@@ -106,34 +96,108 @@ export const CustomerAdmin = () => {
       Email: formData.email,
       BirthDate: formData.birthDate || null,
       Pseudo: formData.pseudo,
-      Actif: formData.actif,             // ✅ on envoie Actif
+      Actif: formData.actif,
     };
-
     if (isEditing) {
       await dispatch(updateUserRequest(payload));
     } else {
-      // registerRequest doit accepter au minimum Email/Password si tu crées un vrai compte.
-      // Ici on part du principe que ton IDP sait créer le customer avec ces champs (adapter si besoin).
       await dispatch(registerRequest(payload));
     }
-
     await dispatch(getCustomerRequest());
     closeModal();
   };
 
   const handleDelete = async (c) => {
-    console.log("Customer poouuuuuf deleted :",c);
     if (!c) return;
     if (window.confirm(`Supprimer le client "${c?.lastName ?? ""} ${c?.firstName ?? ""}" ?`)) {
-      const id = c?.idAspNetUser ?? c?.Id;
-      if (id != null) {
-        await dispatch(deleteCustomerRequest(c.id));
-        await dispatch(getCustomerRequest());
-      }
+      await dispatch(deleteCustomerRequest(c?.id ?? c?.customerId ?? c?.Id));
+      await dispatch(getCustomerRequest());
     }
   };
 
-  // Trie simple (par N° client puis Nom)
+  // ---------- RÔLES ----------
+  // supporte both: tableau de strings ou d'objets { name }
+  const getUserRoleNames = (customer) =>
+    Array.isArray(customer?.roles)
+      ? customer.roles.map((r) => (typeof r === "string" ? r : r?.name)).filter(Boolean)
+      : [];
+
+  const primaryRoleOf = (customer) => getUserRoleNames(customer)[0] || ""; // on considère un rôle max affiché
+
+  const openRoleModal = (customer) => {
+    setRoleUser(customer);
+    const current = primaryRoleOf(customer);
+    // présélection : rôle actuel s'il existe, sinon 1er de la liste si dispo
+    setSelectedRoleName(current || roles[0] || "");
+    setShowRoleModal(true);
+  };
+
+  const closeRoleModal = () => {
+    setShowRoleModal(false);
+    setRoleUser(null);
+    setSelectedRoleName("");
+  };
+
+  const canRemove = (customer) => getUserRoleNames(customer).length > 0;
+  const hasRolesDefined = Array.isArray(roles) && roles.length > 0;
+
+  const getAspId = (u) => u?.idAspNetUser ?? u?.IdAspNetUser ?? u?.aspId ?? null;
+
+  const onAddRole = async () => {
+    if (!roleUser || !selectedRoleName) return;
+    const aspId = getAspId(roleUser);
+    if (!aspId) { alert("IdAspNetUser manquant pour cet utilisateur."); return; }
+
+    await dispatch(addRoleRequest({ UserId: String(aspId), Role: String(selectedRoleName) }));
+    await dispatch(getCustomerRequest());
+    closeRoleModal();
+  };
+
+  const onRemoveRole = async () => {
+    if (!roleUser || !selectedRoleName) return;
+    const aspId = getAspId(roleUser);
+    if (!aspId) { alert("IdAspNetUser manquant pour cet utilisateur."); return; }
+
+    await dispatch(removeRoleRequest({ UserId: String(aspId), Role: String(selectedRoleName) }));
+    await dispatch(getCustomerRequest());
+    closeRoleModal();
+  };
+
+  // Modifier le rôle : supprime l'ancien puis ajoute le nouveau avec une pause
+  const onChangeRole = async () => {
+    if (!roleUser || !selectedRoleName) return;
+
+    const aspId = getAspId(roleUser);
+    if (!aspId) { alert("IdAspNetUser manquant pour cet utilisateur."); return; }
+
+    const current = primaryRoleOf(roleUser) || "";
+
+    // Si aucun rôle actuel → assignation simple
+    if (!current) {
+      await onAddRole();
+      return;
+    }
+
+    // Si le rôle choisi est identique → rien à faire
+    if (current === selectedRoleName) {
+      closeRoleModal();
+      return;
+    }
+
+    // 1) Supprimer l'ancien rôle
+    await dispatch(removeRoleRequest({ UserId: String(aspId), Role: String(current) }));
+
+    // petite pause pour laisser le backend persister
+    await sleep(ROLE_CHANGE_DELAY_MS);
+
+    // 2) Ajouter le nouveau rôle
+    await dispatch(addRoleRequest({ UserId: String(aspId), Role: String(selectedRoleName) }));
+
+    await dispatch(getCustomerRequest());
+    closeRoleModal();
+  };
+
+  // ---------- TABLE ----------
   const rows = useMemo(() => {
     const list = Array.isArray(customers) ? customers : [];
     return [...list].sort((a, b) => {
@@ -151,6 +215,8 @@ export const CustomerAdmin = () => {
     const d = new Date(v);
     return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString("fr-FR");
   };
+
+  const getRoleBadge = (customer) => primaryRoleOf(customer) || "NONE";
 
   return (
     <div className="container py-3">
@@ -173,14 +239,15 @@ export const CustomerAdmin = () => {
               <th>Email</th>
               <th>Date de naissance</th>
               <th>Pseudo</th>
+              <th>Role</th>
               <th>Actif</th>
-              <th style={{ width: 140 }}>Actions</th>
+              <th style={{ width: 180 }}>Actions</th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={10} className="text-center">Aucun client.</td>
+                <td colSpan={11} className="text-center">Aucun client.</td>
               </tr>
             ) : (
               rows.map((c) => (
@@ -193,22 +260,18 @@ export const CustomerAdmin = () => {
                   <td>{c?.email ?? "—"}</td>
                   <td>{fmtDate(c?.birthDate ?? c?.dateOfBirth ?? c?.naissance)}</td>
                   <td>{c?.pseudo ?? c?.username ?? "—"}</td>
+                  <td>{getRoleBadge(c)}</td>
                   <td>{c?.actif ? "Oui" : "Non"}</td>
                   <td>
                     <div className="d-flex gap-2">
-                      <button
-                        className="btn btn-sm btn-warning"
-                        onClick={() => openEdit(c)}
-                        title="Modifier"
-                      >
+                      <button className="btn btn-sm btn-warning" onClick={() => openEdit(c)} title="Modifier">
                         <i className="bi bi-pencil" />
                       </button>
-                      <button
-                        className="btn btn-sm btn-danger"
-                        onClick={() => handleDelete(c)}
-                        title="Supprimer"
-                      >
+                      <button className="btn btn-sm btn-danger" onClick={() => handleDelete(c)} title="Supprimer">
                         <i className="bi bi-trash" />
+                      </button>
+                      <button className="btn btn-sm btn-secondary" onClick={() => openRoleModal(c)} title="Droits">
+                        <i className="bi bi-eye" />
                       </button>
                     </div>
                   </td>
@@ -243,12 +306,7 @@ export const CustomerAdmin = () => {
               <div className="row g-3">
                 <div className="col-sm-4">
                   <label className="form-label">Civilité</label>
-                  <select
-                    className="form-select"
-                    name="civility"
-                    value={formData.civility}
-                    onChange={handleChange}
-                  >
+                  <select className="form-select" name="civility" value={formData.civility} onChange={handleChange}>
                     <option value="M">M.</option>
                     <option value="Mme">Mme</option>
                   </select>
@@ -256,74 +314,34 @@ export const CustomerAdmin = () => {
 
                 <div className="col-sm-4">
                   <label className="form-label">Nom</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    name="lastName"
-                    value={formData.lastName}
-                    onChange={handleChange}
-                    required
-                  />
+                  <input type="text" className="form-control" name="lastName" value={formData.lastName} onChange={handleChange} required />
                 </div>
 
                 <div className="col-sm-4">
                   <label className="form-label">Prénom</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    name="firstName"
-                    value={formData.firstName}
-                    onChange={handleChange}
-                    required
-                  />
+                  <input type="text" className="form-control" name="firstName" value={formData.firstName} onChange={handleChange} required />
                 </div>
 
                 <div className="col-sm-6">
                   <label className="form-label">N° (téléphone)</label>
-                  <input
-                    type="tel"
-                    className="form-control"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleChange}
-                  />
+                  <input type="tel" className="form-control" name="phone" value={formData.phone} onChange={handleChange} />
                 </div>
 
                 <div className="col-sm-6">
                   <label className="form-label">Email</label>
-                  <input
-                    type="email"
-                    className="form-control"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    required
-                  />
+                  <input type="email" className="form-control" name="email" value={formData.email} onChange={handleChange} required />
                 </div>
 
                 <div className="col-sm-6">
                   <label className="form-label">Date de naissance</label>
-                  <input
-                    type="date"
-                    className="form-control"
-                    name="birthDate"
-                    value={formData.birthDate}
-                    onChange={handleChange}
-                  />
+                  <input type="date" className="form-control" name="birthDate" value={formData.birthDate} onChange={handleChange} />
                 </div>
 
                 <div className="col-sm-6">
                   <label className="form-label">Pseudo</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    name="pseudo"
-                    value={formData.pseudo}
-                    onChange={handleChange}
-                  />
+                  <input type="text" className="form-control" name="pseudo" value={formData.pseudo} onChange={handleChange} />
                 </div>
 
-                {/* ✅ Actif */}
                 <div className="col-sm-6 d-flex align-items-center">
                   <div className="form-check mt-4">
                     <input
@@ -334,22 +352,91 @@ export const CustomerAdmin = () => {
                       checked={!!formData.actif}
                       onChange={handleChange}
                     />
-                    <label className="form-check-label" htmlFor="cust-active">
-                      Actif
-                    </label>
+                    <label className="form-check-label" htmlFor="cust-active">Actif</label>
                   </div>
                 </div>
               </div>
 
               <div className="d-flex justify-content-end mt-3">
-                <button type="button" className="btn btn-secondary me-2" onClick={closeModal}>
-                  Annuler
-                </button>
-                <button type="submit" className="btn btn-dark">
-                  {isEditing ? "Modifier" : "Ajouter"}
-                </button>
+                <button type="button" className="btn btn-secondary me-2" onClick={closeModal}>Annuler</button>
+                <button type="submit" className="btn btn-dark">{isEditing ? "Modifier" : "Ajouter"}</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* -------- MODALE RÔLES -------- */}
+      {showRoleModal && (
+        <div
+          className="admin-modal-backdrop"
+          role="presentation"
+          onClick={closeRoleModal}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 2100 }}
+        >
+          <div
+            className="admin-modal-panel"
+            role="dialog"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+            style={{ width: "min(560px,92vw)", background: "#fff", borderRadius: 12 }}
+          >
+            <h3 className="mb-2">Droits / Rôles</h3>
+            <div className="text-muted mb-3" style={{ fontSize: 14 }}>
+              Utilisateur : <strong>{roleUser?.email ?? `${roleUser?.lastName ?? ""} ${roleUser?.firstName ?? ""}`}</strong>
+            </div>
+
+            {!hasRolesDefined && (
+              <div className="alert alert-warning">Aucun rôle disponible.</div>
+            )}
+
+            {hasRolesDefined && (
+              <>
+                <div className="mb-3" role="radiogroup" aria-label="Rôles">
+                  {roles.map((r) => (
+                    <label key={r} className="d-flex align-items-center mb-2" style={{ gap: 8, cursor: "pointer" }}>
+                      <input
+                        type="radio"
+                        name="role-radio"
+                        className="form-check-input"
+                        checked={selectedRoleName === r}
+                        onChange={() => setSelectedRoleName(r)}
+                      />
+                      <span>{r}</span>
+                    </label>
+                  ))}
+                </div>
+
+                <div className="d-flex justify-content-end gap-2">
+                  <button className="btn btn-secondary" onClick={closeRoleModal}>Fermer</button>
+
+                  {canRemove(roleUser) ? (
+                    <button
+                      className="btn btn-primary"
+                      onClick={onChangeRole}
+                      disabled={!selectedRoleName || selectedRoleName === primaryRoleOf(roleUser)}
+                    >
+                      Modifier le rôle
+                    </button>
+                  ) : (
+                    <button className="btn btn-primary" onClick={onAddRole} disabled={!selectedRoleName}>
+                      Attribuer le rôle
+                    </button>
+                  )}
+                </div>
+
+                {/* Indication du rôle actuel */}
+                <div className="mt-3 text-muted" style={{ fontSize: 13 }}>
+                  Rôle actuel : <strong>{primaryRoleOf(roleUser) || "Aucun"}</strong>
+                </div>
+
+                {canRemove(roleUser) && selectedRoleName === primaryRoleOf(roleUser) && (
+                  <div className="mt-2 text-muted" style={{ fontSize: 12 }}>
+                    Sélectionnez un rôle différent pour modifier.
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
       )}

@@ -28,6 +28,14 @@ export const actionsAccount = {
 
     UPDATE_USER_RESET: "UPDATE_USER_RESET",
     UPDATE_USER_PASSWORD_RESET: "UPDATE_USER_PASSWORD_RESET",
+
+    ADD_USER_ROLE_REQUEST : "ADD_USER_ROLE_REQUEST",
+    ADD_USER_ROLE_SUCCESS : "ADD_USER_ROLE_SUCCESS",
+    ADD_USER_ROLE_FAILURE : "ADD_USER_ROLE_FAILURE",
+
+    REMOVE_USER_ROLE_REQUEST : "REMOVE_USER_ROLE_REQUEST",
+    REMOVE_USER_ROLE_SUCCESS : "REMOVE_USER_ROLE_SUCCESS",
+    REMOVE_USER_ROLE_FAILURE : "REMOVE_USER_ROLE_FAILURE",
 }
 
 
@@ -158,7 +166,61 @@ export const updateUserReset = () => ({
     type: actionsAccount.UPDATE_USER_PASSWORD_RESET,
   });
 
+
+
 export const registerClear = () => ({ type: actionsAccount.REGISTER_CLEAR });
+
+
+
+//roles 
+
+//add role
+export function addRoleRequest(data) {
+    return {
+        type: actionsAccount.ADD_USER_ROLE_REQUEST,
+        payload: data,
+    }
+}
+
+export function addRoleSuccess(data) {
+    return {
+        type: actionsAccount.ADD_USER_ROLE_SUCCESS,
+        payload: data,
+    }
+}
+
+export function addRoleFailure(error) {
+    return {
+        type: actionsAccount.ADD_USER_ROLE_FAILURE,
+        payload: error,
+    }
+}
+
+//remove role
+
+export function removeRoleRequest(data) {
+    return {
+        type: actionsAccount.REMOVE_USER_ROLE_REQUEST,
+        payload: data,
+    }
+}
+
+
+export function removeRoleSuccess(data) {
+    return {
+        type: actionsAccount.REMOVE_USER_ROLE_SUCCESS,
+        payload: data,
+    }
+}
+
+export function removeRoleFailure(error) {
+    return {
+        type: actionsAccount.REMOVE_USER_ROLE_FAILURE,
+        payload: error,
+    }
+}
+
+
 
 
 

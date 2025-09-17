@@ -23,6 +23,7 @@ import packageProfilsSaga from "./packageProfils";
 import subCategoriesSaga from "./subCategories";
 import stripeSaga from "./stripe";
 import invoicesSaga from "./invoices";
+import rolesSaga from "./roles";
 import { all } from "redux-saga/effects";
 
 
@@ -52,6 +53,7 @@ export default function* rootSaga() {
         packageProfilsSaga(),
         subCategoriesSaga(),
         stripeSaga(),
-        invoicesSaga()
+        invoicesSaga(),
+        rolesSaga()
     ]);
 }
