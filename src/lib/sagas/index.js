@@ -24,6 +24,7 @@ import subCategoriesSaga from "./subCategories";
 import stripeSaga from "./stripe";
 import invoicesSaga from "./invoices";
 import rolesSaga from "./roles";
+import customerPromotionsSaga from "./customerPromotions";
 import { all } from "redux-saga/effects";
 
 
@@ -54,6 +55,7 @@ export default function* rootSaga() {
         subCategoriesSaga(),
         stripeSaga(),
         invoicesSaga(),
-        rolesSaga()
+        rolesSaga(),
+        customerPromotionsSaga()
     ]);
 }

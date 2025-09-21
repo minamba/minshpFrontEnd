@@ -27,8 +27,10 @@ import {DeliveryPayment} from './DeliveryPayment';
 import {PackageProfilAdmin} from './PackageProfilAdmin';
 import {SubCategoryAdmin} from './SubCategoryAdmin';
 import {InvoiceAdmin} from './InvoiceAdmin';
+import {CustomerPromotionAdmin} from './CustomerPromotionAdmin';
 import Success from './Succes';
 import {Cancel} from './Cancel';
+import {Error} from './Error';
 import {Cart} from './Cart';
 import {News} from './News';
 import {FeatureCategoryAdmin} from './FeatureCategoryAdmin';
@@ -67,6 +69,8 @@ import  ResetPassword  from "./Account/ResetPassword";
 import RequireRole from './Authentication/RequireRole';
 import {Notfound} from './Maintenance/Notfound';
 import {Maintenance} from './Maintenance/Maintenance';
+import MaintenanceGate from './Authentication/MaintenanceGate';
+import { getCustomerPromotionCodeRequest } from "../../lib/actions/CustomerPromotionCodeActions";
 
 export const BaseApp = () => {
 
@@ -76,6 +80,7 @@ export const BaseApp = () => {
 
     const dispatch = useDispatch();
     useEffect(() => {
+        dispatch(getApplicationRequest());
         dispatch(getProductUserRequest());
         dispatch(getCategoryRequest());
         dispatch(getStockRequest());
@@ -85,7 +90,6 @@ export const BaseApp = () => {
         dispatch(getFeatureCategoryRequest());
         dispatch(getPromotionRequest());
         dispatch(getPromotionCodesRequest());
-        dispatch(getApplicationRequest());
         dispatch(getCustomerRequest());
         dispatch(getOrderCustomerProductRequest());
         dispatch(getOrderRequest());
@@ -95,6 +99,7 @@ export const BaseApp = () => {
         dispatch(getSubCategoryRequest());
         dispatch(getContentCategoryRequest());
         dispatch(getInvoiceRequest());
+        dispatch(getCustomerPromotionCodeRequest());
     }, []);
 
     useEffect(() => {
@@ -108,8 +113,6 @@ export const BaseApp = () => {
                 <Navbar/>
                 <main>
                     <Routes>
-                        <Route path="/" element={<Home/>} />
-
                         {/* Admin */}
                         <Route element={<RequireRole allowed={["Admin"]} />}>
                             <Route path="/admin/products" element={<ProductAdmin/>} />
@@ -131,26 +134,33 @@ export const BaseApp = () => {
                             <Route path="/admin/invoices" element={<RequireAuth><InvoiceAdmin/></RequireAuth>}/>
                             <Route path="/admin/packageProfil" element={<RequireAuth><PackageProfilAdmin/></RequireAuth>}/>
                             <Route path="/admin/subCategory" element={<RequireAuth><SubCategoryAdmin/></RequireAuth>}/>
+                            <Route path="/admin/customerPromotions" element={<RequireAuth><CustomerPromotionAdmin/></RequireAuth>}/>
                         </Route>
 
                         {/* Other page */}
-                        <Route path="/product/:id" element={<Product/>} />
-                        <Route path="/cart" element={<Cart/>}/>
-                        <Route path="/category/:id" element={<Category/>}/>
-                        <Route path="/promotion" element={<Promotion/>}/>
-                        <Route path="/news" element={<News/>}/>
-                        <Route path="/login" element={<LoginPage/>}/>
-                        <Route path="/deliveryPayment" element={<RequireAuth><DeliveryPayment/></RequireAuth>}/>
-                        <Route path="/userInformation" element={<RequireAuth><UserInformation/></RequireAuth>}/>
-                        <Route path="/address" element={<RequireAuth><Address/></RequireAuth>}/>
-                        <Route path="/register" element={<Register/>}/>
-                        <Route path="/subCategory/:id" element={<SubCategory/>}/>
-                        <Route path="/account" element={ <RequireAuth><Account /></RequireAuth> } /> fallback si pas d'id
-                        <Route path="/success" element={<Success/>}/>
-                        <Route path="/cancel" element={<Cancel/>}/>
-                        <Route path="/reset-password" element={<ResetPassword/>}/>
-                        <Route path="*" element={<Notfound/>}/>
-                        <Route path="/maintenance" element={<Maintenance/>}/>
+                        {/* // toutes les pages qui sont en dehors de l'admin redirige vers la page de maintenance quand l'appli est en maintenance */}
+                        <Route element={<MaintenanceGate />}>
+                            <Route path="/" element={<Home/>} /> 
+                            <Route path="/product/:id" element={<Product/>} />
+                            <Route path="/cart" element={<Cart/>}/>
+                            <Route path="/category/:id" element={<Category/>}/>
+                            <Route path="/promotion" element={<Promotion/>}/>
+                            <Route path="/news" element={<News/>}/>
+                            <Route path="/deliveryPayment" element={<RequireAuth><DeliveryPayment/></RequireAuth>}/>
+                            <Route path="/userInformation" element={<RequireAuth><UserInformation/></RequireAuth>}/>
+                            <Route path="/address" element={<RequireAuth><Address/></RequireAuth>}/>
+                            <Route path="/register" element={<Register/>}/>
+                            <Route path="/subCategory/:id" element={<SubCategory/>}/>
+                            <Route path="/account" element={ <RequireAuth><Account /></RequireAuth> } /> fallback si pas d'id
+                            <Route path="/success" element={<Success/>}/>
+                            <Route path="/cancel" element={<Cancel/>}/>
+                            <Route path="/error" element={<Error/>}/>
+                            <Route path="/reset-password" element={<ResetPassword/>}/>
+                            <Route path="*" element={<Notfound/>}/>
+                            <Route path="/maintenance" element={<Maintenance/>}/>
+                        </Route>
+                            {/* je  laisse la page de connexion accessible quand meme pour les admins */}
+                            <Route path="/login" element={<LoginPage/>}/> 
                     </Routes>
                 </main>
                 <Footer/>

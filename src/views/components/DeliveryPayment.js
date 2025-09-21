@@ -897,22 +897,55 @@ export const DeliveryPayment = () => {
     return items.reduce((s, it) => s + (it.weightKg ?? 0.25) * getQty(it), 0);
   }, []);
 
-  // Packages
+  // Packages for order
   const packages = useMemo(
     () =>
       products.flatMap((p) =>
         p.packageProfil
           ? [
               {
-                Id: String(p.packageProfil.id ?? ""),
-                ContainedCode: String(p.containedCode ?? ""),
-                PackageWeight: String(p.packageProfil.weight ?? ""),
-                PackageLonger: String(p.packageProfil.longer ?? ""),
+                Type: "PARCEL",
+                Value :{
+                  Value : parseFloat(p.price ?? 0),
+                  Currency : "EUR"
+                },
                 PackageWidth: String(p.packageProfil.width ?? ""),
                 PackageHeight: String(p.packageProfil.height ?? ""),
+                PackageLonger: String(p.packageProfil.longer ?? ""),
+                PackageWeight: String(p.packageProfil.weight ?? ""),
+                Content : {
+                  Id: p.containedCode ? `content:v1:${p.containedCode}` : "MERCHANDISE",
+                  Description : "Object high tech"
+                },
+                Stackable : true,
+                ExternalId : String(p.id),
                 PackageValue: parseFloat(p.price ?? 0) || null,
                 PackageStackable: true,
+                PackageId : String(p.packageProfil.id ?? ""), // bonus
+             
+              },
+            ]
+          : []
+      ),
+    [products]
+  );
+
+
+
+  const packagesForRates = useMemo(
+    () =>
+      products.flatMap((p) =>
+        p.packageProfil
+          ? [
+              {
                 Type: "PARCEL",
+                Id : String(p.id ?? ""),
+                ContainedCode : String(p.containedCode ?? ""),
+                PackageWidth: String(p.packageProfil.width ?? ""),
+                PackageHeight: String(p.packageProfil.height ?? ""),
+                PackageLonger: String(p.packageProfil.longer ?? ""),
+                PackageWeight: String(p.packageProfil.weight ?? ""),
+                PackageValue : parseFloat(p.price ?? 0) || null    
               },
             ]
           : []
@@ -935,7 +968,7 @@ export const DeliveryPayment = () => {
         RecipientZipCode: String(depZip),
         RecipientCountry: depCountry,
         RecipientCity: depCity,
-        Packages: packages,
+        Packages: packagesForRates,
       })
     );
   }, [dispatch, depZip, depCity, depCountry, packages]);
@@ -1116,39 +1149,88 @@ const declaredValue = Number(baseTotal) || 0;
 
     return {
 
-      //creation de la commande
-      CustomerId: currentCustomerId,
-      Amount: Number(grandTotal),
-      DeliveryAmount: shippingPrice,
-      PaymentMethod: "carte",
-      DeliveryMode: deliveryMode,
+      //V1
+      // //creation de la commande
+      // CustomerId: currentCustomerId,
+      // Amount: Number(grandTotal),
+      // DeliveryAmount: shippingPrice,
+      // PaymentMethod: "carte",
+      // DeliveryMode: deliveryMode,
 
-      //creation de orderProduct
-      OperatorCode: operatorCode,
-      ServiceCode: serviceCode,
-      IsRelay: toIsRelay,
-      PickupPointCode: pickupPointCode,
-      DropOffPointCode: chosenRate?.dropOffPointCodes?.[0] || null,
-      ContentDescription: "Object high tech",
-      DeclaredValue: declaredValue,
-      Packages: packages,
-      UseCodes: promoUseCodes,
+      // //creation de orderProduct
+      // OperatorCode: operatorCode,
+      // ServiceCode: serviceCode,
+      // IsRelay: toIsRelay,
+      // PickupPointCode: pickupPointCode,
+      // DropOffPointCode: chosenRate?.dropOffPointCodes?.[0] || null,
+      // ContentDescription: "Object high tech",
+      // DeclaredValue: declaredValue,
+      // Packages: packages,
+      // UseCodes: promoUseCodes,
       
-      // Destinataire
-      ToType: "particulier",
-      ToCivility: currentCustomer?.civilite || null,
-      ToLastName: currentCustomer?.lastName || "",
-      ToFirstName: currentCustomer?.firstName || "",
-      ToEmail: user?.email || null,
-      ToPhone: currentCustomer?.phoneNumber || null,
-      ToAddress: toAddressLine,
-      ToZip: toZip,
-      ToCity: toCity,
-      ToCountry: toCountry,
+      // // Destinataire
+      // ToType: "particulier",
+      // ToCivility: currentCustomer?.civilite || null,
+      // ToLastName: currentCustomer?.lastName || "",
+      // ToFirstName: currentCustomer?.firstName || "",
+      // ToEmail: user?.email || null,
+      // ToPhone: currentCustomer?.phoneNumber || null,
+      // ToAddress: toAddressLine,
+      // ToZip: toZip,
+      // ToCity: toCity,
+      // ToCountry: toCountry,
       
-      TakeOverDate: today,
+      // TakeOverDate: today,
 
-      OrderCustomerProducts: readLsItems().map((it) => ({
+
+
+//V3
+Shipment:{
+// --- Colis ---
+Packages : packages,
+
+  // --- Adresses ---
+  toAddress : {
+    type: "particulier",
+    contact: {
+      email: currentCustomer?.email,
+      phone: String(deliveryFavoriteAddress?.phone),
+      lastName: deliveryFavoriteAddress?.lastName,
+      firstName: deliveryFavoriteAddress?.firstName,
+      civility: currentCustomer?.civilite
+    },
+    location: {
+      city: deliveryFavoriteAddress?.city,
+      street: deliveryFavoriteAddress?.address,
+      postalCode: String(deliveryFavoriteAddress?.postalCode),
+      countryIsoCode: "FR",
+    }
+  },         
+},
+
+// --- Options ---
+Insured : false,
+LabelType : "PDF_A4",
+ShippingOfferCode : serviceCode ,                   
+ExpectedTakingOverDate : today,
+
+
+//info complementaire
+CustomerId: currentCustomerId,
+CustomerNumber: currentCustomer?.clientNumber,
+Amount: Number(grandTotal),
+DeliveryAmount: shippingPrice,
+PaymentMethod: "carte",
+DeliveryMode: deliveryMode,
+UseCodes: promoUseCodes,
+ContentDescription: "Object high tech",
+ServiceCode: serviceCode,
+OperatorCode: operatorCode,
+PickupPointCode: pickupPointCode,
+DropOffPointCode: chosenRate?.dropOffPointCodes?.[0] || null,
+
+// --- Commande ---
+OrderCustomerProducts: readLsItems().map((it) => ({
         ProductId: getPid(it),
         CustomerId: Number(currentCustomerId),
         Quantity: getQty(it),

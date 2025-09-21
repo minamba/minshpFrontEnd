@@ -21,7 +21,8 @@ export const ApplicationAdmin = () => {
     displayNewProductNumber: 0,
     startDate: '',
     endDate: '',
-    // ↓↓↓ nouveaux champs ↓↓↓
+    isMaintenance: false,                 // ← nouveau champ (bool)
+    // ↓↓↓ champs existants ↓↓↓
     defaultDropOffMondialRelay: '',
     defaultDropOffChronoPost: '',
     defaultDropOffUps: '',
@@ -85,6 +86,8 @@ export const ApplicationAdmin = () => {
       startDate: toInputDate(app.startDate),
       endDate: toInputDate(app.endDate),
 
+      isMaintenance: !!app.isMaintenance, // ← alimente la checkbox
+
       defaultDropOffMondialRelay: app.defaultDropOffMondialRelay ?? '',
       defaultDropOffChronoPost:  app.defaultDropOffChronoPost ?? '',
       defaultDropOffUps:         app.defaultDropOffUps ?? '',
@@ -107,7 +110,13 @@ export const ApplicationAdmin = () => {
   };
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
+
+    if (type === 'checkbox') {
+      setFormData((prev) => ({ ...prev, [name]: !!checked }));
+      return;
+    }
+
     if (name === 'displayNewProductNumber') {
       const n = Math.max(0, parseInt(value || '0', 10));
       setFormData((prev) => ({ ...prev, [name]: n }));
@@ -123,11 +132,13 @@ export const ApplicationAdmin = () => {
       return;
     }
 
-    // Payload complet avec les nouveaux champs
+    // Payload complet (ajout de isMaintenance)
     const payload = {
       displayNewProductNumber: Number(formData.displayNewProductNumber ?? 0),
       startDate: formData.startDate || null,
       endDate: formData.endDate || null,
+
+      isMaintenance: !!formData.isMaintenance, // ← envoyé aux APIs
 
       defaultDropOffMondialRelay: formData.defaultDropOffMondialRelay || null,
       defaultDropOffChronoPost:  formData.defaultDropOffChronoPost || null,
@@ -152,7 +163,7 @@ export const ApplicationAdmin = () => {
 
   return (
     <div className="container py-5">
-      <h1 className="text-center mb-4">Gestion des applications</h1>
+      <h1 className="text-center mb-4">Paramètres généraux de l'application</h1>
 
       <div className="d-flex justify-content-end mb-3">
         <button className="btn btn-success" onClick={handleAddClick}>
@@ -165,16 +176,17 @@ export const ApplicationAdmin = () => {
           <thead className="table-dark">
             <tr>
               <th>Nb produits à afficher</th>
-              <th>Date début</th>
-              <th>Date fin</th>
-              <th>DropOff_mondialRelay</th>
-              <th>DropOff_chronoPost</th>
-              <th>DropOff_ups</th>
-              <th>DropOff_laposte</th>
-              <th>SocietyName</th>
-              <th>SocietyAddress</th>
-              <th>SocietyZipCode</th>
-              <th>SocietyCity</th>
+              <th>En Maintenance</th>
+              {/* <th>Date début</th>
+              <th>Date fin</th> */}
+              <th>mondialRelay</th>
+              <th>chronoPost</th>
+              <th>ups</th>
+              <th>laposte</th>
+              <th>Société</th>
+              <th>Adresse</th>
+              <th>Code Postal</th>
+              <th>Ville</th>
               <th style={{ width: 140 }}>Actions</th>
             </tr>
           </thead>
@@ -186,9 +198,9 @@ export const ApplicationAdmin = () => {
                 style={{ cursor: 'pointer' }}
               >
                 <td>{app.displayNewProductNumber ?? '—'}</td>
-                <td className="text-muted">{app.startDate || '—'}</td>
-                <td className="text-muted">{app.endDate || '—'}</td>
-
+                {/* <td className="text-muted">{app.startDate || '—'}</td>
+                <td className="text-muted">{app.endDate || '—'}</td> */}
+                <td>{app.isMaintenance ? 'Oui' : 'Non'}</td>
                 <td>{app.defaultDropOffMondialRelay ?? '—'}</td>
                 <td>{app.defaultDropOffChronoPost ?? '—'}</td>
                 <td>{app.defaultDropOffUps ?? '—'}</td>
@@ -279,6 +291,23 @@ export const ApplicationAdmin = () => {
                     min={formData.startDate || undefined}
                     onChange={handleChange}
                   />
+                </div>
+
+                {/* Nouveau: En maintenance */}
+                <div className="col-md-12 d-flex align-items-center">
+                  <div className="form-check mt-2">
+                    <input
+                      type="checkbox"
+                      id="isMaintenance"
+                      name="isMaintenance"
+                      className="form-check-input"
+                      checked={!!formData.isMaintenance}
+                      onChange={handleChange}
+                    />
+                    <label className="form-check-label ms-2" htmlFor="isMaintenance">
+                      En maintenance (afficher uniquement la page de maintenance)
+                    </label>
+                  </div>
                 </div>
               </div>
 

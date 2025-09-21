@@ -5,6 +5,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ProductSpecs } from '../../components/index';
 import { addToCartRequest, saveCartRequest } from '../../lib/actions/CartActions';
 import { GenericModal } from '../../components/index';
+import { toMediaUrl } from '../../lib/utils/mediaUrl';
 
 export const Product = () => {
   const { id } = useParams();
@@ -16,17 +17,16 @@ export const Product = () => {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
   }, [id]);
 
-  // Store
-  const products        = useSelector((s) => s.products.products) || [];
-  const images          = useSelector((s) => s.images.images) || [];
+  // ===== Store =====
+  const products        = useSelector((s) => s.products?.products) || [];
+  const images          = useSelector((s) => s.images?.images) || [];
   const videos          = useSelector((s) => s.videos?.videos) || [];
-  const items           = useSelector((s) => s.items.items) || [];
-  const promotionCodes  = useSelector((s) => s.promotionCodes.promotionCodes) || [];
+  const items           = useSelector((s) => s.items?.items) || [];
+  const promotionCodes  = useSelector((s) => s.promotionCodes?.promotionCodes) || [];
+  const stocks          = useSelector((s) => s.stocks?.stocks) || []; // <- stocks du store
 
-  // Save cart
-  useEffect(() => {
-    dispatch(saveCartRequest(items));
-  }, [items, dispatch]);
+  // Sauvegarde panier
+  useEffect(() => { dispatch(saveCartRequest(items)); }, [items, dispatch]);
 
   // Produit courant
   const product = useMemo(
@@ -34,7 +34,7 @@ export const Product = () => {
     [products, id]
   );
 
-  // (optionnel) promo liée à la catégorie si tu en as besoin ailleurs
+  // Promo liée à la catégorie (optionnel)
   const promotion = useMemo(
     () => promotionCodes.find((p) => String(p.id) === String(product?.idPromotionCode)) || null,
     [promotionCodes, product]
@@ -43,14 +43,14 @@ export const Product = () => {
   // Images
   const productImages = useMemo(() => {
     if (!product) return [];
-    const list = images.filter((i) => i.idProduct === product.id);
+    const list = images.filter((i) => String(i.idProduct) === String(product.id));
     return list.length ? list : [{ url: '/Images/placeholder.jpg', position: 1 }];
   }, [images, product]);
 
   // Vidéos
   const productVideos = useMemo(() => {
     if (!product) return [];
-    return (videos || []).filter((v) => v.idProduct === product.id && v.position === 2);
+    return (videos || []).filter((v) => String(v.idProduct) === String(product.id) && v.position === 2);
   }, [videos, product]);
 
   const heroVideo = useMemo(
@@ -63,13 +63,13 @@ export const Product = () => {
     [heroVideo]
   );
 
-  // Galerie
+  // ===== Galerie =====
   const [currentIndex, setCurrentIndex] = useState(0);
   const currentImage = productImages[currentIndex]?.url || '/Images/placeholder.jpg';
   const [mainLoaded, setMainLoaded] = useState(false);
   useEffect(() => setMainLoaded(false), [currentImage]);
 
-  // Lightbox
+  // ===== Lightbox =====
   const [isLightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const openLightbox  = (idx) => { setLightboxIndex(idx); setLightboxOpen(true); };
@@ -88,7 +88,7 @@ export const Product = () => {
     return () => window.removeEventListener('keydown', onKey);
   }, [isLightboxOpen]);
 
-  // ===== PROMO / PRIX =====
+  // ===== Helpers prix/promo =====
   const toNum = (x) => {
     const n = typeof x === 'number' ? x : parseFloat(x);
     return Number.isFinite(n) ? n : null;
@@ -109,7 +109,7 @@ export const Product = () => {
     return `${dd}/${mm}`;
   };
 
-  // Promo PRODUIT (première active)
+  // Promo produit (première active)
   const rawFirstPromo = product?.promotions?.[0] ?? null;
   const activePromo = useMemo(() => {
     if (!rawFirstPromo) return null;
@@ -126,28 +126,18 @@ export const Product = () => {
 
   const promoUntil = activePromo?.endDate ? formatEndShort(activePromo.endDate) : null;
 
-  // ---- RÈGLE DEMANDÉE ----
-  // 1) Si priceTtcCategoryCodePromoted est défini => on l’affiche
-  const priceFromCategoryCode = toNum(product?.priceHtCategoryCodePromoted);
-
-  // 2) Si priceTtcSubCategoryCodePromoted est défini => on l’affiche
+  // Règles de prix
+  const priceFromCategoryCode    = toNum(product?.priceHtCategoryCodePromoted);
   const priceFromSubCategoryCode = toNum(product?.priceHtSubCategoryCodePromoted);
+  const priceHtPromoted          = toNum(product?.priceHtPromoted);
+  const price                    = toNum(product?.price);
 
-  // 3) Si priceTtcPromoted est défini => on l’affiche
-  const priceHtPromoted = toNum(product?.priceHtPromoted);
-
-  // 4) Si price est défini => on l’affiche
-  const price = toNum(product?.price);
-
-  // 2) Si purcentageCodePromoted est défini => le badge affiche ce pourcentage
   const pctFromCategoryCode = product?.purcentageCodePromoted != null && product.purcentageCodePromoted !== ''
     ? Number(product.purcentageCodePromoted)
     : null;
 
-  // Fallbacks
   const productPromoPct = activePromo ? Number(activePromo.purcentage) || 0 : 0;
 
-  // Prix si promo produit uniquement
   const discountedPriceProduct = useMemo(() => {
     if (!activePromo) return priceRef;
     const p = toNum(product?.priceHtPromoted);
@@ -155,15 +145,18 @@ export const Product = () => {
     return +(priceRef * (1 - productPromoPct / 100)).toFixed(2);
   }, [activePromo, product, priceRef, productPromoPct]);
 
-  // Prix affiché (priorité au prix de code catégorie s’il existe)
   const displayPrice = useMemo(() => {
-    if (priceFromSubCategoryCode != null) return priceFromSubCategoryCode * (product?.tva / 100 + 1) + product?.taxWithoutTvaAmount;
-    else if (priceFromCategoryCode != null && priceFromSubCategoryCode == null) return priceFromCategoryCode * (product?.tva / 100 + 1) + product?.taxWithoutTvaAmount;
-    else if (priceHtPromoted != null && priceFromSubCategoryCode == null && priceFromCategoryCode == null ) return priceHtPromoted * (product?.tva / 100 + 1) + product?.taxWithoutTvaAmount;
-    else return price * (product?.tva / 100 + 1) + product?.taxWithoutTvaAmount
-  }, [priceFromCategoryCode, discountedPriceProduct]);
+    if (priceFromSubCategoryCode != null) {
+      return priceFromSubCategoryCode * (product?.tva / 100 + 1) + product?.taxWithoutTvaAmount;
+    } else if (priceFromCategoryCode != null && priceFromSubCategoryCode == null) {
+      return priceFromCategoryCode * (product?.tva / 100 + 1) + product?.taxWithoutTvaAmount;
+    } else if (priceHtPromoted != null && priceFromSubCategoryCode == null && priceFromCategoryCode == null) {
+      return priceHtPromoted * (product?.tva / 100 + 1) + product?.taxWithoutTvaAmount;
+    } else {
+      return price * (product?.tva / 100 + 1) + product?.taxWithoutTvaAmount;
+    }
+  }, [priceFromCategoryCode, discountedPriceProduct]); // dépendances gardées telles quelles
 
-  // Pourcentage affiché sur le badge (priorité au % de code catégorie s’il existe)
   const badgePct = pctFromCategoryCode ?? productPromoPct;
   const showBadge = Number.isFinite(badgePct) && badgePct > 0;
 
@@ -172,18 +165,56 @@ export const Product = () => {
   const euros = eurosStr;
   const cents = centsStr;
 
-  // ===== STOCK =====
+  // ===== STOCK (statut + quantité disponible) =====
   const stockStatusRaw = (product?.stockStatus ?? '').trim();
   const stockIn  = stockStatusRaw.toLowerCase() === 'en stock';
-  const stockOut = stockStatusRaw.toLowerCase() === 'en rupture';
-  const stockStatusLabel = stockStatusRaw || 'Disponibilité limitée';
-  const stockRowClass = stockIn ? 'stock-in' : stockOut ? 'stock-out' : 'stock-warn';
-  const stockDotClass = stockIn ? 'in' : stockOut ? 'out' : 'warn';
+  const stockOutStatus = stockStatusRaw.toLowerCase() === 'en rupture'; // d'après le statut texte
 
-  // Achat
+  // Récupération du stock dispo depuis le store
+  const stockForProduct = useMemo(() => {
+    if (!product) return null;
+    return stocks.find(
+      (st) =>
+        String(st?.idProduct ?? st?.Id_product ?? st?.IdProduct) === String(product.id)
+    ) || null;
+  }, [stocks, product]);
+
+  const availableQty = useMemo(() => {
+    const q = Number(
+      stockForProduct?.quantity ??
+      stockForProduct?.Quantity ??
+      stockForProduct?.qty ??
+      stockForProduct?.Qty ??
+      0
+    );
+    return Number.isFinite(q) && q > 0 ? q : 0;
+  }, [stockForProduct]);
+
+  // On considère rupture si statut “en rupture” OU stock disponible = 0
+  const isActuallyOut = stockOutStatus || availableQty <= 0;
+
+  const stockStatusLabel =
+    stockStatusRaw || (availableQty > 0 ? `Disponibilité limitée` : `En rupture`);
+  const stockRowClass = !isActuallyOut && stockIn ? 'stock-in' : isActuallyOut ? 'stock-out' : 'stock-warn';
+  const stockDotClass = !isActuallyOut && stockIn ? 'in' : isActuallyOut ? 'out' : 'warn';
+
+  // ===== Achat =====
   const [qty, setQty] = useState(1);
+
+  // Clamp la quantité quand le stock (ou le produit) change
+  useEffect(() => {
+    if (availableQty <= 0) {
+      setQty(1); // remet à 1, mais le sélecteur sera désactivé
+    } else if (qty > availableQty) {
+      setQty(availableQty);
+    } else if (qty < 1) {
+      setQty(1);
+    }
+  }, [availableQty, product?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const [showAdded, setShowAdded] = useState(false);
   const addToCart = () => {
+    if (isActuallyOut) return; // rien si rupture / 0 stock
     if (!product) return;
     const payloadItem = {
       id: product.id,
@@ -222,6 +253,14 @@ export const Product = () => {
 
   const handleContextMenu = (e) => e.preventDefault();
 
+  // Construit les options de quantité en fonction du stock
+  const qtyOptions = useMemo(() => {
+    const max = Math.max(0, availableQty);
+    // On peut mettre une limite de confort si besoin (ex: 50) :
+    const cap = Math.min(max, 50);
+    return Array.from({ length: cap }, (_, i) => i + 1);
+  }, [availableQty]);
+
   return (
     <div className="product-page" onContextMenu={handleContextMenu}>
       {/* Zone haute: galerie + infos achat */}
@@ -236,7 +275,7 @@ export const Product = () => {
               aria-label={`Voir image ${idx + 1}`}
               type="button"
             >
-              <img loading="lazy" src={img.url} alt={`Miniature ${idx + 1} de ${product?.name || 'Produit'}`} />
+              <img loading="lazy" src={toMediaUrl(img.url)} alt={`Miniature ${idx + 1} de ${product?.name || 'Produit'}`} />
             </button>
           ))}
         </div>
@@ -246,7 +285,7 @@ export const Product = () => {
           {!mainLoaded && <div className="img-skeleton" aria-hidden="true" />}
           <img
             className={`product-main-image ${mainLoaded ? 'is-loaded' : ''}`}
-            src={currentImage}
+            src={toMediaUrl(currentImage)}
             alt={product?.name || 'Produit'}
             onLoad={() => setMainLoaded(true)}
           />
@@ -263,7 +302,7 @@ export const Product = () => {
           <div className="details-stack">
             {hasPrice && (
               <>
-                {/* Prix de référence + badge : on affiche le badge si un pourcentage est disponible */}
+                {/* Prix de référence + badge */}
                 {showBadge && (
                   <div className="refprice-wrap">
                     <div className="refprice-label">Prix de référence</div>
@@ -276,13 +315,13 @@ export const Product = () => {
                   </div>
                 )}
 
-                {/* Prix affiché (priorité prix de code catégorie si présent) */}
+                {/* Prix affiché */}
                 <div className="product-price">
                   <span className="euros">{euros}€</span>
                   <sup className="cents">{cents}</sup>
                 </div>
 
-                {/* Jusqu’au … inclus : on garde l’info uniquement pour la promo produit */}
+                {/* Jusqu’au … */}
                 {activePromo && promoUntil && (
                   <div className="promo-until">
                     Jusqu'au {promoUntil} inclus
@@ -302,6 +341,11 @@ export const Product = () => {
             {/* Statut de stock */}
             <div className={`stock-row ${stockRowClass}`}>
               <span className={`stock-dot ${stockDotClass}`} /> <span>{stockStatusLabel}</span>
+              {/* {!isActuallyOut && availableQty > 0 && (
+                <span style={{ marginLeft: 8, color: '#6b7280', fontSize: '.9rem' }}>
+                  ({availableQty} en stock)
+                </span>
+              )} */}
             </div>
 
             <div className="buy-row">
@@ -310,13 +354,24 @@ export const Product = () => {
                 value={qty}
                 onChange={(e) => setQty(Number(e.target.value))}
                 aria-label="Quantité"
+                disabled={isActuallyOut || availableQty <= 0}
               >
-                {[1,2,3,4,5,6,7,8,9,10].map((n) => (
-                  <option key={n} value={n}>{n}</option>
-                ))}
+                {qtyOptions.length === 0 ? (
+                  <option value={1}>—</option>
+                ) : (
+                  qtyOptions.map((n) => (
+                    <option key={n} value={n}>{n}</option>
+                  ))
+                )}
               </select>
 
-              <button className="buy-button buy-accent" onClick={addToCart}>
+              <button
+                className="buy-button buy-accent"
+                onClick={addToCart}
+                disabled={isActuallyOut}
+                aria-disabled={isActuallyOut}
+                title={isActuallyOut ? "Article en rupture" : "Ajouter au panier"}
+              >
                 🛍️&nbsp;Ajouter au panier
               </button>
             </div>
@@ -336,7 +391,7 @@ export const Product = () => {
           <button className="lb-prev"  type="button" aria-label="Précédent" onClick={(e) => { e.stopPropagation(); prev();  }}>‹</button>
           <img
             className="lb-img"
-            src={productImages[lightboxIndex]?.url}
+            src={toMediaUrl(productImages[lightboxIndex]?.url)}
             alt={`Image ${lightboxIndex + 1} de ${product?.name || 'Produit'}`}
             onClick={(e) => e.stopPropagation()}
           />
@@ -359,7 +414,7 @@ export const Product = () => {
           <video
             ref={videoRef}
             className="product-video"
-            src={heroVideo.url}
+            src={toMediaUrl(heroVideo.url)}
             autoPlay
             muted
             playsInline

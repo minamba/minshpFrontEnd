@@ -13,6 +13,7 @@ import {
 import { GenericModal } from "../../components";
 import { getPromotionCodesRequest } from "../../lib/actions/PromotionCodeActions";
 import { calculPriceForApplyPromoCode } from "../../lib/utils/Helpers";
+import { toMediaUrl } from "../../lib/utils/mediaUrl";
 
 /* ---------- helpers format/ids ---------- */
 const fmt = (n) =>
@@ -108,6 +109,7 @@ export const Cart = () => {
   const promotions = useSelector((s) => s?.promotions?.promotions) || [];
   const categories = useSelector((s) => s?.categories?.categories) || [];
   const subCategories = useSelector((s) => s?.subCategories?.subCategories) || [];
+  const stocks = useSelector((s) => s?.stocks?.stocks) || []; // <-- STOCKS
 
   // Paiement (confirmation Stripe via slice global)
   const payment = useSelector((s) => s?.payment) || {};
@@ -127,7 +129,6 @@ export const Cart = () => {
   // map produit -> code appliqué
   const [promoAppliedMap, setPromoAppliedMap] = useState(() => readPromoMap());
 
-  // helper: purge complète du map (LS + state)
   const clearPromoMap = () => {
     localStorage.removeItem("promo_map");
     setPromoAppliedMap({});
@@ -145,8 +146,7 @@ export const Cart = () => {
     if ((reduxItems?.length ?? 0) === 0) clearPromoMap();
   }, [reduxItems, dispatch]);
 
-  // ✅ Purger panier + promo_map quand le paiement est confirmé, même si on n'a pas
-  // revisité DeliveryPayment (assure un état clean après commande)
+  // Purge post-paiement
   useEffect(() => {
     if (paymentConfirmed) {
       clearPromoMap();
@@ -203,7 +203,6 @@ export const Cart = () => {
       setPromoAppliedMap(next);
       writePromoMap(next);
     }
-    // 🧹 si le panier est totalement vide, on purge complètement le map
     if (items.length === 0 && Object.keys(promoAppliedMap).length > 0) {
       clearPromoMap();
     }
@@ -240,7 +239,6 @@ export const Cart = () => {
   };
 
   const removeItem = (id) => {
-    // supprimer l’association produit->code pour débloquer la ressaisie
     const pid = String(id);
     if (promoAppliedMap[pid]) {
       const nextMap = { ...promoAppliedMap };
@@ -256,11 +254,10 @@ export const Cart = () => {
     const next = items.filter((it) => it.id !== id);
     setItems(next);
     persistLsItems(next);
-
-    // 🧹 si c’était le dernier article, purge complète du map
     if (next.length === 0) clearPromoMap();
   };
 
+  // Stock UI (badge)
   const getStockUi = (productId) => {
     const prod = products.find((p) => String(p.id) === String(productId));
     const raw = (prod?.stockStatus ?? "").trim();
@@ -271,8 +268,33 @@ export const Cart = () => {
     const label = lower.includes("plus que")
       ? "Bientôt en rupture"
       : raw || "Disponibilité limitée";
-    return { cls, label };
+    return { cls, label, isOut };
   };
+
+  // Stock disponible (quantité) pour un produit
+  const getAvailableQty = (productId) => {
+    const st = stocks.find(
+      (s) =>
+        String(s?.idProduct ?? s?.Id_product ?? s?.IdProduct) === String(productId)
+    );
+    const q = Number(
+      st?.quantity ?? st?.Quantity ?? st?.qty ?? st?.Qty ?? 0
+    );
+    return Number.isFinite(q) && q > 0 ? q : 0;
+  };
+
+  // Clamp auto si le stock baisse (ex : on avait 5, stock passe à 3)
+  useEffect(() => {
+    items.forEach((it) => {
+      const available = getAvailableQty(it.id);
+      if (available > 0 && it.qty > available) {
+        handleQty(it.id, available);
+      }
+      // si available === 0, on laisse la ligne présente,
+      // mais elle bloquera le bouton "Passer commande".
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stocks, items.map(i => `${i.id}:${i.qty}`).join("|")]);
 
   // ======== Appliquer un code promo ========
   const applyPromo = () => {
@@ -288,7 +310,7 @@ export const Cart = () => {
       return;
     }
 
-    // 🔒 Bloquer si ce code est déjà appliqué à AU MOINS un produit actuellement présent
+    // 🔒 Bloqué si déjà appliqué à au moins un produit du panier
     const alreadyAppliedSomewhere = items.some(
       (it) => promoAppliedMap[String(it.id)] === code
     );
@@ -460,6 +482,17 @@ export const Cart = () => {
   const grandTotal = Math.max(0, subTotal);
   const hasItems = items.length > 0;
 
+  // ======== BLOQUE LA COMMANDE SI RUPTURE ========
+  const outOfStockList = useMemo(
+    () => items.filter((it) => getAvailableQty(it.id) <= 0),
+    // stocks change -> recompute
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [items, stocks.map(s => `${s.IdProduct ?? s.idProduct}:${s.quantity ?? s.Quantity ?? s.qty ?? 0}`).join("|")]
+  );
+  const hasOutOfStock = outOfStockList.length > 0;
+
+  const canCheckout = hasItems && !hasOutOfStock;
+
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" });
   }, []);
@@ -482,14 +515,22 @@ export const Cart = () => {
           {items.length === 0 && <div className="cart-empty">Votre panier est vide.</div>}
 
           {items.map((it) => {
-            const { cls, label } = getStockUi(it.id);
+            const { cls, label, isOut } = getStockUi(it.id);
+            const available = getAvailableQty(it.id);
             const codeOnThis = promoAppliedMap[String(it.id)] || null;
+
+            // options dynamiques 1..available (cap 50)
+            const cap = Math.min(available, 50);
+            const qtyOptions =
+              cap > 0 ? Array.from({ length: cap }, (_, i) => i + 1) : [];
+
+            const disableSelect = isOut || available <= 0;
 
             return (
               <div key={it.id} className="cart-line">
                 <div className="line-left">
                   <Link to={`/product/${it.id}`}>
-                    <img className="cart-thumb" src={it.imageUrl} alt={it.name} />
+                    <img className="cart-thumb" src={toMediaUrl(it.imageUrl)} alt={it.name} />
                   </Link>
                   <div className="line-info">
                     <Link className="line-name" to={`/product/${it.id}`}>
@@ -499,6 +540,11 @@ export const Cart = () => {
                       <span className={`card-stock-dot ${cls}`} />
                       {label}
                     </span>
+                    {available <= 0 && (
+                      <div style={{ color: "#dc2626", fontWeight: 700 }}>
+                        Rupture de stock
+                      </div>
+                    )}
                     {codeOnThis && (
                       <span
                         style={{
@@ -520,12 +566,19 @@ export const Cart = () => {
                     value={it.qty}
                     onChange={(e) => handleQty(it.id, Number(e.target.value))}
                     className="qty-select"
+                    disabled={disableSelect}
+                    aria-disabled={disableSelect}
+                    title={disableSelect ? "Article en rupture" : "Changer la quantité"}
                   >
-                    {[...Array(10)].map((_, i) => (
-                      <option key={i + 1} value={i + 1}>
-                        {i + 1}
-                      </option>
-                    ))}
+                    {qtyOptions.length === 0 ? (
+                      <option value={it.qty}>—</option>
+                    ) : (
+                      qtyOptions.map((n) => (
+                        <option key={n} value={n}>
+                          {n}
+                        </option>
+                      ))
+                    )}
                   </select>
                 </div>
 
@@ -574,11 +627,44 @@ export const Cart = () => {
           <h3 className="sum-title">Montant total de vos produits</h3>
           <div className="sum-amount">{fmt(grandTotal)}</div>
 
+          {/* Alerte si des ruptures bloquent la commande */}
+          {hasOutOfStock && (
+            <div
+              style={{
+                background: "#fee2e2",
+                color: "#991b1b",
+                border: "1px solid #fecaca",
+                borderRadius: 10,
+                padding: 10,
+                marginBottom: 10,
+                fontWeight: 700,
+              }}
+            >
+              Un ou plusieurs articles sont en rupture de stock.
+              <br />
+              Supprimez-les pour continuer votre commande.
+              <ul style={{ margin: "8px 0 0 18px", fontWeight: 600 }}>
+                {outOfStockList.map((it) => (
+                  <li key={it.id}>
+                    {it.name}{" "}
+                    <button
+                      className="btn btn-light"
+                      style={{ marginLeft: 6, padding: "4px 8px" }}
+                      onClick={() => removeItem(it.id)}
+                    >
+                      Retirer
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <button
-            className={hasItems ? "checkout-btn" : "checkout-btn-disabled"}
-            disabled={!hasItems}
+            className={canCheckout ? "checkout-btn" : "checkout-btn-disabled"}
+            disabled={!canCheckout}
             onClick={() =>
-              hasItems &&
+              canCheckout &&
               navigate("/deliveryPayment", {
                 state: { totalCents: Math.round(grandTotal * 100) },
               })
@@ -600,9 +686,7 @@ export const Cart = () => {
         variant={promoModal.variant}
         title="Code promo"
         message={promoModal.message}
-        actions={[
-          { label: "OK", variant: "primary", onClick: closePromoModal, autoFocus: true },
-        ]}
+        actions={[{ label: "OK", variant: "primary", onClick: closePromoModal, autoFocus: true }]}
       />
     </div>
   );

@@ -5,6 +5,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { addToCartRequest, saveCartRequest } from "../../lib/actions/CartActions";
 import { GenericModal } from "../../components";
 import { calculPrice } from "../../lib/utils/Helpers";
+import { toMediaUrl } from "../../lib/utils/mediaUrl";
 
 // Helpers
 const parseDate = (val) => {
@@ -168,7 +169,7 @@ export const News = () => {
   return (
     <div className="category-page">
       {/* BANNIÈRE (NB via CSS) */}
-      <section className="category-hero" style={{ "--hero-url": `url("${heroUrl}")` }}>
+      <section className="category-hero" style={{ "--hero-url": `url("${toMediaUrl(heroUrl)}")` }}>
         <h1 className="category-hero__title">Nouveautés</h1>
         <div className="category-hero__count">
           {filteredLimited.length} produit{filteredLimited.length > 1 ? "s" : ""}
@@ -229,28 +230,37 @@ export const News = () => {
               <article key={product.id} className="product-card" data-aos="zoom-in">
                 <div className="product-thumb">
                   <Link to={`/product/${product.id}`} className="thumb-link">
-                    <img src={img} alt={name} />
+                    <img src={toMediaUrl(img)} alt={name} />
                   </Link>
 
                   {hasAnyPromo && <span className="promo-pill">Promotion</span>}
 
                   <div className="thumb-overlay" aria-hidden="true" />
-                  <button
-                    type="button"
-                    className="thumb-add-btn"
-                    title="Ajouter au panier"
-                    aria-label="Ajouter au panier"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      const payloadItem = { id: product.id, name, price: displayPrice, image: img, packageProfil: product.packageProfil, containedCode: product.containedCode };
-                      dispatch(addToCartRequest(payloadItem, 1));
-                      setLastAdded({ id: product.id, name });
-                      setShowAdded(true);
-                    }}
-                  >
-                    <i className="bi bi-cart-plus" aria-hidden="true"></i>
-                  </button>
+                  {!isOut && (
+                    <button
+                      type="button"
+                      className="thumb-add-btn"
+                      title="Ajouter au panier"
+                      aria-label="Ajouter au panier"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const payloadItem = {
+                          id: product.id,
+                          name,
+                          price: displayPrice,
+                          image: img,
+                          packageProfil: product.packageProfil,
+                          containedCode: product.containedCode
+                        };
+                        dispatch(addToCartRequest(payloadItem, 1));
+                        setLastAdded({ id: product.id, name });
+                        setShowAdded(true);
+                      }}
+                    >
+                      <i className="bi bi-cart-plus" aria-hidden="true"></i>
+                    </button>
+                  )}
                 </div>
 
                 <h3 className="product-name">{name}</h3>

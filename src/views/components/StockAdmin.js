@@ -98,7 +98,7 @@ export const StockAdmin = () => {
   const stocksWithProductNames = stocksFromStore
     .map((stock) => ({
       ...stock,
-      productName: productsFromStore.find(p => p.id === stock.idProduct)?.name || 'Produit inconnu'
+      productName: productsFromStore.find(p => p.id === stock.idProduct)?.brand  + " " + productsFromStore.find(p => p.id === stock.idProduct)?.model || 'Produit inconnu'
     }))
     .filter((stock) =>
       (stock.productName || '').toLowerCase().includes((searchQuery || '').toLowerCase())
@@ -136,7 +136,7 @@ export const StockAdmin = () => {
               stocksWithProductNames.map((stock) => (
                 <tr key={stock.id} onClick={() => handleEditClick(stock)} style={{ cursor: 'pointer' }}>
                   <td>{stock.productName}</td>
-                  <td>{stock.quantity}</td>
+                  <td className={stock.quantity < 1 ? 'text-danger fw-bold' : stock.quantity < 20 ? 'text-secondary fw-bold'  : stock.quantity < 30 ? 'text-primary fw-bold' : 'text-success fw-bold'}>{stock.quantity}</td>
                   <td>
                     <button
                       className='btn btn-sm btn-warning me-2'

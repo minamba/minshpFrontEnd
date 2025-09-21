@@ -11,6 +11,7 @@ import { getImageRequest, updateImageRequest } from "../../lib/actions/ImageActi
 import { getProductUserRequest } from "../../lib/actions/ProductActions";
 import { getTaxeRequest } from "../../lib/actions/TaxeActions";
 import "../../App.css";
+import { toMediaUrl } from "../../lib/utils/mediaUrl";
 
 export const SubCategoryAdmin = () => {
   const dispatch = useDispatch();
@@ -357,7 +358,7 @@ export const SubCategoryAdmin = () => {
                   style={{ cursor: "pointer" }}
                 >
                   <td>
-                    <img src={getSubCategoryImageUrl(sc.id)} width={100} alt={sc.name} />
+                    <img src={toMediaUrl(getSubCategoryImageUrl(sc.id))} width={100} alt={sc.name} />
                   </td>
                   <td>{sc.name}</td>
                   <td>{getCategoryNameForSubCat(sc)}</td>{/* ✅ affichage nom catégorie */}

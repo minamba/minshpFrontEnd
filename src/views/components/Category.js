@@ -1,12 +1,13 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import "../../App.css";
 import { useSelector, useDispatch } from "react-redux";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { addToCartRequest, saveCartRequest } from "../../lib/actions/CartActions";
 import { GenericModal } from "../../components";
+import { toMediaUrl } from "../../lib/utils/mediaUrl";
 import { calculPrice } from "../../lib/utils/Helpers";
 
-// ---------- Helpers ----------
+/* -------------------- Helpers -------------------- */
 const parseDate = (val) => {
   if (!val) return null;
   const d = new Date(val);
@@ -52,22 +53,38 @@ const toNumOrNull = (v) => {
   return Number.isFinite(n) ? n : null;
 };
 
-// ---------- Component ----------
+/* id parent d'une sous-catégorie (tolérant) */
+const getSubcatParentId = (sc) =>
+  sc?.parentCategoryId ??
+  sc?.idCategory ??
+  sc?.categoryId ??
+  sc?.idCategorie ??
+  sc?.categorieId ??
+  sc?.parentId ??
+  sc?.idParent ??
+  null;
+
+const getSubcatName = (sc) => (sc?.name ?? sc?.title ?? `Sous-catégorie ${sc?.id ?? ""}`).toString();
+const getCatName = (c) => (c?.name ?? c?.title ?? "Catégorie").toString();
+
+/* -------------------- Component -------------------- */
 export const Category = () => {
   const { id: routeCategoryId } = useParams();
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
-  // Store
-  const products   = useSelector((s) => s.products.products)   || [];
-  const images     = useSelector((s) => s.images.images)       || [];
-  const items      = useSelector((s) => s.items.items)         || [];
-  const categories = useSelector((s) => s.categories.categories) || [];
+  /* Store */
+  const products   = useSelector((s) => s.products?.products) || [];
+  const images     = useSelector((s) => s.images?.images) || [];
+  const items      = useSelector((s) => s.items?.items) || [];
+  const categories = useSelector((s) => s.categories?.categories) || [];
+  /* ✅ Sous-catégories depuis le store */
+  const subcategories = useSelector((s) => s.subCategories?.subCategories) || [];
 
-  // Sauvegarde panier
+  /* Sauvegarde panier */
   useEffect(() => { dispatch(saveCartRequest(items)); }, [items, dispatch]);
 
-  // Catégorie courante + bannière
+  /* Catégorie courante + bannière */
   const currentCategory = useMemo(
     () => (categories || []).find((c) => String(c.id) === String(routeCategoryId)) || null,
     [categories, routeCategoryId]
@@ -76,15 +93,16 @@ export const Category = () => {
   const categoryBannerUrl = useMemo(() => {
     const byCat = images.find((i) => String(i.idCategory) === String(routeCategoryId));
     return byCat?.url || "/Images/placeholder.jpg";
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [images, routeCategoryId]);
 
-  // Image principale du produit
+  /* Image principale produit */
   const getProductImage = (productId) => {
     const productImages = images.filter((i) => String(i.idProduct) === String(productId));
     return productImages.length > 0 ? productImages[0].url : "/Images/placeholder.jpg";
   };
 
-  // Produits de la catégorie
+  /* Produits de la catégorie */
   const categoryProducts = useMemo(() => {
     if (!routeCategoryId) return [];
     return (products || []).filter(
@@ -92,11 +110,10 @@ export const Category = () => {
     );
   }, [products, categories, routeCategoryId]);
 
-  // ---------- Recherche + tri ----------
+  /* ---------- Recherche + tri ---------- */
   const [search, setSearch]   = useState("");
-  const [sortKey, setSortKey] = useState(""); // placeholder “Trier les produits”
+  const [sortKey, setSortKey] = useState(""); // placeholder
 
-  // Pré-calculs pour trier/afficher
   const augmented = useMemo(() => {
     return categoryProducts.map((product, index) => {
       const name  = product.name || product.title || `Produit ${index + 1}`;
@@ -107,7 +124,6 @@ export const Category = () => {
           typeof product.priceTtc === "number" ? product.priceTtc : parseFloat(product.priceTtc)
         ) ?? 0;
 
-      // ==== PROMO PRODUIT (dates inclusives, fin à 23:59:59) ====
       const p0 = product?.promotions?.[0];
       const hasProductPromo = (() => {
         if (!p0) return false;
@@ -129,13 +145,10 @@ export const Category = () => {
           ? product.priceHtPromoted
           : parseFloat(product.priceHtPromoted)
       );
-
-      // Prix promo “produit” uniquement si promo active
       const productPromoPrice = hasProductPromo
         ? (Number.isFinite(promotedVal) ? promotedVal : computedPromo)
         : null;
 
-      // ==== PROMO PAR CODES (priorité sous-cat puis cat) ====
       const subCatCodeVal = toNumOrNull(
         typeof product.priceHtSubCategoryCodePromoted === "number"
           ? product.priceHtSubCategoryCodePromoted
@@ -149,11 +162,9 @@ export const Category = () => {
 
       const codePrice = (subCatCodeVal ?? catCodeVal);
 
-      // ==== Prix affiché & indicateurs UI ====
-      let displayPrice = calculPrice(product);
+      const displayPrice = calculPrice(product);
       const hasAnyPromo  = (codePrice != null) || (productPromoPrice != null);
 
-      // Pour les tris “remise” & “promo d’abord”
       const discountRate = priceRef > 0 ? (priceRef - displayPrice) / priceRef : 0;
       const discountPct  = +(discountRate * 100).toFixed(2);
 
@@ -215,32 +226,133 @@ export const Category = () => {
       case "discount-desc":
         list.sort((a, b) => (b.discountRate - a.discountRate) || (b.creationTs - a.creationTs));
         break;
-      case "":
       default:
         break;
     }
     return list;
   }, [augmented, search, sortKey]);
 
-  // ---------- Modal “ajouté au panier” ----------
+  /* ---------- Barre sous-catégories (pills) ---------- */
+  // Sous-catégories directes dont le parent = catégorie courante
+  const visibleSubcats = useMemo(() => {
+    if (!routeCategoryId) return [];
+    return (subcategories || []).filter(
+      (sc) => String(getSubcatParentId(sc)) === String(routeCategoryId)
+    );
+  }, [subcategories, routeCategoryId]);
+
+  // Pills = [catégorie courante] + [sous-catégories]
+  const pills = useMemo(() => {
+    const head = currentCategory
+      ? [{ id: String(currentCategory.id), name: getCatName(currentCategory), type: "category" }]
+      : [];
+    const subs = visibleSubcats.map((sc) => ({
+      id: String(sc.id),
+      name: getSubcatName(sc),
+      type: "sub",
+    }));
+    return [...head, ...subs];
+  }, [currentCategory, visibleSubcats]);
+
+  // Scroll + flèches
+  const pillsRef = useRef(null);
+  const [canScrollLeft, setCanScrollLeft]   = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const updatePillScrollState = () => {
+    const el = pillsRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 0);
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
+  };
+
+  useEffect(() => { updatePillScrollState(); }, [pills.length]);
+
+  useEffect(() => {
+    const el = pillsRef.current;
+    if (!el) return;
+    el.addEventListener("scroll", updatePillScrollState, { passive: true });
+    window.addEventListener("resize", updatePillScrollState);
+    return () => {
+      el.removeEventListener("scroll", updatePillScrollState);
+      window.removeEventListener("resize", updatePillScrollState);
+    };
+  }, []);
+
+  const scrollPills = (dir) => {
+    const el = pillsRef.current;
+    if (!el) return;
+    const delta = Math.round(el.clientWidth * 0.8) * (dir === "right" ? 1 : -1);
+    el.scrollBy({ left: delta, behavior: "smooth" });
+  };
+
+  /* ---------- Modal “ajouté au panier” ---------- */
   const [showAdded, setShowAdded] = useState(false);
   const [lastAdded, setLastAdded] = useState(null);
   const closeAdded = () => setShowAdded(false);
-  const goToCart = () => { setShowAdded(false); navigate("/cart"); };
+  const goToCart  = () => { setShowAdded(false); navigate("/cart"); };
 
+  /* -------------------- Render -------------------- */
   return (
     <div className="category-page">
       {/* BANNIÈRE */}
-      <section className="category-hero" style={{ '--hero-url': `url("${categoryBannerUrl}")` }} >
-        <h1 className="category-hero__title">
-          {currentCategory?.name || currentCategory?.title || "Catégorie"}
-        </h1>
+      <section className="category-hero" style={{ "--hero-url": `url("${toMediaUrl(categoryBannerUrl)}")` }}>
+        <h1 className="category-hero__title">{getCatName(currentCategory)}</h1>
         <div className="category-hero__count">
           {filteredSorted.length} produit{filteredSorted.length > 1 ? "s" : ""}
         </div>
       </section>
 
-      {/* BARRE D'OUTILS */}
+      {/* ====== BARRE SOUS-CATÉGORIES (désormais AU-DESSUS de la recherche/tri) ====== */}
+      {pills.length > 0 && (
+        <div className="subcat-bar">
+          <button
+            type="button"
+            className={`pill-nav pill-nav--left ${canScrollLeft ? "" : "is-disabled"}`}
+            onClick={() => scrollPills("left")}
+            aria-label="Défiler vers la gauche"
+          >
+            ‹
+          </button>
+
+          <div className="pill-scroll" ref={pillsRef}>
+            <ul className="pill-list" role="tablist" aria-label="Sous-catégories">
+              {pills.map((p) => {
+                const isCategoryPill = p.type === "category";
+                const active = isCategoryPill && String(p.id) === String(routeCategoryId);
+                return (
+                  <li key={`${p.type}-${p.id}`} className="pill-item">
+                    <button
+                      type="button"
+                      className={`pill ${active ? "pill--active" : ""}`}
+                      onClick={() => {
+                        if (isCategoryPill) {
+                          if (!active) navigate(`/category/${p.id}`);
+                        } else {
+                          navigate(`/subcategory/${p.id}`);
+                        }
+                      }}
+                    >
+                      {p.name}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+
+          <button
+            type="button"
+            className={`pill-nav pill-nav--right ${canScrollRight ? "" : "is-disabled"}`}
+            onClick={() => scrollPills("right")}
+            aria-label="Défiler vers la droite"
+          >
+            ›
+          </button>
+        </div>
+      )}
+
+      {/* BARRE D'OUTILS (recherche + tri) */}
       <div className="category-toolbar">
         <input
           className="form-control category-search"
@@ -248,7 +360,6 @@ export const Category = () => {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-
         <select
           className={`form-select category-sort ${sortKey === "" ? "is-placeholder" : ""}`}
           value={sortKey}
@@ -292,28 +403,37 @@ export const Category = () => {
               <article key={product.id} className="product-card" data-aos="zoom-in">
                 <div className="product-thumb">
                   <Link to={`/product/${product.id}`} className="thumb-link">
-                    <img src={img} alt={name} />
+                    <img src={toMediaUrl(img)} alt={name} />
                   </Link>
 
                   {hasAnyPromo && <span className="promo-pill">Promotion</span>}
 
                   <div className="thumb-overlay" aria-hidden="true" />
-                  <button
-                    type="button"
-                    className="thumb-add-btn"
-                    title="Ajouter au panier"
-                    aria-label="Ajouter au panier"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      const payloadItem = { id: product.id, name, price: displayPrice, image: img, packageProfil: product.packageProfil, containedCode: product.containedCode };
-                      dispatch(addToCartRequest(payloadItem, 1));
-                      setLastAdded({ id: product.id, name });
-                      setShowAdded(true);
-                    }}
-                  >
-                    <i className="bi bi-cart-plus" aria-hidden="true"></i>
-                  </button>
+                  {!isOut && (
+                    <button
+                      type="button"
+                      className="thumb-add-btn"
+                      title="Ajouter au panier"
+                      aria-label="Ajouter au panier"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const payloadItem = {
+                          id: product.id,
+                          name,
+                          price: displayPrice,
+                          image: img,
+                          packageProfil: product.packageProfil,
+                          containedCode: product.containedCode
+                        };
+                        dispatch(addToCartRequest(payloadItem, 1));
+                        setLastAdded({ id: product.id, name });
+                        setShowAdded(true);
+                      }}
+                    >
+                      <i className="bi bi-cart-plus" aria-hidden="true"></i>
+                    </button>
+                  )}
                 </div>
 
                 <h3 className="product-name">{product.brand + " " + product.model}</h3>

@@ -1,6 +1,8 @@
 import {takeEvery, takeLatest, call, put, fork} from "redux-saga/effects";
 import * as actions from "../actions/StockActions";
+import * as actionsProduct from "../actions/ProductActions";
 import * as api from "../api/stocks";
+import * as apiProduct from "../api/products";
 
 
 
@@ -21,6 +23,9 @@ function* addStock(action) {
         console.log("Stock added :",response.data);
         const stocks = yield call (api.getStocks);
         yield put (actions.getStockSuccess({stocks : stocks.data}));
+
+        const products = yield call (apiProduct.getProducts);
+        yield put (actionsProduct.getProductUserSuccess({products : products.data}));
     }
     catch (error) {
         yield put (actions.addStockFailure({error : error.response?.data || error.message}));
@@ -34,6 +39,9 @@ function* updateStock(action) {
         console.log("Stock updated :",response.data);
         const stocks = yield call (api.getStocks);
         yield put (actions.getStockSuccess({stocks : stocks.data}));
+
+        const products = yield call (apiProduct.getProducts);
+        yield put (actionsProduct.getProductUserSuccess({products : products.data}));
     }
     catch (error) {
         yield put (actions.updateStockFailure({error : error.response?.data || error.message}));
@@ -46,6 +54,9 @@ function* deleteStock(action) {
             const response = yield call(api.getStocks);
 
             yield put (actions.getStockSuccess({stocks : response.data}));
+
+            const products = yield call (apiProduct.getProducts);
+            yield put (actionsProduct.getProductUserSuccess({products : products.data}));
     }
     catch (error) {
         yield put (actions.deleteStockFailure({error : error.response?.data || error.message}));

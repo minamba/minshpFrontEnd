@@ -7,6 +7,7 @@ import {
 } from '../../lib/actions/VideoActions';
 import { getProductUserRequest } from '../../lib/actions/ProductActions';
 import { postUploadRequest } from '../../lib/actions/UploadActions';
+import { toMediaUrl } from '../../lib/utils/mediaUrl';
 
 export const VideoAdmin = () => {
   const videosFromStore = useSelector((state) => state.videos.videos) || [];
@@ -179,7 +180,7 @@ export const VideoAdmin = () => {
               <tr key={vid.id} onClick={() => handleEditClick(vid)} style={{ cursor: 'pointer' }}>
                 <td>
                   <video width="200" controls>
-                    <source src={vid.url} type="video/mp4" />
+                    <source src={toMediaUrl(vid.url)} type="video/mp4" />
                     Votre navigateur ne supporte pas la vidéo.
                   </video>
                 </td>

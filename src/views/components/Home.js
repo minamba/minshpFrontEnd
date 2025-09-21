@@ -5,6 +5,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { addToCartRequest, saveCartRequest } from '../../lib/actions/CartActions';
 import { GenericModal } from '../../components/index';
 import { calculPrice } from '../../lib/utils/Helpers';
+import { toMediaUrl } from '../../lib/utils/mediaUrl';
 
 export const Home = () => {
   const products  = useSelector((state) => state.products.products) || [];
@@ -66,7 +67,7 @@ export const Home = () => {
       <section className="hero-section">
         {heroVideo?.url ? (
           <video className="hero-video" autoPlay muted loop>
-            <source src={heroVideo.url} type="video/mp4" />
+            <source src={ toMediaUrl(heroVideo.url)} type="video/mp4" />
           </video>
         ) : (
           <p>Vidéo manquante</p>
@@ -95,7 +96,7 @@ export const Home = () => {
                   <p>{image.description || 'Description manquante'}</p>
                 </div>
                 <img
-                  src={image.url || '/Images/placeholder.jpg'}
+                  src={ toMediaUrl(image.url) || '/Images/placeholder.jpg'}
                   alt={image.title || `Image ${image.position}`}
                 />
               </div>
@@ -124,7 +125,7 @@ export const Home = () => {
               <article key={cat.name} className="category-card" data-aos="zoom-in">
                 <h3 className="category-title">{cat.name}</h3>
                 <img
-                  src={getCategoryImage(cat.id)}
+                  src={toMediaUrl(getCategoryImage(cat.id))}
                   alt={`Catégorie ${cat.name}`}
                   className="category-image"
                   onClick={() => navigate(`/category/${cat.id}`)}
@@ -225,27 +226,36 @@ export const Home = () => {
               <article key={product.id} className="product-card" data-aos="zoom-in">
                 <div className="product-thumb">
                   <Link to={`/product/${product.id}`} className="thumb-link">
-                    <img src={img} alt={name} />
+                    <img src={toMediaUrl(img)} alt={name} />
                   </Link>
 
                   {hasAnyPromo && <span className="promo-pill">Promotion</span>}
                   <div className="thumb-overlay" aria-hidden="true" />
-                  <button
-                    type="button"
-                    className="thumb-add-btn"
-                    title="Ajouter au panier"
-                    aria-label="Ajouter au panier"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      const payloadItem = { id: product.id, name, price: displayPrice, image: img, packageProfil: product.packageProfil, containedCode: product.containedCode };
-                      dispatch(addToCartRequest(payloadItem, 1));
-                      setLastAdded({ id: product.id, name });
-                      setShowAdded(true);
-                    }}
-                  >
-                    <i className="bi bi-cart-plus" aria-hidden="true"></i>
-                  </button>
+                  {!isOut && (
+                    <button
+                      type="button"
+                      className="thumb-add-btn"
+                      title="Ajouter au panier"
+                      aria-label="Ajouter au panier"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const payloadItem = {
+                          id: product.id,
+                          name,
+                          price: displayPrice,
+                          image: img,
+                          packageProfil: product.packageProfil,
+                          containedCode: product.containedCode
+                        };
+                        dispatch(addToCartRequest(payloadItem, 1));
+                        setLastAdded({ id: product.id, name });
+                        setShowAdded(true);
+                      }}
+                    >
+                      <i className="bi bi-cart-plus" aria-hidden="true"></i>
+                    </button>
+                  )}
                 </div>
 
                 <h3 className="product-name">{name}</h3>

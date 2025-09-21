@@ -10,6 +10,7 @@ import { getImageRequest, updateImageRequest } from '../../lib/actions/ImageActi
 import { getProductUserRequest } from '../../lib/actions/ProductActions';
 import { getTaxeRequest } from '../../lib/actions/TaxeActions';
 import '../../App.css';
+import { toMediaUrl } from '../../lib/utils/mediaUrl';
 
 export const CategoryAdmin = () => {
   const categoriesFromStore = useSelector((s) => s.categories.categories) || [];
@@ -329,7 +330,7 @@ export const CategoryAdmin = () => {
           <tbody>
             {sortedCategories.map((cat) => (
               <tr key={cat.id} onClick={() => handleEditClick(cat)} style={{ cursor: 'pointer' }}>
-                <td><img src={getCategoryImage(cat.id)} width={100} alt={cat.name} /></td>
+                <td><img src={toMediaUrl(getCategoryImage(cat.id))} width={100} alt={cat.name} /></td>
                 <td>{cat.name}</td>
                 <td>{getCategoryTaxNames(cat)}</td>
                 <td>{getContentCodeLabel(cat)}</td>
@@ -493,7 +494,7 @@ export const CategoryAdmin = () => {
                           title={img.fileName || img.url}
                         >
                           <img
-                            src={img.url}
+                            src={toMediaUrl(img.url)}
                             alt={img.fileName || `img-${img.id}`}
                             style={{ width: '100%', height: 80, objectFit: 'cover', borderRadius: 6 }}
                           />
@@ -531,7 +532,7 @@ export const CategoryAdmin = () => {
                         title={img.fileName || img.url}
                       >
                         <img
-                          src={img.url}
+                          src={toMediaUrl(img.url)}
                           alt={img.fileName || `img-${img.id}`}
                           style={{ width: '100%', height: 80, objectFit: 'cover', borderRadius: 6 }}
                         />

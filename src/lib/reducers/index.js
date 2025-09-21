@@ -25,6 +25,7 @@ import subCategoryReducer from "./SubCategoryActions";
 import StripeReducer from "./StripeReducers";
 import invoiceReducer from "./InvoiceReducers";
 import roleReducer from "./RoleReducers";
+import customerPromotionCodeReducer from "./CustomerPromotionCodeReducers";
 
 export default combineReducers({
     products : productReducer,
@@ -53,4 +54,5 @@ export default combineReducers({
     stripe : StripeReducer,
     invoices : invoiceReducer,
     roles : roleReducer,
+    customerPromotionCodes : customerPromotionCodeReducer,
 })

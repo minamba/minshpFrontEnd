@@ -299,7 +299,7 @@ function AddressModal({
 
     return {
       id: initial?.id ?? null,
-      civ: type === "billing" ? (currentCustomer?.civ || "M") : (initial?.civ || "M"),
+      civilite: type === "billing" ? (currentCustomer?.civilite || "M") : (initial?.civilite || "M"),
       firstName: type === "billing" ? (currentCustomer?.firstName || "") : (initial?.firstName || ""),
       lastName:  type === "billing" ? (currentCustomer?.lastName  || "") : (initial?.lastName  || ""),
       address1: initial?.address1 || initial?.address || "",
@@ -353,15 +353,15 @@ function AddressModal({
         </div>
 
         <form onSubmit={submit} style={S.formVertical}>
-          {/* Civilité */}
+          {/* civiliteilité */}
           <div style={S.formRow}>
             <label className="form-label">Civilité <b>*</b></label>
             {type === "billing" ? (
-              <input className="form-control" value={form.civ === "Mme" ? "Madame" : "Monsieur"} disabled />
+              <input className="form-control" value={form.civilite === "Mme" ? "Madame" : "Monsieur"} disabled />
             ) : (
               <div style={S.radioRow}>
-                <label><input type="radio" name="civ" value="M"  checked={form.civ === "M"}  onChange={handle} /> M.</label>
-                <label><input type="radio" name="civ" value="Mme" checked={form.civ === "Mme"} onChange={handle} /> Mme</label>
+                <label><input type="radio" name="civilite" value="M"  checked={form.civilite === "M"}  onChange={handle} /> M.</label>
+                <label><input type="radio" name="civilite" value="Mme" checked={form.civilite === "Mme"} onChange={handle} /> Mme</label>
               </div>
             )}
           </div>
@@ -526,7 +526,7 @@ export const Address = () => {
     if (!a) return null;
     return {
       id: a?.id ?? a?.billingAddressId ?? a?.deliveryAddressId ?? a?.Id ?? null,
-      civ: a?.civ ?? a?.Civ ?? "M",
+      civilite: a?.civilite ?? a?.civilite ?? "M",
       firstName: a?.firstName ?? a?.FirstName ?? "",
       lastName: a?.lastName ?? a?.LastName ?? "",
       address1: a?.address ?? a?.Address ?? a?.addressLine ?? a?.line1 ?? "",
@@ -557,7 +557,7 @@ export const Address = () => {
     const base = {
       Id: form.id ?? undefined,
       IdCustomer: currentCustomer?.id,
-      Civ: form.civ,
+      Civilite: form.civilite,
       FirstName: type === "billing" ? currentCustomer?.firstName : form.firstName,
       LastName:  type === "billing" ? currentCustomer?.lastName  : form.lastName,
       Address: form.address1,
@@ -689,7 +689,7 @@ export const Address = () => {
               <div key={addr.id} style={S.miniCard}>
                 <div style={S.miniHeader}>
                   <div style={{ fontWeight: 600 }}>
-                    {addr.civ === "Mme" ? "Mme" : "M."} {addr.firstName} {addr.lastName}
+                    {addr.civilite === "Mme" ? "Mme" : "M."} {addr.firstName} {addr.lastName}
                   </div>
                   <div style={S.miniActions}>
                     <button className="btn btn-light" title="Modifier" onClick={() => editShipping(addr)}><i className="bi bi-pencil" /></button>

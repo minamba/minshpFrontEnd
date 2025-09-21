@@ -9,6 +9,7 @@ import {
 } from '../../lib/actions/ImageActions';
 import { getProductUserRequest } from '../../lib/actions/ProductActions';
 import { postUploadRequest } from '../../lib/actions/UploadActions';
+import { toMediaUrl } from '../../lib/utils/mediaUrl';
 
 export const ImageAdmin = () => {
   const imagesFromStore   = useSelector((state) => state.images.images) || [];
@@ -191,7 +192,7 @@ export const ImageAdmin = () => {
             {filteredImages.map((img) => (
               <tr key={img.id} onClick={() => handleEditClick(img)} style={{ cursor: 'pointer' }}>
                 <td>
-                  <img src={img.url} alt="preview" style={{ width: '80px', height: 'auto' }} />
+                  <img src={toMediaUrl(img.url)} alt="preview" style={{ width: '80px', height: 'auto' }} />
                 </td>
                 <td>{img.description}</td>
                 <td>{getProductName(img.idProduct)}</td>

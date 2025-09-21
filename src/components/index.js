@@ -20,6 +20,7 @@ import { logout } from '../lib/actions/AccountActions';
 import { calculPrice } from '../lib/utils/Helpers';
 import { getUserRoles } from '../lib/utils/jwt';
 import { RequireRole } from '../views/components/Authentication/RequireRole';
+import { toMediaUrl } from '../lib/utils/mediaUrl';
 
 
 
@@ -287,25 +288,26 @@ export const Navbar = () => {
             )}
             {adminOpen &&  (
               <div className="navbar-dropdown-menu">
-                <Link to="/admin/products" onClick={() => setIsOpen(false)}>Produits</Link>
-                <Link to="/admin/categories" onClick={() => setIsOpen(false)}>Catégories</Link>
-                <Link to="/admin/subCategory" onClick={() => setIsOpen(false)}>Sous catégories</Link>
-                <Link to="/admin/customers" onClick={() => setIsOpen(false)}>Clients</Link>
-                <Link to="/admin/orders" onClick={() => setIsOpen(false)}>Commandes</Link>
-                <Link to="/admin/featureCategories" onClick={() => setIsOpen(false)}>Catégories des caractéristiques</Link>
-                <Link to="/admin/stocks" onClick={() => setIsOpen(false)}>Stocks</Link>
-                <Link to="/admin/promotions" onClick={() => setIsOpen(false)}>Promotions</Link>
-                <Link to="/admin/features" onClick={() => setIsOpen(false)}>Caractéristiques</Link>
-                <Link to="/admin/featureProducts" onClick={() => setIsOpen(false)}>Caractéristiques produits</Link>
-                <Link to="/admin/images" onClick={() => setIsOpen(false)}>Images</Link>
-                <Link to="/admin/videos" onClick={() => setIsOpen(false)}>Vidéos</Link>
-                <Link to="/admin/taxes" onClick={() => setIsOpen(false)}>Taxes</Link>
-                <Link to="/admin/promotionCodes" onClick={() => setIsOpen(false)}>Codes promotionnels</Link>
                 <Link to="/admin/application" onClick={() => setIsOpen(false)}>Application</Link>
                 <Link to="/admin/billingAddress" onClick={() => setIsOpen(false)}>Adresses de facturation</Link>
                 <Link to="/admin/deliveryAddress" onClick={() => setIsOpen(false)}>Adresses de livraison</Link>
-                <Link to="/admin/packageProfil" onClick={() => setIsOpen(false)}>Profils de colis</Link>
+                <Link to="/admin/categories" onClick={() => setIsOpen(false)}>Catégories</Link>
+                <Link to="/admin/subCategory" onClick={() => setIsOpen(false)}>Sous catégories</Link>
+                <Link to="/admin/features" onClick={() => setIsOpen(false)}>Caractéristiques</Link>
+                <Link to="/admin/featureProducts" onClick={() => setIsOpen(false)}>Caractéristiques produits</Link>
+                <Link to="/admin/featureCategories" onClick={() => setIsOpen(false)}>Catégories des caractéristiques</Link>
+                <Link to="/admin/customers" onClick={() => setIsOpen(false)}>Clients</Link>
                 <Link to="/admin/invoices" onClick={() => setIsOpen(false)}>Factures</Link>
+                <Link to="/admin/customerPromotions" onClick={() => setIsOpen(false)}>Codes promo clients</Link>
+                <Link to="/admin/promotionCodes" onClick={() => setIsOpen(false)}>Codes promo produits</Link>
+                <Link to="/admin/orders" onClick={() => setIsOpen(false)}>Commandes</Link>
+                <Link to="/admin/products" onClick={() => setIsOpen(false)}>Produits</Link>
+                <Link to="/admin/images" onClick={() => setIsOpen(false)}>Images</Link>
+                <Link to="/admin/videos" onClick={() => setIsOpen(false)}>Vidéos</Link>
+                <Link to="/admin/stocks" onClick={() => setIsOpen(false)}>Stocks</Link>
+                <Link to="/admin/promotions" onClick={() => setIsOpen(false)}>Promotions</Link>
+                <Link to="/admin/taxes" onClick={() => setIsOpen(false)}>Taxes</Link>
+                <Link to="/admin/packageProfil" onClick={() => setIsOpen(false)}>Profils de colis</Link>
               </div>
             )}
           </div>
@@ -637,7 +639,7 @@ export const ProductTable = () => {
                 <tr key={prod.id}>
                   <td>
                     <Link to={`/product/${prod.id}`}>
-                      <img src={prod.images?.[0]?.url} alt={prod.name} width={100} />
+                      <img src={toMediaUrl(prod.images?.[0]?.url)} alt={prod.name} width={100} />
                     </Link>
                   </td>
                   <td>{prod.name}</td>

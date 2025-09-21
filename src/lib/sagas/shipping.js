@@ -18,6 +18,7 @@ function* getRatesWorker({ payload }) {
     console.log("getRatesWorker", data); 
     yield put(getShippingRatesSuccess(data));  
   } catch (e) {
+    console.log("error : getRatesWorker", e);
     yield put(getShippingRatesFailure(e?.message || "rates error"));
   } 
 }

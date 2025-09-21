@@ -9,6 +9,7 @@ import {
   getCartRequest,
 } from "../../lib/actions/CartActions";
 import { GenericModal } from "../../components";
+import { toMediaUrl } from "../../lib/utils/mediaUrl";
 
 /* ---------- Helpers ---------- */
 const parseDate = (val) => {
@@ -241,7 +242,7 @@ export const Promotion = () => {
   return (
     <div className="category-page">
       {/* BANNIÈRE — noir & blanc via CSS (::before + --hero-url) */}
-      <section className="category-hero" style={{ "--hero-url": `url("${bannerUrl}")` }}>
+      <section className="category-hero" style={{ "--hero-url": `url("${toMediaUrl(bannerUrl)}")` }}>
         <h1 className="category-hero__title">Promotions</h1>
         <div className="category-hero__count">
           {filteredSorted.length} produit{filteredSorted.length > 1 ? "s" : ""}
@@ -300,35 +301,37 @@ export const Promotion = () => {
               <article key={product.id} className="product-card" data-aos="zoom-in">
                 <div className="product-thumb">
                   <Link to={`/product/${product.id}`} className="thumb-link">
-                    <img src={img} alt={name} />
+                    <img src={toMediaUrl(img)} alt={name} />
                   </Link>
 
                   <span className="promo-pill">Promotion</span>
 
                   <div className="thumb-overlay" aria-hidden="true" />
-                  <button
-                    type="button"
-                    className="thumb-add-btn"
-                    title="Ajouter au panier"
-                    aria-label="Ajouter au panier"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      const payloadItem = {
-                        id: product.id,
-                        name,
-                        price: displayPrice,
-                        image: img,
-                        packageProfil: product.packageProfil,
-                        containedCode: product.containedCode
-                      };
-                      dispatch(addToCartRequest(payloadItem, 1));
-                      setLastAdded({ id: product.id, name });
-                      setShowAdded(true);
-                    }}
-                  >
-                    <i className="bi bi-cart-plus" aria-hidden="true"></i>
-                  </button>
+                  {!isOut && (
+                      <button
+                        type="button"
+                        className="thumb-add-btn"
+                        title="Ajouter au panier"
+                        aria-label="Ajouter au panier"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          const payloadItem = {
+                            id: product.id,
+                            name,
+                            price: displayPrice,
+                            image: img,
+                            packageProfil: product.packageProfil,
+                            containedCode: product.containedCode
+                          };
+                          dispatch(addToCartRequest(payloadItem, 1));
+                          setLastAdded({ id: product.id, name });
+                          setShowAdded(true);
+                        }}
+                      >
+                        <i className="bi bi-cart-plus" aria-hidden="true"></i>
+                      </button>
+                    )}
                 </div>
 
                 <h3 className="product-name">{(product.brand || "") + " " + (product.model || name)}</h3>

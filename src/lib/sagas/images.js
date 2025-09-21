@@ -47,6 +47,7 @@ function* deleteImage(action) {
             yield put (actions.getImageSuccess({images : response.data}));
     }
     catch (error) {
+        console.log("Error deleting image :",error);
         yield put (actions.deleteImageFailure({error : error.response?.data || error.message}));
     }
 }

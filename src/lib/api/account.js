@@ -1,7 +1,11 @@
 import axios from "axios";
 
+const API_HOST = window.location.hostname;     // ex: "localhost" ou "192.168.1.63"
+const API_PORT = 5098;                         // ton port API HTTP
+
 const idp = axios.create({
-  baseURL: "https://localhost:7183",
+
+  baseURL: `http://${API_HOST}:${API_PORT}`,
   // header pas obligatoire ici, Axios le mettra pour URLSearchParams
   headers: { "Accept": "application/json" },
   timeout: 10000,
