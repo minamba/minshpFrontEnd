@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import '../../App.css';
 import {ProductTable} from '../../components/index';
+import "../../styles/components/admin-products-table.css";
 
 export const ProductAdmin = () => {
       

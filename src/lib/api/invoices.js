@@ -12,6 +12,9 @@ export const updateInvoice = (invoice) => {
     return axios.put("/invoice", invoice);
 }
 
-export const deleteInvoice = (id) => {
-    return axios.delete(`/invoice/${id}`);
-}
+export const deleteInvoice = (invoice) => {
+    return axios.delete("/invoice", {
+      headers: { "Content-Type": "application/json" },
+      data: invoice, // <-- le body est bien ici
+    });
+  };

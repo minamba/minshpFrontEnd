@@ -85,7 +85,7 @@ function PhoneInput({ dial, local, onChange }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 8 }}>
       <select
-        className="form-control"
+        className="form-control mb-3"
         value={dial || DEFAULT_DIAL}
         onChange={(e) => onChange({ dial: e.target.value, local })}
       >
@@ -123,6 +123,12 @@ export const UserInformation = ({ user = {} }) => {
   const customers = useSelector((s) => s?.customers?.customers) || [];
   const currentCustomer = customers.find((c) => c.idAspNetUser === user.id);
 
+  // ---- Newsletters
+
+  const newsletters = useSelector((s) => s?.newsletters?.newsletters) || [];
+  const currentNewsletter = newsletters.find((n) => n.mail === currentCustomer?.email).suscribe;
+
+
   // ---- États du formulaire "infos perso"
   const rawBirthDate = currentCustomer?.birthDate ?? null;
   const initialBirth = rawBirthDate ? rawBirthDate.slice(0, 10) : "";
@@ -153,10 +159,21 @@ export const UserInformation = ({ user = {} }) => {
   const [openProfileModal, setOpenProfileModal] = useState(false);
   const [openPasswordModal, setOpenPasswordModal] = useState(false);
 
+  //abonné
+  const [subscribed, setSubscribed] = useState(false);
+
+
+  useEffect(() => {
+    setSubscribed(Boolean(currentNewsletter));
+  }, [currentNewsletter]);
+
+
   // Si currentCustomer arrive après le premier rendu, re-synchroniser les champs
   useEffect(() => {
     const d = currentCustomer?.birthDate;
     setBirthdate(d ? d.slice(0, 10) : "");
+
+
 
     if (currentCustomer) {
       if (currentCustomer.firstName != null) setFirstName(currentCustomer.firstName);
@@ -224,6 +241,7 @@ export const UserInformation = ({ user = {} }) => {
 
     const payload = {
       Id: currentCustomer?.idAspNetUser ?? user.id, // fallback par sécurité
+      IdApi: currentCustomer.id, // fallback par sécurité
       Civility: civility,
       FirstName: firstName.trim(),
       LastName: lastName.trim(),
@@ -233,6 +251,7 @@ export const UserInformation = ({ user = {} }) => {
       Pseudo: (pseudo || "").trim() || null,
       Actif: true,
       Phone: phoneE164,
+      Subscribe: subscribed, // ⬅️ valeur de la checkbox
     };
     setSaving(true);
     await dispatch(updateUserRequest(payload));
@@ -274,7 +293,7 @@ export const UserInformation = ({ user = {} }) => {
         {/* Colonne gauche */}
         <div className="form-col">
           <span>Civilité</span>
-          <div className="radio-row" role="radiogroup" aria-label="Civilité">
+          <div className="radio-row mb-3" role="radiogroup" aria-label="Civilité">
             <label style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
               <input
                 type="radio"
@@ -301,18 +320,18 @@ export const UserInformation = ({ user = {} }) => {
             Prénom <span style={{ color: "#ef4444" }}>*</span>
           </span>
           <input
-            className="form-control"
+            className="form-control mb-3"
             value={firstName}
             onChange={(e) => setFirstName(e.target.value)}
             placeholder="Votre prénom"
             required
           />
 
-          <span>
+          <span className="mb-3">
             Nom <span style={{ color: "#ef4444" }}>*</span>
           </span>
           <input
-            className="form-control"
+            className="form-control mb-3"
             value={lastName}
             onChange={(e) => setLastName(e.target.value)}
             placeholder="Votre nom"
@@ -330,9 +349,9 @@ export const UserInformation = ({ user = {} }) => {
               setPhoneLocal(local);
             }}
           />
-          <small style={{ color: "#6b7280" }}>
+          {/* <small style={{ color: "#6b7280" }}>
             Exemple FR : tapez <b>06…</b> — sera enregistré <b>+336…</b>
-          </small>
+          </small> */}
         </div>
 
         {/* Colonne droite */}
@@ -341,7 +360,7 @@ export const UserInformation = ({ user = {} }) => {
             Email <span style={{ color: "#ef4444" }}>*</span>
           </span>
           <input
-            className="form-control"
+            className="form-control mb-3"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -354,7 +373,7 @@ export const UserInformation = ({ user = {} }) => {
           </span>
           <input
             type="date"
-            className="form-control"
+            className="form-control mb-3"
             value={birthdate || ""}
             onChange={(e) => setBirthdate(e.target.value)}
             required
@@ -362,16 +381,30 @@ export const UserInformation = ({ user = {} }) => {
 
           <span>Pseudo</span>
           <input
-            className="form-control"
+            className="form-control mb-5"
             value={pseudo}
             onChange={(e) => setPseudo(e.target.value)}
             placeholder="Votre pseudo (optionnel)"
           />
+
+            <span className="mt-">Abonné à la newsletter</span>
+            <div className="form-check mb-3">
+              <input
+                id="newsletter-subscribed"
+                className="form-check-input"
+                type="checkbox"
+                checked={subscribed}
+                onChange={(e) => setSubscribed(e.target.checked)}
+              />
+              <label className="form-check-label" htmlFor="newsletter-subscribed">
+                Recevoir les nouveautés et offres
+              </label>
+            </div>
         </div>
 
         <div style={{ gridColumn: "1 / -1", marginTop: 6 }}>
-          <button type="submit" className="gbtn gbtn--primary" disabled={!profileValid || saving}>
-            {saving ? "Enregistrement…" : "Valider"}
+          <button type="submit" className="gbtn gbtn--primary mt-3 mb-4" disabled={!profileValid || saving}>
+            {saving ? "Enregistrement…" : "Mettre à jour"}
           </button>
           {/* Erreur MAJ profil */}
           {errorUpdate && (
@@ -400,7 +433,7 @@ export const UserInformation = ({ user = {} }) => {
           </span>
           <div style={{ position: "relative" }}>
             <input
-              className="form-control"
+              className="form-control mb-3"
               type={showCur ? "text" : "password"}
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
@@ -425,7 +458,7 @@ export const UserInformation = ({ user = {} }) => {
           </span>
           <div style={{ position: "relative" }}>
             <input
-              className="form-control"
+              className="form-control mb-3"
               type={showNew ? "text" : "password"}
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
@@ -446,7 +479,7 @@ export const UserInformation = ({ user = {} }) => {
 
         <div style={{ gridColumn: "1 / -1" }}>
           <button type="submit" className="gbtn gbtn--primary" disabled={!passwordValid || changing}>
-            {changing ? "Validation…" : "Valider"}
+            {changing ? "Validation…" : "Mettre à jour"}
           </button>
           {/* Erreur MAJ mot de passe */}
           {errorUpdatePassword && (

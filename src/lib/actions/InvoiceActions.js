@@ -63,10 +63,10 @@ export function updateInvoiceFailure(error) {
 
 
 //delete
-export function deleteInvoiceRequest(IdInvoice) {
+export function deleteInvoiceRequest(data) {
     return {
         type: actionsInvoice.DELETE_INVOICE_REQUEST,
-        payload: IdInvoice,
+        payload: data,
     }
 }
 

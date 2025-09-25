@@ -1,0 +1,186 @@
+/* src/styles/pages/success.css */
+
+/* =========================
+   Variables (thème clair)
+   ========================= */
+   :root {
+    /* Couleurs marque/success */
+    --success: #16a34a;
+    --success-700: #15803d;
+  
+    /* Fond page (dégradé frais bleu → vert menthe) */
+    --bg-color:
+      radial-gradient(1200px 600px at 80% -100px, rgba(255, 255, 255, 0.12), transparent),
+      radial-gradient(900px 500px at -10% 120%, rgba(255, 255, 255, 0.12), transparent),
+      linear-gradient(180deg, #eff6ff 0%, #ffffff 60%, #4ab985 100%);
+  
+    /* Carte + texte */
+    --card-bg: #ffffff;
+    --text: #000000;
+    --muted: #1c252e;
+  
+    /* Effets */
+    --ring: rgba(22, 163, 74, 0.35);
+    --border: rgba(255, 255, 255, 0.08);
+    --shadow-1: 0 10px 25px rgba(2, 6, 23, 0.06), 0 4px 10px rgba(2, 6, 23, 0.04);
+    --shadow-2: 0 8px 18px rgba(22, 163, 74, 0.28);
+    --shadow-3: 0 12px 24px rgba(21, 128, 61, 0.32);
+  }
+  
+  /* =========================
+     Page & card
+     ========================= */
+  .success-page {
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: 2rem;
+    background: var(--bg-color);
+  }
+  
+  .success-card {
+    position: relative;
+    width: 100%;
+    max-width: 560px;
+    background: var(--card-bg);
+    color: var(--text);
+    border-radius: 1rem;
+    padding: 3.5rem 2rem 2.25rem;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-1);
+    text-align: center;
+  }
+  
+  /* =========================
+     Badge (coche)
+     ========================= */
+  .success-badge {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    top: -28px;
+    width: 56px;
+    height: 56px;
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
+    background: var(--success);
+    color: #fff;
+    border: 4px solid var(--card-bg);
+    box-shadow: 0 10px 20px rgba(22, 163, 74, 0.35);
+    pointer-events: none;
+  }
+  
+  .success-badge .bi {
+    font-size: 1.6rem;
+    line-height: 1;
+  }
+  
+  /* =========================
+     Typographie
+     ========================= */
+  .success-title {
+    margin: 0.25rem 0 0.5rem;
+    font-weight: 800;
+    font-size: clamp(1.5rem, 1.2rem + 1.2vw, 2rem);
+    letter-spacing: -0.015em;
+  }
+  
+  .success-text {
+    margin: 0.25rem auto 0;
+    max-width: 46ch;
+    line-height: 1.65;
+    color: var(--muted);
+    font-size: 0.98rem;
+  }
+  
+  /* =========================
+     Actions / Bouton
+     ========================= */
+  .success-actions {
+    margin-top: 1.5rem;
+    display: flex;
+    justify-content: center;
+  }
+  
+  .success-home-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.85rem 1.25rem;
+    border-radius: 0.875rem;
+    background: var(--success);
+    color: #fff;
+    text-decoration: none;
+    font-weight: 600;
+    border: 1px solid transparent;
+    transition: transform 0.12s ease, box-shadow 0.2s ease, background 0.2s ease;
+    box-shadow: var(--shadow-2);
+  }
+  
+  .success-home-btn:hover {
+    background: var(--success-700);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-3);
+  }
+  
+  .success-home-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 6px 14px rgba(21, 128, 61, 0.28);
+  }
+  
+  .success-home-btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 4px var(--ring);
+  }
+  
+  /* =========================
+     Dark mode
+     ========================= */
+  @media (prefers-color-scheme: dark) {
+    :root {
+      /* Fond sombre mais “positif” */
+      --bg-color:
+        radial-gradient(1200px 600px at 80% -100px, rgba(56, 189, 248, 0.12), transparent),
+        radial-gradient(900px 500px at -10% 120%, rgba(34, 197, 94, 0.10), transparent),
+        linear-gradient(180deg, #e0e6f1 0%, #ffffff 100%);
+      --card-bg: #ffffff;
+      --text: #03060a;
+      --muted: #265081;
+      --border: rgba(148, 163, 184, 0.15);
+      --shadow-1: 0 10px 25px rgba(0, 0, 0, 0.35), 0 4px 10px rgba(0, 0, 0, 0.25);
+    }
+  
+    .success-card {
+      box-shadow: var(--shadow-1);
+    }
+  
+    .success-badge {
+      border-color: var(--card-bg);
+    }
+  }
+  
+  /* =========================
+     Accessibilité
+     ========================= */
+  @media (prefers-reduced-motion: reduce) {
+    .success-home-btn {
+      transition: none;
+    }
+  }
+  
+  /* =========================
+     Petits écrans
+     ========================= */
+  @media (max-width: 420px) {
+    .success-card {
+      padding: 3rem 1.25rem 1.75rem;
+      border-radius: 0.875rem;
+    }
+    .success-badge {
+      top: -24px;
+      width: 52px;
+      height: 52px;
+    }
+  }
+  

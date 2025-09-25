@@ -1,7 +1,7 @@
 // src/pages/account/Account.jsx
 import React, { useMemo, useState } from "react";
 import "bootstrap-icons/font/bootstrap-icons.css";
-import "../../../App.css";
+import "../../../styles/pages/account.css";
 
 import { UserInformation } from "./UserInformation";
 import { Address } from "./Address";
@@ -10,6 +10,7 @@ import { useNavigate } from "react-router-dom";
 import { logout } from "../../../lib/actions/AccountActions";
 import { downloadInvoiceRequest } from "../../../lib/actions/OrderActions";
 import { Link } from "react-router-dom";
+import { toMediaUrl } from '../../../lib/utils/mediaUrl';
 
 /* ===== Helpers ===== */
 
@@ -81,6 +82,9 @@ export const Account = () => {
   const orders = useSelector((s) => s?.orders?.orders) || [];
   const products = useSelector((s) => s?.products?.products) || [];
   const orderProducts = useSelector((s) => s?.orderProducts?.orderProducts) || [];
+  const images = useSelector((s) => s?.images?.images) || [];
+
+  console.log("fdsfsdfdfsffdfsfds",images);
 
   const uid = user?.id || null;
   const currentCustomer = customers.find((c) => c.idAspNetUser === uid);
@@ -167,6 +171,12 @@ export const Account = () => {
     navigate("/");
   };
 
+  const getImage = (id) => {
+    const getImage = images.find((i) => i.idProduct === id);
+    if (!getImage) return null;
+    return getImage.url;
+  };
+
   return (
     <div className="account-page">
       {/* -------- SIDEBAR -------- */}
@@ -198,7 +208,8 @@ export const Account = () => {
             )}
           </div>
           <button className="account-logout" onClick={deconnect}>
-            <i className="bi bi-power" /> Se déconnecter
+            <i className="bi bi-power" aria-hidden="true" />
+            <span>Se déconnecter</span>
           </button>
         </div>
 
@@ -283,7 +294,7 @@ export const Account = () => {
                       <span className="order-id">N° {orderNumber(o)}</span>
                       <span className="order-price">{fmtPrice(amount)} TTC</span>
                       <span>{orderDateFR(o)}</span>
-                      <span className="order-status">{orderStatus(o)}</span>
+                      <span className="order-status ">{orderStatus(o)}</span>
                       <button
                         className="order-detail-btn"
                         onClick={() => setOpenId(open ? null : (getId(o) ?? o.id))}
@@ -294,45 +305,52 @@ export const Account = () => {
                     </div>
 
                     {open && (
-                      <div className="order-details">
-                        {items.map((it, i) => (
-                          <div key={i} className="order-item">
-                            <span>
-                              <Link to={`/product/${it.productId}`}>{it.name}</Link>
+                        <div className="order-details">
+                          {items.map((it, i) => (
+                            <React.Fragment key={i}>
+                              <div className="order-item lineBackgroundColor">
+                                <span>
+                                  <Link to={`/product/${it.productId}`}>
+                                    <img src={ toMediaUrl(getImage(it.productId))} alt={it.name} width={60} />                   
+                                  </Link>
+                                </span>
+                                <span className="text-dark fw-bold">{fmtPrice(it.price * it.qty)}</span>
+                                <span>x{it.qty}</span>
+                              </div>
+                              <hr />
+                            </React.Fragment>
+                          ))}
+
+                          <div className="order-item order-item--shipping lineBackgroundColor">
+                            <span className="shipping-label text-success">Prix de Livraison</span>
+                            <span className="text-dark fw-bold">
+                              {fmtPrice(Number(o?.deliveryAmount ?? o?.shippingAmount ?? o?.shipping ?? 0))}
                             </span>
-                            <span className="text-dark fw-bold">{fmtPrice(it.price * it.qty)}</span>
-                            <span>x{it.qty}</span>
+                            <span className="order-item__qty" aria-hidden="true">&nbsp;</span>
                           </div>
-                        ))}
+                          <hr />
 
-                        <div className="order-item order-item--shipping">
-                          <span className="shipping-label">Prix de Livraison</span>
-                          <span className="text-dark fw-bold">
-                            {fmtPrice(Number(o?.deliveryAmount ?? o?.shippingAmount ?? o?.shipping ?? 0))}
-                          </span>
-                          <span className="order-item__qty" aria-hidden="true">&nbsp;</span>
-                        </div>
+                          <div className="order-item order-item--shipping lineBackgroundColor">
+                            <span className="shipping-label text-success">N° de suivi</span>
+                            <span className="text-dark fw-bold">
+                              <a href={o?.trackingLink} target="_blank" rel="">
+                                {o?.trackingNumber}
+                              </a>
+                            </span>
+                            <span className="order-item__qty" aria-hidden="true">&nbsp;</span>
+                          </div>
+                          <hr />
 
-                        <div className="order-item order-item--shipping">
-                          <span className="shipping-label">N° de suivi</span>
-                          <span className="text-dark fw-bold">
-                            <a
-                              href={o?.trackingLink}
-                              target="_blank"
-                              rel=""
+                          <div className="order-actions">
+                            <button
+                              className="gbtn gbtn--primary"
+                              onClick={() => dispatch(downloadInvoiceRequest(o.id))}
                             >
-                              {o?.trackingNumber}
-                            </a>
-                          </span>
-                          <span className="order-item__qty" aria-hidden="true">&nbsp;</span>
+                              Télécharger la facture
+                            </button>
+                          </div>
                         </div>
-
-                        <div className="order-actions">
-                          <button className="gbtn gbtn--primary" onClick={() => dispatch(downloadInvoiceRequest(o.id))}>Télécharger la facture</button>
-                          {/* <button className="gbtn gbtn--primary">Commander à nouveau</button> */}
-                        </div>
-                      </div>
-                    )}
+                      )}
                   </div>
                 );
               })}

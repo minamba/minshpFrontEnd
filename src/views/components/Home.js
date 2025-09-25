@@ -1,9 +1,10 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import '../../App.css';
+import "../../styles/components/product-card.css";
+import "../../styles/pages/home.css";
 import { useSelector, useDispatch } from 'react-redux';
 import { Link, useNavigate } from "react-router-dom";
 import { addToCartRequest, saveCartRequest } from '../../lib/actions/CartActions';
-import { GenericModal } from '../../components/index';
+import { GenericModal } from '../../components';
 import { calculPrice } from '../../lib/utils/Helpers';
 import { toMediaUrl } from '../../lib/utils/mediaUrl';
 
@@ -13,28 +14,62 @@ export const Home = () => {
   const videos    = useSelector((state) => state.videos.videos) || [];
   const categoriesFromStore = useSelector((state) => state.categories.categories) || [];
   const items     = useSelector((state) => state.items.items) || [];
+
   const dispatch  = useDispatch();
   const navigate  = useNavigate();
 
   const [showAdded, setShowAdded] = useState(false);
   const [lastAdded, setLastAdded] = useState(null);
+  const [isMobile, setIsMobile]   = useState(() =>
+    typeof window !== 'undefined'
+      ? window.matchMedia('(max-width: 768px)').matches
+      : false
+  );
+
+  useEffect(() => {
+    const mm = window.matchMedia('(max-width: 768px)');
+    const handler = (e) => setIsMobile(e.matches);
+    if (mm.addEventListener) mm.addEventListener('change', handler);
+    else mm.addListener(handler);
+    return () => {
+      if (mm.removeEventListener) mm.removeEventListener('change', handler);
+      else mm.removeListener(handler);
+    };
+  }, []);
 
   useEffect(() => { dispatch(saveCartRequest(items)); }, [items, dispatch]);
 
   const NEW_MAX = 4;
 
-  const mainProduct = products.find((p) => p.main === true);
+  const mainProduct = products.find((p) => p.main === true) || null;
   const galleryProducts = products.filter((p) => p.id !== mainProduct?.id);
 
+  // --- Media du produit principal ---
   const mainProductImages = mainProduct
-    ? images.filter((i) => i.idProduct === mainProduct.id)
+    ? images.filter((i) => String(i.idProduct) === String(mainProduct.id))
     : [];
 
   const mainProductVideos = mainProduct
-    ? videos.filter((v) => v.idProduct === mainProduct.id)
+    ? videos.filter((v) => String(v.idProduct) === String(mainProduct.id))
     : [];
 
-  const heroVideo = mainProductVideos.find((vid) => vid.position === 1);
+  // Vidéo "hero" (position 1)
+  const heroVideo = mainProductVideos.find((vid) => Number(vid.position) === 1);
+
+  // Image "hero" fallback (position 99)
+  const heroImage99 = mainProductImages.find((img) => Number(img.position) === 99);
+
+  // Bleu foncé fallback (SVG data URI)
+  // const BLUE_FALLBACK =
+  //   'data:image/svg+xml;utf8,' +
+  //   encodeURIComponent(
+  //     `<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900">
+  //        <rect width="100%" height="100%" fill="#0B1B3A"/>
+  //      </svg>`
+  //   );
+
+  const IMAGE_FALLBACK = "/Images//background_fallback.png";
+
 
   const getProductImage = (id) => {
     const productImages = images.filter((i) => String(i.idProduct) === String(id));
@@ -61,31 +96,46 @@ export const Home = () => {
   const closeAdded = () => setShowAdded(false);
   const goToCart = () => { setShowAdded(false); navigate('/cart'); };
 
+  // --- HERO: logique d’affichage ---
+  const shouldShowVideo = !!heroVideo?.url && !isMobile;
+  const heroImageSrc = heroImage99?.url
+    ? toMediaUrl(heroImage99.url)
+    : IMAGE_FALLBACK;
+
   return (
     <div className="home-container">
-      {/* HERO */}
+      {/* ===================== HERO ===================== */}
       <section className="hero-section">
-        {heroVideo?.url ? (
-          <video className="hero-video" autoPlay muted loop>
-            <source src={ toMediaUrl(heroVideo.url)} type="video/mp4" />
+        {shouldShowVideo ? (
+          <video className="hero-video" autoPlay muted loop playsInline>
+            <source src={toMediaUrl(heroVideo.url)} type="video/mp4" />
           </video>
         ) : (
-          <p>Vidéo manquante</p>
+          <img
+            className="hero-image"
+            src={heroImageSrc}
+            alt={heroImage99?.title || 'Hero'}
+          />
         )}
 
         <div className="hero-content text-center">
-          <h1 className="hero-title">{heroVideo?.title || 'Titre manquant'}</h1>
-          <p className="hero-subtitle">{heroVideo?.description || 'Description manquante'}</p>
+          <h1 className="hero-title">
+            {heroVideo?.title || heroImage99?.title || 'Titre manquant'}
+          </h1>
+          <p className="hero-subtitle">
+            {heroVideo?.description || heroImage99?.description || 'Description manquante'}
+          </p>
           <a href="#features" className="hero-button">Découvrir</a>
         </div>
       </section>
 
-      {/* FEATURES */}
+      {/* ===================== FEATURES ===================== */}
       {mainProductImages.length > 0 && (
         <section className="features-section" id="features">
-          {mainProductImages.map((image, index) => {
-            if (!image) return null;
-            return (
+          {mainProductImages
+            .filter((image) => image && Number(image.position) !== 99) // on évite de re-afficher la 99 ici
+            .sort((a, b) => Number(a.position) - Number(b.position))
+            .map((image, index) => (
               <div
                 key={image.position}
                 className={`feature ${index % 2 === 1 ? 'reverse' : ''}`}
@@ -96,12 +146,11 @@ export const Home = () => {
                   <p>{image.description || 'Description manquante'}</p>
                 </div>
                 <img
-                  src={ toMediaUrl(image.url) || '/Images/placeholder.jpg'}
+                  src={toMediaUrl(image.url) || '/Images/placeholder.jpg'}
                   alt={image.title || `Image ${image.position}`}
                 />
               </div>
-            );
-          })}
+            ))}
 
           <div className="features-cta">
             {mainProduct && (
@@ -113,16 +162,20 @@ export const Home = () => {
         </section>
       )}
 
-      {/* CATEGORIES */}
+      {/* ===================== CATEGORIES ===================== */}
       {categoriesFromStore.length > 0 && (
         <section className="categories-section section-alt bg-light" id="categories">
           <div className="new-header">
             <h2 className="new-title">Catégories</h2>
           </div>
 
-          <div className="categories-grid">
+          <div
+            className="categories-grid categories-carousel"
+            role="list"
+            aria-label="Catégories (balayez pour voir plus)"
+          >
             {categoriesFromStore.map((cat) => (
-              <article key={cat.name} className="category-card" data-aos="zoom-in">
+              <article key={cat.id} className="category-card" data-aos="zoom-in">
                 <h3 className="category-title">{cat.name}</h3>
                 <img
                   src={toMediaUrl(getCategoryImage(cat.id))}
@@ -133,10 +186,17 @@ export const Home = () => {
               </article>
             ))}
           </div>
+
+          {/* Indice “balayez” (visible en mobile via CSS) */}
+          <div className="swipe-indicator" aria-hidden="true">
+            <span className="chev">‹</span>
+            <span className="swipe-text">Balayez</span>
+            <span className="chev">›</span>
+          </div>
         </section>
       )}
 
-      {/* NOUVEAUTÉS */}
+      {/* ===================== NOUVEAUTÉS ===================== */}
       <section className="new-section" id="nouveautes">
         <div className="new-header">
           <h2 className="new-title">Nouveautés</h2>
@@ -152,15 +212,20 @@ export const Home = () => {
           </div>
         </div>
 
-        <div className="new-grid">
+        <div className="new-grid" {...(isMobile ? { 'data-aos': 'fade-up', 'data-aos-once': 'true' } : {})}>
           {newestProducts.map((product, index) => {
             const img = getProductImage(product.id);
-            const name = product.brand + " " + product.model || product.title || `Produit ${index + 1}`;
+            const name =
+              (product.brand ? `${product.brand} ` : '') +
+              (product.model || product.title || `Produit ${index + 1}`);
 
             // Prix de référence
-            const priceRef = Number(
-              typeof product.priceTtc === 'number' ? product.priceTtc : parseFloat(product.priceTtc)
-            ) || 0;
+            const priceRef =
+              Number(
+                typeof product.priceTtc === 'number'
+                  ? product.priceTtc
+                  : parseFloat(product.priceTtc)
+              ) || 0;
 
             // ==== PROMO PRODUIT (dates inclusives, fin à 23:59:59) ====
             const p0 = product?.promotions?.[0];
@@ -169,17 +234,19 @@ export const Home = () => {
               const pct = Number(p0.purcentage) || 0;
               if (pct <= 0) return false;
               const start = parseDate(p0.startDate);
-              const end   = parseDate(p0.endDate);
-              const now   = new Date();
-              const endOfDay = end ? new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23,59,59,999) : null;
+              const end = parseDate(p0.endDate);
+              const now = new Date();
+              const endOfDay = end
+                ? new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59, 999)
+                : null;
               if (start && start > now) return false;
               if (endOfDay && endOfDay < now) return false;
               return true;
             })();
 
-            const discountPct   = hasProductPromo ? Number(p0.purcentage) : 0;
+            const discountPct = hasProductPromo ? Number(p0.purcentage) : 0;
             const computedPromo = +(priceRef * (1 - discountPct / 100)).toFixed(2);
-            const promotedVal   = Number(
+            const promotedVal = Number(
               typeof product.priceHtPromoted === 'number'
                 ? product.priceHtPromoted
                 : parseFloat(product.priceHtPromoted)
@@ -203,88 +270,109 @@ export const Home = () => {
             );
 
             const codePrice =
-              Number.isFinite(subCatCodeVal) ? subCatCodeVal :
-              (Number.isFinite(catCodeVal) ? catCodeVal : null);
+              Number.isFinite(subCatCodeVal)
+                ? subCatCodeVal
+                : (Number.isFinite(catCodeVal) ? catCodeVal : null);
 
             // ==== Prix affiché & indicateurs UI ====
             const displayPrice = calculPrice(product);
-            const hasAnyPromo  = (codePrice != null) || (productPromoPrice != null);
+            const hasAnyPromo = (codePrice != null) || (productPromoPrice != null);
 
             const [euros, cents] = displayPrice.toFixed(2).split('.');
 
             // Statut stock
             const raw = (product?.stockStatus ?? '').trim();
             const lower = raw.toLowerCase();
-            const isIn   = lower === 'en stock';
-            const isOut  = lower === 'en rupture';
+            const isIn = lower === 'en stock';
+            const isOut = lower === 'en rupture';
             const stockCls = isIn ? 'in' : isOut ? 'out' : 'warn';
             const stockLabel =
               lower.includes('plus que') ? 'Bientôt en rupture' :
               raw || 'Disponibilité limitée';
 
+            // 👉 Animation par carte : seulement desktop
+            const cardAosProps = isMobile ? {} : { 'data-aos': 'zoom-in' };
+
             return (
-              <article key={product.id} className="product-card" data-aos="zoom-in">
+              <article
+                key={product.id}
+                className="product-card"
+                {...cardAosProps}
+              >
                 <div className="product-thumb">
                   <Link to={`/product/${product.id}`} className="thumb-link">
                     <img src={toMediaUrl(img)} alt={name} />
-                  </Link>
+          </Link>
 
-                  {hasAnyPromo && <span className="promo-pill">Promotion</span>}
-                  <div className="thumb-overlay" aria-hidden="true" />
-                  {!isOut && (
-                    <button
-                      type="button"
-                      className="thumb-add-btn"
-                      title="Ajouter au panier"
-                      aria-label="Ajouter au panier"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        const payloadItem = {
-                          id: product.id,
-                          name,
-                          price: displayPrice,
-                          image: img,
-                          packageProfil: product.packageProfil,
-                          containedCode: product.containedCode
-                        };
-                        dispatch(addToCartRequest(payloadItem, 1));
-                        setLastAdded({ id: product.id, name });
-                        setShowAdded(true);
-                      }}
-                    >
-                      <i className="bi bi-cart-plus" aria-hidden="true"></i>
-                    </button>
+                {hasAnyPromo && <span className="promo-pill">Promotion</span>}
+                <div className="thumb-overlay" aria-hidden="true" />
+                {!isOut && (
+                  <button
+                    type="button"
+                    className="thumb-add-btn"
+                    title="Ajouter au panier"
+                    aria-label="Ajouter au panier"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const payloadItem = {
+                        id: product.id,
+                        name,
+                        price: displayPrice,
+                        image: img,
+                        packageProfil: product.packageProfil,
+                        containedCode: product.containedCode
+                      };
+                      dispatch(addToCartRequest(payloadItem, 1));
+                      setLastAdded({ id: product.id, name });
+                      setShowAdded(true);
+                    }}
+                  >
+                    <i className="bi bi-cart-plus" aria-hidden="true"></i>
+                  </button>
+                )}
+              </div>
+
+              <h3 className="product-name">{name}</h3>
+
+              <div className="new-price-row">
+                <span className={`card-stock ${stockCls}`}>
+                  <span className={`card-stock-dot ${stockCls}`} />
+                  {stockLabel}
+                </span>
+
+                <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', lineHeight:1.1 }}>
+                  {hasAnyPromo && (
+                    <span className="price-old">
+                      {priceRef.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+                    </span>
                   )}
-                </div>
-
-                <h3 className="product-name">{name}</h3>
-
-                <div className="new-price-row">
-                  <span className={`card-stock ${stockCls}`}>
-                    <span className={`card-stock-dot ${stockCls}`} />
-                    {stockLabel}
-                  </span>
-
-                  <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', lineHeight:1.1 }}>
-                    {hasAnyPromo && (
-                      <span className="price-old">
-                        {priceRef.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
-                      </span>
-                    )}
-                    <div className={`product-price ${hasAnyPromo ? 'product-price--promo' : ''}`}>
-                      <span className="euros">{euros}€</span>
-                      <sup className="cents">{cents}</sup>
-                    </div>
+                  <div className={`price--big ${hasAnyPromo ? 'price--promo' : ''}`}>
+                    <span className="euros">{euros}€</span>
+                    <sup className="cents">{cents}</sup>
                   </div>
                 </div>
-              </article>
-            );
-          })}
+              </div>
+            </article>
+          );
+        })}
+      </div>
+
+
+        {/* Bouton “+” en bas sur mobile */}
+        <div className="new-actions new-actions--mobile">
+          <button
+            type="button"
+            className="icon-btn bg-primary text-white fw-bold"
+            aria-label="Voir plus"
+            onClick={() => navigate('/news')}
+          >
+            +
+          </button>
         </div>
       </section>
 
-      {/* MODALE ajout panier */}
+      {/* ===================== MODALE ajout panier ===================== */}
       <GenericModal
         open={showAdded}
         onClose={closeAdded}

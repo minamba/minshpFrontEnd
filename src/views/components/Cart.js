@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import "bootstrap-icons/font/bootstrap-icons.css";
-import "../../App.css";
+import "../../styles/pages/cart.css";
 import { Link, useNavigate } from "react-router-dom";
 import {
   updateCartRequest,
@@ -109,9 +109,8 @@ export const Cart = () => {
   const promotions = useSelector((s) => s?.promotions?.promotions) || [];
   const categories = useSelector((s) => s?.categories?.categories) || [];
   const subCategories = useSelector((s) => s?.subCategories?.subCategories) || [];
-  const stocks = useSelector((s) => s?.stocks?.stocks) || []; // <-- STOCKS
+  const stocks = useSelector((s) => s?.stocks?.stocks) || [];
 
-  // Paiement (confirmation Stripe via slice global)
   const payment = useSelector((s) => s?.payment) || {};
   const paymentConfirmed = !!payment.confirmed;
 
@@ -128,7 +127,6 @@ export const Cart = () => {
 
   // map produit -> code appliqué
   const [promoAppliedMap, setPromoAppliedMap] = useState(() => readPromoMap());
-
   const clearPromoMap = () => {
     localStorage.removeItem("promo_map");
     setPromoAppliedMap({});
@@ -271,7 +269,7 @@ export const Cart = () => {
     return { cls, label, isOut };
   };
 
-  // Stock disponible (quantité) pour un produit
+  // Stock disponible (quantité)
   const getAvailableQty = (productId) => {
     const st = stocks.find(
       (s) =>
@@ -283,15 +281,13 @@ export const Cart = () => {
     return Number.isFinite(q) && q > 0 ? q : 0;
   };
 
-  // Clamp auto si le stock baisse (ex : on avait 5, stock passe à 3)
+  // Clamp auto si stock baisse
   useEffect(() => {
     items.forEach((it) => {
       const available = getAvailableQty(it.id);
       if (available > 0 && it.qty > available) {
         handleQty(it.id, available);
       }
-      // si available === 0, on laisse la ligne présente,
-      // mais elle bloquera le bouton "Passer commande".
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stocks, items.map(i => `${i.id}:${i.qty}`).join("|")]);
@@ -310,7 +306,7 @@ export const Cart = () => {
       return;
     }
 
-    // 🔒 Bloqué si déjà appliqué à au moins un produit du panier
+    // Bloqué si déjà appliqué ailleurs
     const alreadyAppliedSomewhere = items.some(
       (it) => promoAppliedMap[String(it.id)] === code
     );
@@ -485,7 +481,6 @@ export const Cart = () => {
   // ======== BLOQUE LA COMMANDE SI RUPTURE ========
   const outOfStockList = useMemo(
     () => items.filter((it) => getAvailableQty(it.id) <= 0),
-    // stocks change -> recompute
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [items, stocks.map(s => `${s.IdProduct ?? s.idProduct}:${s.quantity ?? s.Quantity ?? s.qty ?? 0}`).join("|")]
   );
@@ -506,20 +501,19 @@ export const Cart = () => {
       <div className="cart-grid">
         {/* Colonne gauche: lignes */}
         <div className="cart-lines">
-          <div className="cart-head">
+          <div className="cart-head d-none-mobile">
             <span className="col-design">Désignation</span>
             <span className="col-qty">Quantité</span>
             <span className="col-sub">Sous-total</span>
           </div>
 
-          {items.length === 0 && <div className="cart-empty">Votre panier est vide.</div>}
+          {items.length === 0 && <div className="cart-empty text-center fw-bold text-danger">Votre panier est vide.</div>}
 
           {items.map((it) => {
             const { cls, label, isOut } = getStockUi(it.id);
             const available = getAvailableQty(it.id);
             const codeOnThis = promoAppliedMap[String(it.id)] || null;
 
-            // options dynamiques 1..available (cap 50)
             const cap = Math.min(available, 50);
             const qtyOptions =
               cap > 0 ? Array.from({ length: cap }, (_, i) => i + 1) : [];
@@ -529,34 +523,29 @@ export const Cart = () => {
             return (
               <div key={it.id} className="cart-line">
                 <div className="line-left">
-                  <Link to={`/product/${it.id}`}>
-                    <img className="cart-thumb" src={toMediaUrl(it.imageUrl)} alt={it.name} />
-                  </Link>
-                  <div className="line-info">
-                    <Link className="line-name" to={`/product/${it.id}`}>
-                      {it.name}
+                  {/* media = image seule */}
+                  <div className="line-media">
+                    <Link to={`/product/${it.id}`}>
+                      <img className="cart-thumb" src={toMediaUrl(it.imageUrl)} alt={it.name} />
                     </Link>
-                    <span className={`card-stock ${cls}`}>
-                      <span className={`card-stock-dot ${cls}`} />
-                      {label}
-                    </span>
-                    {available <= 0 && (
-                      <div style={{ color: "#dc2626", fontWeight: 700 }}>
-                        Rupture de stock
-                      </div>
-                    )}
-                    {codeOnThis && (
-                      <span
-                        style={{
-                          display: "inline-block",
-                          marginTop: 4,
-                          fontWeight: 700,
-                          fontSize: ".85rem",
-                          color: "#1569e6",
-                        }}
-                      >
-                        Code appliqué : {codeOnThis}
+                  </div>
+
+                  {/* infos = nom + badge stock (+ messages) */}
+                  <div className="line-info">
+                    <div className="line-title">
+                      <Link className="line-name" to={`/product/${it.id}`}>{it.name}</Link>
+                      <span className={`card-stock ${cls}`}>
+                        <span className={`card-stock-dot ${cls}`} />
+                        {label}
                       </span>
+                    </div>
+
+                    {/* {available <= 0 && (
+                      <div className="line-alert">Rupture de stock</div>
+                    )} */}
+
+                    {codeOnThis && (
+                      <span className="line-code">Code appliqué : {codeOnThis}</span>
                     )}
                   </div>
                 </div>
@@ -570,15 +559,9 @@ export const Cart = () => {
                     aria-disabled={disableSelect}
                     title={disableSelect ? "Article en rupture" : "Changer la quantité"}
                   >
-                    {qtyOptions.length === 0 ? (
-                      <option value={it.qty}>—</option>
-                    ) : (
-                      qtyOptions.map((n) => (
-                        <option key={n} value={n}>
-                          {n}
-                        </option>
-                      ))
-                    )}
+                    {qtyOptions.length === 0
+                      ? <option value={it.qty}>—</option>
+                      : qtyOptions.map((n) => <option key={n} value={n}>{n}</option>)}
                   </select>
                 </div>
 
@@ -609,7 +592,7 @@ export const Cart = () => {
                   if (e.key === "Enter") applyPromo();
                 }}
               />
-              <button className="promo-btn" onClick={applyPromo}>
+              <button className="promo-btn bg-primary" onClick={applyPromo}>
                 OK
               </button>
             </div>
@@ -624,10 +607,9 @@ export const Cart = () => {
 
         {/* Colonne droite: récap */}
         <aside className="cart-summary">
-          <h3 className="sum-title">Montant total de vos produits</h3>
+          <h3 className="sum-title  ">Montant total</h3>
           <div className="sum-amount">{fmt(grandTotal)}</div>
 
-          {/* Alerte si des ruptures bloquent la commande */}
           {hasOutOfStock && (
             <div
               style={{

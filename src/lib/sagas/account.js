@@ -1,8 +1,10 @@
 import {takeEvery, takeLatest, call, put, fork} from "redux-saga/effects";
 import * as actions from "../actions/AccountActions";
 import * as actionsCustomers from "../actions/CustomerActions";
+import * as actionsNewsletters from "../actions/NewLetterActions";
 import * as api from "../api/account";
 import * as apiCustomers from "../api/customers";
+import * as apiNewsletters from "../api/newLetter";
 import { getCustomerRequest } from "../actions/CustomerActions";
 import { decodeJwt } from "../utils/jwt";
 
@@ -114,6 +116,9 @@ function* Register(action) {
       const res = yield call(api.updateUser, action.payload);
       yield put(actions.updateUserSuccess(res.data));
       yield put(getCustomerRequest());
+              const response = yield call (apiNewsletters.getNewsletters);
+              console.log("Newsletters :",response.data);
+              yield put (actionsNewsletters.getNewsletterSuccess({newsletters : response.data}));
     } catch (err) {
       yield put(actions.updateUserFailure({ error: problemToText(err) }));
     }

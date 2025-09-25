@@ -28,6 +28,7 @@ import {PackageProfilAdmin} from './PackageProfilAdmin';
 import {SubCategoryAdmin} from './SubCategoryAdmin';
 import {InvoiceAdmin} from './InvoiceAdmin';
 import {CustomerPromotionAdmin} from './CustomerPromotionAdmin';
+import CookieConsent from './CookieConsent';
 import Success from './Succes';
 import {Cancel} from './Cancel';
 import {Error} from './Error';
@@ -49,6 +50,7 @@ import {Product} from './Product';
 import { getFeaturesCategoryByProductRequest } from "../../lib/actions/FeatureCategoryActions";
 import { getRolesRequest } from "../../lib/actions/RoleActions";
 import {PromotionCodeAdmin} from './PromotionCodeAdmin';
+import {NewLetterAdmin} from './NewLetterAdmin';
 import { getPromotionCodesRequest } from "../../lib/actions/PromotionCodeActions";
 import { getApplicationRequest } from "../../lib/actions/ApplicationActions";
 import LoginPage from './Authentication/LoginPage';
@@ -71,12 +73,24 @@ import {Notfound} from './Maintenance/Notfound';
 import {Maintenance} from './Maintenance/Maintenance';
 import MaintenanceGate from './Authentication/MaintenanceGate';
 import { getCustomerPromotionCodeRequest } from "../../lib/actions/CustomerPromotionCodeActions";
+import { getNewsletterRequest } from "../../lib/actions/NewLetterActions";
+import { hasConsent } from "./CookieConsent";
+
 
 export const BaseApp = () => {
+
+    // Example: load analytics only if allowed
+useEffect(() => {
+    if (hasConsent("analytics")) {
+      // init analytics SDK…
+    }
+  }, []);
 
 
     useCartPriceSync();
     useAuthSync({ tokenKeys: ["access_token"] });
+
+    
 
     const dispatch = useDispatch();
     useEffect(() => {
@@ -100,6 +114,7 @@ export const BaseApp = () => {
         dispatch(getContentCategoryRequest());
         dispatch(getInvoiceRequest());
         dispatch(getCustomerPromotionCodeRequest());
+        dispatch(getNewsletterRequest());
     }, []);
 
     useEffect(() => {
@@ -135,6 +150,7 @@ export const BaseApp = () => {
                             <Route path="/admin/packageProfil" element={<RequireAuth><PackageProfilAdmin/></RequireAuth>}/>
                             <Route path="/admin/subCategory" element={<RequireAuth><SubCategoryAdmin/></RequireAuth>}/>
                             <Route path="/admin/customerPromotions" element={<RequireAuth><CustomerPromotionAdmin/></RequireAuth>}/>
+                            <Route path="/admin/newsletter" element={<RequireAuth><NewLetterAdmin/></RequireAuth>}/>
                         </Route>
 
                         {/* Other page */}
@@ -163,6 +179,7 @@ export const BaseApp = () => {
                             <Route path="/login" element={<LoginPage/>}/> 
                     </Routes>
                 </main>
+                {/* <CookieConsent/> */}
                 <Footer/>
             </Router>
         </Fragment>

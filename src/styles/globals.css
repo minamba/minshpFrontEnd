@@ -1,0 +1,186 @@
+:root{
+    --accent:#0071e3;
+    --text:#111;
+    --muted:#ffffff;
+    --bg:#c3cde728; --bg-alt:#425aac;
+    --shadow-1:0 6px 18px rgba(0,0,0,.06);
+    --shadow-2:0 10px 30px rgba(0,0,0,.08);
+    --shadow-3:0 18px 40px rgba(0,0,0,.12);
+  
+    /* badges stock */
+    --stock-in-bg:#eafaf0;   --stock-in-br:#c9f0d9;   --stock-in-tx:#138a36;
+    --stock-warn-bg:#fff7ed; --stock-warn-br:#fde3bd; --stock-warn-tx:#b45309;
+    --stock-out-bg:#fee2e2;  --stock-out-br:#fecaca;  --stock-out-tx:#b91c1c;
+    --navbar-h-desktop: 30px;
+    --navbar-h-mobile: 10px;
+  }
+  
+  *{box-sizing:border-box}
+  html, body{
+    margin: 0;              /* <-- au lieu de 0x */
+    padding: 0;
+    overflow-x: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    color: var(--text);
+    background: var(--bg);
+    padding-top: var(--navbar-h-desktop); /* espace sous la navbar (desktop) */
+  }
+  img{max-width:100%;display:block}
+  a{color:inherit;text-decoration:none}
+  #root{display:flex;flex-direction:column;min-height:100vh}
+  main{flex:1}
+  
+  /* Utilitaires génériques */
+  .text-center{text-align:center}
+  .bg-light{background:var(--bg-alt)}
+  .bg-primary{background:var(--accent)!important}
+  .text-white{color:#fff!important}
+  .fw-bold{font-weight:800}
+  
+  .btn-light{border:0;border-radius:10px;padding:8px 12px;background:#f3f4f6;cursor:pointer;font-weight:900}
+  .btn-light:hover{background:#e5e7eb}
+  .form-control,.form-select{border:1px solid #e5e7eb;border-radius:12px;padding:10px 12px;outline:none}
+  .form-control:focus,.form-select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,113,227,.15)}
+  
+  /* Bouton pill primaire partagé */
+  .btn-pill{display:inline-flex;align-items:center;justify-content:center;padding:.8rem 1.6rem;border-radius:999px;font-weight:800;border:1px solid transparent}
+  .btn-primary{background:var(--accent);color:#fff;min-width:280px;transition:transform .15s,box-shadow .15s}
+  .btn-primary:hover{transform:translateY(-1px);box-shadow:0 10px 24px rgba(0,0,0,.08)}
+  
+  /* GenericModal (bases) */
+  .gmodal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:1100}
+  .gmodal-panel{width:min(520px,92vw);background:#fff;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.18);padding:22px 20px 18px;text-align:center}
+  .gmodal-title{margin:0;font-weight:900;font-size:1.15rem}
+
+
+  /* ===== Titres de section communs (Home, Category, etc.) ===== */
+.section-title,
+.new-title{
+  font-weight: 900;
+  font-size: clamp(1.6rem, 4.5vw, 2rem);
+  line-height: 1.15;
+  letter-spacing: -.02em;
+  margin: 0 0 1rem;
+  display: inline-block;
+  position: relative;
+  padding-bottom: 6px;
+}
+
+.section-title::after,
+.new-title::after{
+  content: "";
+  position: absolute;
+  left: 0; bottom: 0;
+  height: 3px; width: 140px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--accent), rgba(0,113,227,.15));
+}
+
+/* En-tête de bloc (titre + actions) */
+.new-header{
+  max-width: 1200px;
+  margin: 0 auto 1.25rem;
+  padding: 0 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.new-actions{ display:flex; gap:10px; }
+.icon-btn{
+  width: 34px; height: 34px;
+  border-radius: 10px; border: none;
+  background: #efefef; color: #111;
+  font-size: 18px; cursor: pointer;
+}
+.icon-btn:hover{ background:#e5e5e5; transform:translateY(-1px); }
+
+/* Variante mobile pour l’action “+” en bas du bloc */
+.new-actions--mobile{
+  display: none;
+  max-width: 1200px;
+  margin: .75rem auto 0;
+  padding: 0 2rem;
+  justify-content: flex-end;
+}
+@media (max-width: 768px){
+  .new-actions--mobile{ display: flex; }
+}
+
+
+/* ==============================
+   PRICES (globaux)
+   ============================== */
+
+/* Prix standard (cartes, listings, home...) */
+.price {
+    font-size: 1.2rem;
+    font-weight: 800;
+    line-height: 1.3;
+  }
+  
+  .price .euros {
+    font-size: 1.4rem;
+  }
+  
+  .price .cents {
+    font-size: 0.9rem;
+    vertical-align: super;
+    margin-left: 2px;
+  }
+  
+  /* Prix mis en avant (pages produit, vue détail) */
+  .price--big {
+    font-size: 1.8rem;
+    font-weight: 900;
+  }
+  
+  .price--big .euros {
+    font-size: 2rem;
+  }
+  
+  .price--big .cents {
+    font-size: 1rem;
+    vertical-align: super;
+    margin-left: 2px;
+  }
+  
+  /* Prix en promotion */
+  .price--promo {
+    color: #ef4444; /* rouge */
+  }
+
+
+  /* Prix : pile verticale quand promo */
+.price-stack{
+    display:flex;
+    align-items:flex-end;
+    gap:8px;                 /* affichage par défaut : cote à cote */
+  }
+  
+  .price-stack.has-promo{
+    flex-direction:column;   /* 🔥 passe au-dessus */
+    gap:2px;
+    line-height:1.1;
+  }
+  
+  /* Style de l’ancien prix (barré) — si pas déjà global */
+  .price-old{
+    color:#6b7280;
+    font-weight:800;
+    font-size:.95rem;
+    text-decoration: line-through;
+    text-decoration-thickness: 2px;
+    text-decoration-color: #d1d5db;
+  }
+  
+  /* Prix actuel (si tu utilises les classes globales “price”) */
+  .price{ font-size:1.2rem; font-weight:800; line-height:1.3; }
+  .price .euros{ font-size:1.4rem; }
+  .price .cents{ font-size:.9rem; vertical-align:super; margin-left:2px; }
+  .price--promo{ color:#ef4444; }
+
+
+
+
+  

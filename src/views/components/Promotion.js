@@ -1,4 +1,6 @@
+// src/views/pages/Promotion.jsx
 import React, { useMemo, useState, useEffect } from "react";
+import ReactDOM from "react-dom";
 import "../../App.css";
 import { useSelector, useDispatch } from "react-redux";
 import { Link, useNavigate } from "react-router-dom";
@@ -10,6 +12,7 @@ import {
 } from "../../lib/actions/CartActions";
 import { GenericModal } from "../../components";
 import { toMediaUrl } from "../../lib/utils/mediaUrl";
+import "../../styles/pages/category.css";
 
 /* ---------- Helpers ---------- */
 const parseDate = (val) => {
@@ -122,7 +125,6 @@ export const Promotion = () => {
   };
 
   useEffect(() => {
-    // Recalcule tous les items du LS en fonction du store (produits/promos)
     const ls = JSON.parse(localStorage.getItem("items") || "[]");
     if (!Array.isArray(ls) || ls.length === 0) return;
 
@@ -137,7 +139,7 @@ export const Promotion = () => {
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [products]); // à chaque mise à jour produits/promos depuis le store
+  }, [products]);
 
   /* ---------- Recherche + tri ---------- */
   const [search, setSearch]   = useState("");
@@ -154,35 +156,19 @@ export const Promotion = () => {
           `Produit ${index + 1}`;
         const brand = (product.brand || "").toString();
 
-        const priceRef =
-          toNumOrNull(
-            typeof product.priceTtc === "number" ? product.priceTtc : parseFloat(product.priceTtc)
-          ) ?? 0;
+        const priceRef = toNumOrNull(
+          typeof product.priceTtc === "number" ? product.priceTtc : parseFloat(product.priceTtc)
+        ) ?? 0;
 
-        // On réutilise le calcul unique pour le prix d’affichage
         const displayPrice = computeDisplayPrice(product);
-
-        // Produit en promo si prix affiché < prix de référence
         const hasAnyPromo = displayPrice < priceRef - 1e-6;
 
         const discountRate = priceRef > 0 ? (priceRef - displayPrice) / priceRef : 0;
-        const creationTs = (() => {
-          const d = parseDate(product?.creationDate);
-          return d ? d.getTime() : 0;
-        })();
+        const creationTs = parseDate(product?.creationDate)?.getTime() ?? 0;
 
-        return {
-          product,
-          name,
-          brand,
-          priceRef,
-          displayPrice,
-          hasAnyPromo,
-          discountRate,     // 0..1
-          creationTs,
-        };
+        return { product, name, brand, priceRef, displayPrice, hasAnyPromo, discountRate, creationTs };
       })
-      .filter((a) => a.hasAnyPromo); // seulement les produits en promo
+      .filter((a) => a.hasAnyPromo);
   }, [products]);
 
   // Recherche + tri
@@ -191,46 +177,26 @@ export const Promotion = () => {
     let list = augmented.filter((a) => a.name.toLowerCase().includes(q));
 
     switch (sortKey) {
-      case "name-asc":
-        list.sort((a, b) => a.name.localeCompare(b.name, "fr", { sensitivity: "base" }));
-        break;
-      case "name-desc":
-        list.sort((a, b) => b.name.localeCompare(a.name, "fr", { sensitivity: "base" }));
-        break;
-      case "price-asc":
-        list.sort((a, b) => a.displayPrice - b.displayPrice);
-        break;
-      case "price-desc":
-        list.sort((a, b) => b.displayPrice - a.displayPrice);
-        break;
-      case "brand-asc":
-        list.sort((a, b) => a.brand.localeCompare(b.brand, "fr", { sensitivity: "base" }));
-        break;
-      case "brand-desc":
-        list.sort((a, b) => b.brand.localeCompare(a.brand, "fr", { sensitivity: "base" }));
-        break;
-      case "date-asc":
-        list.sort((a, b) => a.creationTs - b.creationTs);
-        break;
-      case "date-desc":
-        list.sort((a, b) => b.creationTs - a.creationTs);
-        break;
+      case "name-asc":   list.sort((a, b) => a.name.localeCompare(b.name, "fr", { sensitivity: "base" })); break;
+      case "name-desc":  list.sort((a, b) => b.name.localeCompare(a.name, "fr", { sensitivity: "base" })); break;
+      case "price-asc":  list.sort((a, b) => a.displayPrice - b.displayPrice); break;
+      case "price-desc": list.sort((a, b) => b.displayPrice - a.displayPrice); break;
+      case "brand-asc":  list.sort((a, b) => a.brand.localeCompare(b.brand, "fr", { sensitivity: "base" })); break;
+      case "brand-desc": list.sort((a, b) => b.brand.localeCompare(a.brand, "fr", { sensitivity: "base" })); break;
+      case "date-asc":   list.sort((a, b) => a.creationTs - b.creationTs); break;
+      case "date-desc":  list.sort((a, b) => b.creationTs - a.creationTs); break;
       case "promo-first":
       case "discount-desc":
-        list.sort((a, b) => (b.discountRate - a.discountRate) || (b.creationTs - a.creationTs));
-        break;
-      case "": // placeholder : pas de tri
-      default:
-        break;
+        list.sort((a, b) => (b.discountRate - a.discountRate) || (b.creationTs - a.creationTs)); break;
+      default: break;
     }
     return list;
   }, [augmented, search, sortKey]);
 
-  // Bannière (essaie de prendre l’image du 1er produit en promo, sinon placeholder)
+  // Bannière
   const bannerUrl = useMemo(() => {
     const firstPromo = filteredSorted[0]?.product;
-    if (firstPromo) return getProductImage(firstPromo.id);
-    return "/Images/placeholder.jpg";
+    return firstPromo ? getProductImage(firstPromo.id) : "/Images/placeholder.jpg";
   }, [filteredSorted, images]);
 
   /* ---------- Modal “ajouté au panier” ---------- */
@@ -239,9 +205,95 @@ export const Promotion = () => {
   const closeAdded = () => setShowAdded(false);
   const goToCart   = () => { setShowAdded(false); navigate("/cart"); };
 
+  /* ---------- Barre filtre mobile (sticky bottom) ---------- */
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [portalNode, setPortalNode] = useState(null);
+
+  useEffect(() => {
+    const node = document.createElement("div");
+    node.id = "mfb-portal-root";
+    document.body.appendChild(node);
+    setPortalNode(node);
+    return () => { document.body.removeChild(node); };
+  }, []);
+
+  useEffect(() => {
+    if (sheetOpen) document.body.classList.add("has-sheet-open");
+    else document.body.classList.remove("has-sheet-open");
+  }, [sheetOpen]);
+
+  const badgeCount = Math.min(filteredSorted.length, 99);
+
+  const MobileFilterPortal = portalNode
+    ? ReactDOM.createPortal(
+        <>
+          <div className="mobile-filter-bar" role="presentation">
+            <button
+              type="button"
+              className="mfb-btn"
+              onClick={() => setSheetOpen(true)}
+              aria-label="Affinez votre recherche"
+            >
+              Affinez votre recherche
+              <span className="mfb-badge">{badgeCount}</span>
+            </button>
+          </div>
+
+          <div
+            className={`mfb-overlay ${sheetOpen ? "is-open" : ""}`}
+            onClick={() => setSheetOpen(false)}
+          />
+          <div className={`mfb-sheet ${sheetOpen ? "is-open" : ""}`} role="dialog" aria-modal="true">
+            <div className="mfb-sheet__handle" />
+            <div className="mfb-sheet__title">Filtrer / Trier</div>
+
+            <div className="sheet-fields">
+              <input
+                className="form-control"
+                placeholder="Rechercher un produit…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+              <select
+                className={`form-select ${sortKey === "" ? "is-placeholder" : ""}`}
+                value={sortKey}
+                onChange={(e) => setSortKey(e.target.value)}
+              >
+                <option value="" disabled>Trier les produits</option>
+                <option value="date-desc">Nouveautés (récent → ancien)</option>
+                <option value="date-asc">Plus ancien → récent</option>
+                <option value="name-asc">Nom (A → Z)</option>
+                <option value="name-desc">Nom (Z → A)</option>
+                <option value="price-asc">Prix (moins cher → plus cher)</option>
+                <option value="price-desc">Prix (plus cher → moins cher)</option>
+                <option value="brand-asc">Marque (A → Z)</option>
+                <option value="brand-desc">Marque (Z → A)</option>
+                <option value="promo-first">Promotion (d’abord)</option>
+                <option value="discount-desc">Réduction (forte → faible)</option>
+              </select>
+            </div>
+
+            <div className="mfb-actions">
+              <button
+                type="button"
+                className="btn btn--light"
+                onClick={() => { setSearch(""); setSortKey(""); }}
+              >
+                Réinitialiser
+              </button>
+              <button type="button" className="btn btn--primary" onClick={() => setSheetOpen(false)}>
+                Voir les résultats
+              </button>
+            </div>
+          </div>
+        </>,
+        portalNode
+      )
+    : null;
+
   return (
     <div className="category-page">
-      {/* BANNIÈRE — noir & blanc via CSS (::before + --hero-url) */}
+      {/* BANNIÈRE */}
       <section className="category-hero" style={{ "--hero-url": `url("${toMediaUrl(bannerUrl)}")` }}>
         <h1 className="category-hero__title">Promotions</h1>
         <div className="category-hero__count">
@@ -249,7 +301,7 @@ export const Promotion = () => {
         </div>
       </section>
 
-      {/* BARRE D'OUTILS : recherche + tri (centrés) */}
+      {/* Toolbar desktop (cachée en mobile via CSS) */}
       <div className="category-toolbar">
         <input
           className="form-control category-search"
@@ -257,7 +309,6 @@ export const Promotion = () => {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-
         <select
           className={`form-select category-sort ${sortKey === "" ? "is-placeholder" : ""}`}
           value={sortKey}
@@ -278,7 +329,7 @@ export const Promotion = () => {
         </select>
       </div>
 
-      {/* GRILLE PRODUITS (style “Nouveautés”) */}
+      {/* GRILLE PRODUITS */}
       <section className="new-section" id="promo-products">
         <div className="new-grid">
           {filteredSorted.length === 0 && (
@@ -308,30 +359,30 @@ export const Promotion = () => {
 
                   <div className="thumb-overlay" aria-hidden="true" />
                   {!isOut && (
-                      <button
-                        type="button"
-                        className="thumb-add-btn"
-                        title="Ajouter au panier"
-                        aria-label="Ajouter au panier"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          const payloadItem = {
-                            id: product.id,
-                            name,
-                            price: displayPrice,
-                            image: img,
-                            packageProfil: product.packageProfil,
-                            containedCode: product.containedCode
-                          };
-                          dispatch(addToCartRequest(payloadItem, 1));
-                          setLastAdded({ id: product.id, name });
-                          setShowAdded(true);
-                        }}
-                      >
-                        <i className="bi bi-cart-plus" aria-hidden="true"></i>
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      className="thumb-add-btn"
+                      title="Ajouter au panier"
+                      aria-label="Ajouter au panier"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const payloadItem = {
+                          id: product.id,
+                          name,
+                          price: displayPrice,
+                          image: img,
+                          packageProfil: product.packageProfil,
+                          containedCode: product.containedCode
+                        };
+                        dispatch(addToCartRequest(payloadItem, 1));
+                        setLastAdded({ id: product.id, name });
+                        setShowAdded(true);
+                      }}
+                    >
+                      <i className="bi bi-cart-plus" aria-hidden="true"></i>
+                    </button>
+                  )}
                 </div>
 
                 <h3 className="product-name">{(product.brand || "") + " " + (product.model || name)}</h3>
@@ -357,6 +408,12 @@ export const Promotion = () => {
           })}
         </div>
       </section>
+
+      {/* Espace pour ne pas masquer le bas par le bouton mobile */}
+      <div className="mobile-filter-spacer" />
+
+      {/* Portail mobile (bouton + sheet) */}
+      {MobileFilterPortal}
 
       {/* MODALE ajout panier */}
       <GenericModal

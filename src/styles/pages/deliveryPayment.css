@@ -1,0 +1,386 @@
+/* ============ Delivery / Payment page ============ */
+
+/* Conteneur principal */
+.dp-page{
+    max-width:1200px;
+    margin:0 auto;
+    padding:0 16px 24px;
+  }
+  
+  /* Titres de sections */
+  .section-title{
+    margin:0 0 10px;
+    font-weight:900;
+    text-align:left;
+  }
+  
+  /* --- Cartes génériques (bloc blanc arrondi) --- */
+  .category-card{
+    background:#fff;
+    border-radius:12px;
+    box-shadow:0 8px 24px rgba(0,0,0,.06);
+  }
+  
+  /* ================== Grilles ================== */
+  
+  /* 2 colonnes : Livraison (gauche) | Livraison en point relais (droite) */
+  .new-grid{
+    display:grid !important;
+    grid-template-columns:1fr 1fr !important;
+    gap:16px !important;
+    margin-bottom:18px !important;
+  }
+  
+  /* Paiement | Récapitulatif */
+  .pay-grid{
+    display:grid !important;
+    grid-template-columns:1fr 380px !important;
+    gap:18px !important;
+  }
+  
+  /* Carte récap (droite) — on laisse le style existant .cart-summary,
+     mais on s’assure qu’elle n’empiète pas sur petit écran */
+  .cart-summary{
+    background:#fff;
+    border-radius:12px;
+    box-shadow:0 8px 24px rgba(0,0,0,.06);
+    padding:18px;
+  }
+  
+  /* Rangées du récap */
+  .dp-sum-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin:8px 0;
+  }
+  
+  /* Badge “Tarifs en direct / Adresse en 1 ligne” si besoin
+     (on garde aussi tes styles inline existants) */
+  .chip-muted{
+    font-size:12px;
+    background:#eef2ff;
+    color:#374151;
+    padding:3px 8px;
+    border-radius:999px;
+    font-weight:700;
+  }
+  
+  /* ================= Boutons ================= */
+  
+  /* Bouton “Payer ma commande” (style perdu) */
+  .dp-pay-btn{
+    width:100%;
+    border:0;
+    border-radius:12px;
+    padding:14px 18px;
+    color:#fff;
+    font-weight:900;
+    cursor:pointer;
+    margin-top:10px;
+    background:linear-gradient(135deg,#3b79ff,#2c5dff);
+  }
+  .dp-pay-btn:hover{ filter:brightness(.98); }
+  
+  /* Boutons secondaires “Changer / OK / Modifier” (si tu veux les styliser via classe) */
+  .dp-btn-light{
+    padding:8px 12px;
+    border-radius:10px;
+    border:1px solid #e5e7eb;
+    background:#fff;
+    cursor:pointer;
+    font-weight:700;
+  }
+  .dp-btn-primary{
+    padding:10px 14px;
+    border-radius:10px;
+    border:0;
+    background:linear-gradient(135deg,#3b79ff,#2c5dff);
+    color:#fff;
+    cursor:pointer;
+    font-weight:800;
+  }
+  
+  /* ================== Listes transporteurs & relais ================== */
+  
+  /* Chaque offre de transport (label cliquable) — pour homogénéiser si pas de style inline */
+  .ship-option{
+    display:grid;
+    grid-template-columns:auto 1fr auto;
+    gap:10px;
+    align-items:center;
+    padding:10px 12px;
+    border:1px solid #e5e7eb;
+    border-radius:12px;
+    cursor:pointer;
+    background:#fff;
+  }
+  
+  /* Liste des relais recherchés — limite de hauteur avec scroll
+     (utile quand tu as beaucoup de résultats) */
+  .dp-relay-list{
+    display:grid;
+    gap:12px;
+    min-height:340px;
+    max-height:540px;
+    overflow:auto;
+    padding-right:4px;
+  }
+  
+  /* ================== Responsive ================== */
+  
+  /* <= 1024px : on commence à donner plus d’air */
+  @media (max-width:1024px){
+    .pay-grid{ grid-template-columns:1fr 340px !important; }
+  }
+  
+  /* <= 900px : tout passe en 1 colonne, contenu visible sans débordement */
+  @media (max-width:900px){
+    .new-grid{ grid-template-columns:1fr !important; }
+    .pay-grid{ grid-template-columns:1fr !important; }
+  
+    /* la carte récap n’est plus sticky (sinon elle “mange” l’écran) */
+    .cart-summary{
+      position:static !important;
+      top:auto !important;
+      margin-top:12px;
+    }
+  
+    /* inputs & autocomplétion : ne pas écraser la largeur */
+    .dp-page input[type="text"],
+    .dp-page input[type="search"],
+    .dp-page input.form-control,
+    .dp-page select.form-control{
+      width:100%;
+      max-width:100%;
+    }
+  }
+  
+  /* Très petit écran : évite les débordements horizontaux */
+  @media (max-width:360px){
+    .dp-page{ padding-left:12px; padding-right:12px; }
+    .dp-pay-btn{ padding:12px 14px; }
+  }
+  
+
+
+
+  /* =========================
+   DeliveryPayment — Mobile fixes
+   ========================= */
+
+/* général */
+@media (max-width: 768px){
+    .dp-page{
+      padding: 12px !important;
+    }
+  
+    /* sections principales en 1 colonne */
+    .new-grid{
+      grid-template-columns: 1fr !important;
+      gap: 12px !important;
+    }
+  
+    /* paiement + récap en pile */
+    .pay-grid{
+      grid-template-columns: 1fr !important;
+      gap: 12px !important;
+    }
+  
+    /* le récap ne doit pas être sticky en mobile */
+    .cart-summary{
+      position: static !important;
+      top: auto !important;
+      width: 100% !important;
+      margin-top: 8px;
+    }
+  
+    /* carte “adresse préférée” plus compacte */
+    .category-card{
+      padding: 12px !important;
+    }
+    /* petit chip */
+    .category-card .badge,
+    .category-card [style*="border-radius: 999"]{
+      font-size: 11px !important;
+      padding: 2px 6px !important;
+    }
+  
+    /* bloc adresse (gauche/droite -> pile) */
+    .dp-page .addressWrap,
+    .dp-page [style*="display: flex"][style*="gap: 14px"][style*="border-radius: 12px"]{
+      flex-direction: column !important;
+      gap: 10px !important;
+    }
+  
+    /* grille de recherche relais : champ + bouton sous le champ */
+    .dp-page [style*="grid-template-columns: minmax(350px"],
+    .dp-page [style*="grid-template-columns: minmax(350px, 1fr) 60px"]{
+      grid-template-columns: 1fr !important;
+      gap: 8px !important;
+      align-items: stretch !important;
+    }
+  
+    /* liste de relais : hauteur raisonnable + scroll */
+    .dp-page [style*="min-height: 340px"][style*="max-height: 540px"]{
+      min-height: 260px !important;
+      max-height: 420px !important;
+    }
+  
+    /* options transporteur : meilleure lisibilité */
+    label[for^="op-"],
+    label[htmlFor^="op-"]{
+      grid-template-columns: auto 1fr auto !important;
+      gap: 8px !important;
+      padding: 10px 12px !important;
+    }
+  
+    /* inputs plein largeur par défaut */
+    .dp-page .form-control,
+    .dp-page input[type="text"],
+    .dp-page input[type="tel"],
+    .dp-page select{
+      width: 100% !important;
+      max-width: 100% !important;
+    }
+  
+    /* bouton de paiement visible et large */
+    .dp-pay-btn{
+      width: 100% !important;
+      display: block !important;
+      padding: 14px 16px !important;
+      border-radius: 12px !important;
+      font-weight: 800 !important;
+      background: linear-gradient(135deg,#3b79ff,#2c5dff) !important;
+      color: #fff !important;
+      border: 0 !important;
+    }
+  }
+  
+  /* ======= Modale : rendre le panneau scrollable quand l'écran est petit ======= */
+  @media (max-width: 768px){
+    /* cible le panel de la modale rendu par SimpleModal */
+    .dp-modal__panel{
+      width: 94vw !important;
+      max-height: 90vh !important;
+      overflow: auto !important;
+      padding: 16px !important;
+    }
+    .dp-modal__panel h3{
+      font-size: 1.15rem !important;
+    }
+    .dp-modal__panel .form-control{
+      width: 100% !important;
+    }
+    .dp-modal__footer{
+      position: sticky;
+      bottom: 0;
+      background: #fff;
+      padding-top: 8px;
+    }
+  }
+
+
+  /* ===== Point relais : champ + bouton en mobile ===== */
+@media (max-width: 768px){
+    /* cible le bloc "Adresse complète" */
+    .dp-page [style*="Adresse complète"],
+    .dp-page .relay-search,
+    .dp-page .relay-address-input{
+      display: flex !important;
+      flex-direction: column !important;
+      align-items: center !important;
+      gap: 10px !important;
+    }
+  
+    /* champ prend 90% */
+    .dp-page .relay-address-input input,
+    .dp-page input[placeholder*="Adresse complète"]{
+      width: 90% !important;
+      max-width: 90% !important;
+      margin: 0 auto !important;
+    }
+  
+    /* bouton OK centré + plus large */
+    .dp-page .relay-address-input button,
+    .dp-page button:has(> span:contains("OK")),
+    .dp-page button:has(> span:only-child){
+      width: 60% !important;
+      max-width: 220px !important;
+      margin: 0 auto !important;
+      display: block !important;
+      padding: 12px !important;
+      border-radius: 12px !important;
+      font-weight: 700 !important;
+    }
+  }
+
+
+
+  /* ====== Recherche point relais : grille desktop ====== */
+.relay-search-row{
+    display: grid;
+    grid-template-columns: minmax(350px, 1fr) 80px;
+    gap: 12px;
+    align-items: end;
+  }
+  
+  /* Colonne input : rien de spécial en desktop */
+  .relay-input-col{}
+  
+  /* Bouton OK desktop */
+  .relay-ok-btn{
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 12px;
+    font-weight: 800;
+  }
+  
+  /* ====== Mobile : input à 90% + bouton centré, large ====== */
+  @media (max-width: 768px){
+    .relay-search-row{
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      align-items: center;      /* centre le contenu */
+    }
+  
+    /* l'input interne (AddressAutocomplete -> .form-control) */
+    .relay-input-col .form-control{
+      width: 90% !important;    /* ← 90% de la largeur */
+      max-width: 90% !important;
+      margin: 0 auto !important;
+    }
+  
+    /* bouton OK centré et plus large */
+    .relay-ok-btn{
+      width: 65% !important;    /* large mais pas full */
+      max-width: 260px !important;
+      margin: 0 auto !important;
+      display: block !important;
+      padding: 12px 14px !important;
+      border-radius: 12px !important;
+      font-weight: 800 !important;
+    }
+  }
+  
+  /* (déjà présent plus haut) Modale responsive */
+  @media (max-width: 768px){
+    .dp-modal__panel{
+      width: 94vw !important;
+      max-height: 90vh !important;
+      overflow: auto !important;
+      padding: 16px !important;
+    }
+    .dp-modal__footer{
+      position: sticky;
+      bottom: 0;
+      background: #fff;
+      padding-top: 8px;
+    }
+  }
+  
+
+  
+  
+  

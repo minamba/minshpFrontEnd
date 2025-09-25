@@ -1,11 +1,12 @@
+// src/pages/product/Product.jsx
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import '../../App.css';
 import { useSelector, useDispatch } from 'react-redux';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ProductSpecs } from '../../components/index';
 import { addToCartRequest, saveCartRequest } from '../../lib/actions/CartActions';
 import { GenericModal } from '../../components/index';
 import { toMediaUrl } from '../../lib/utils/mediaUrl';
+import "../../styles/pages/product.css";
 
 export const Product = () => {
   const { id } = useParams();
@@ -47,7 +48,7 @@ export const Product = () => {
     return list.length ? list : [{ url: '/Images/placeholder.jpg', position: 1 }];
   }, [images, product]);
 
-  // Vidéos
+  // Vidéos — NE PAS TOUCHER
   const productVideos = useMemo(() => {
     if (!product) return [];
     return (videos || []).filter((v) => String(v.idProduct) === String(product.id) && v.position === 2);
@@ -87,6 +88,23 @@ export const Product = () => {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [isLightboxOpen]);
+
+  // ===== (NOUVEAU) Détection mobile
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined'
+      ? window.matchMedia('(max-width: 768px)').matches
+      : false
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)');
+    const handler = (e) => setIsMobile(e.matches);
+    if (mq.addEventListener) mq.addEventListener('change', handler);
+    else mq.addListener(handler);
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener('change', handler);
+      else mq.removeListener(handler);
+    };
+  }, []);
 
   // ===== Helpers prix/promo =====
   const toNum = (x) => {
@@ -233,7 +251,7 @@ export const Product = () => {
   // Specs
   const specs = ProductSpecs(pid);
 
-  // Vidéo autoplay
+  // Vidéo autoplay — NE PAS TOUCHER
   const videoRef = useRef(null);
   useEffect(() => {
     if (!hasVideo || !videoRef.current) return;
@@ -271,7 +289,15 @@ export const Product = () => {
             <button
               key={img.position || idx}
               className="thumb"
-              onClick={() => setCurrentIndex(idx)}
+              onClick={() => {
+                // ✅ MOBILE : ouvrir la popup sans changer l'image principale
+                if (isMobile) {
+                  openLightbox(idx);
+                } else {
+                  // Desktop : comportement inchangé
+                  setCurrentIndex(idx);
+                }
+              }}
               aria-label={`Voir image ${idx + 1}`}
               type="button"
             >
@@ -295,7 +321,7 @@ export const Product = () => {
         <div className="product-details">
           <p className="product-brand">{product?.brand || ''}</p>
 
-          <h1 className="product-title product-title--center">
+          <h1 className="product-title product-title--center specs-title">
             {product?.brand + ' ' + product?.model || product?.title || 'Produit'}
           </h1>
 
@@ -316,7 +342,7 @@ export const Product = () => {
                 )}
 
                 {/* Prix affiché */}
-                <div className="product-price">
+                <div className="price--big">
                   <span className="euros">{euros}€</span>
                   <sup className="cents">{cents}</sup>
                 </div>
@@ -341,11 +367,6 @@ export const Product = () => {
             {/* Statut de stock */}
             <div className={`stock-row ${stockRowClass}`}>
               <span className={`stock-dot ${stockDotClass}`} /> <span>{stockStatusLabel}</span>
-              {/* {!isActuallyOut && availableQty > 0 && (
-                <span style={{ marginLeft: 8, color: '#6b7280', fontSize: '.9rem' }}>
-                  ({availableQty} en stock)
-                </span>
-              )} */}
             </div>
 
             <div className="buy-row">
@@ -401,14 +422,14 @@ export const Product = () => {
 
       {/* Description */}
       <section className="product-desc">
-        <h2>Description</h2>
+        <h2 className="specs-title">Description</h2>
         <p>
           {product?.description ||
             'Découvrez ce produit au design soigné et aux performances solides. Idéal pour un usage quotidien comme pour les usages intensifs.'}
         </p>
       </section>
 
-      {/* Vidéo */}
+      {/* Vidéo — NE PAS TOUCHER */}
       {hasVideo && (
         <section className="product-video-section">
           <video
@@ -429,7 +450,7 @@ export const Product = () => {
 
       {/* Caractéristiques */}
       <section className="specs-wrap">
-        <h2 className="specs-title">Caractéristiques techniques : {product?.name}</h2>
+        <h2 className="specs-title">Caractéristiques techniques</h2>
 
         <div className="specs-layout">
           <nav className="specs-nav">

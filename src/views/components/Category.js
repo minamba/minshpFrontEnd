@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef } from "react";
-import "../../App.css";
+// import ReactDOM from "react-dom"; // plus nécessaire
+import "../../styles/pages/category.css";
 import { useSelector, useDispatch } from "react-redux";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { addToCartRequest, saveCartRequest } from "../../lib/actions/CartActions";
@@ -7,7 +8,8 @@ import { GenericModal } from "../../components";
 import { toMediaUrl } from "../../lib/utils/mediaUrl";
 import { calculPrice } from "../../lib/utils/Helpers";
 
-/* -------------------- Helpers -------------------- */
+
+/* -------------------- Helpers (définis ici) -------------------- */
 const parseDate = (val) => {
   if (!val) return null;
   const d = new Date(val);
@@ -65,7 +67,7 @@ const getSubcatParentId = (sc) =>
   null;
 
 const getSubcatName = (sc) => (sc?.name ?? sc?.title ?? `Sous-catégorie ${sc?.id ?? ""}`).toString();
-const getCatName = (c) => (c?.name ?? c?.title ?? "Catégorie").toString();
+const getCatName   = (c)  => (c?.name ?? c?.title ?? "Catégorie").toString();
 
 /* -------------------- Component -------------------- */
 export const Category = () => {
@@ -78,8 +80,11 @@ export const Category = () => {
   const images     = useSelector((s) => s.images?.images) || [];
   const items      = useSelector((s) => s.items?.items) || [];
   const categories = useSelector((s) => s.categories?.categories) || [];
-  /* ✅ Sous-catégories depuis le store */
   const subcategories = useSelector((s) => s.subCategories?.subCategories) || [];
+
+    useEffect(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    }, [routeCategoryId]);
 
   /* Sauvegarde panier */
   useEffect(() => { dispatch(saveCartRequest(items)); }, [items, dispatch]);
@@ -93,7 +98,6 @@ export const Category = () => {
   const categoryBannerUrl = useMemo(() => {
     const byCat = images.find((i) => String(i.idCategory) === String(routeCategoryId));
     return byCat?.url || "/Images/placeholder.jpg";
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [images, routeCategoryId]);
 
   /* Image principale produit */
@@ -232,8 +236,7 @@ export const Category = () => {
     return list;
   }, [augmented, search, sortKey]);
 
-  /* ---------- Barre sous-catégories (pills) ---------- */
-  // Sous-catégories directes dont le parent = catégorie courante
+  /* ---------- Barre sous-catégories ---------- */
   const visibleSubcats = useMemo(() => {
     if (!routeCategoryId) return [];
     return (subcategories || []).filter(
@@ -241,7 +244,6 @@ export const Category = () => {
     );
   }, [subcategories, routeCategoryId]);
 
-  // Pills = [catégorie courante] + [sous-catégories]
   const pills = useMemo(() => {
     const head = currentCategory
       ? [{ id: String(currentCategory.id), name: getCatName(currentCategory), type: "category" }]
@@ -254,20 +256,16 @@ export const Category = () => {
     return [...head, ...subs];
   }, [currentCategory, visibleSubcats]);
 
-  // Scroll + flèches
   const pillsRef = useRef(null);
-  const [canScrollLeft, setCanScrollLeft]   = useState(false);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
-
   const updatePillScrollState = () => {
     const el = pillsRef.current;
     if (!el) return;
     setCanScrollLeft(el.scrollLeft > 0);
     setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
   };
-
   useEffect(() => { updatePillScrollState(); }, [pills.length]);
-
   useEffect(() => {
     const el = pillsRef.current;
     if (!el) return;
@@ -278,7 +276,6 @@ export const Category = () => {
       window.removeEventListener("resize", updatePillScrollState);
     };
   }, []);
-
   const scrollPills = (dir) => {
     const el = pillsRef.current;
     if (!el) return;
@@ -286,24 +283,34 @@ export const Category = () => {
     el.scrollBy({ left: delta, behavior: "smooth" });
   };
 
-  /* ---------- Modal “ajouté au panier” ---------- */
+  /* ---------- Modale “ajouté au panier” ---------- */
   const [showAdded, setShowAdded] = useState(false);
   const [lastAdded, setLastAdded] = useState(null);
   const closeAdded = () => setShowAdded(false);
   const goToCart  = () => { setShowAdded(false); navigate("/cart"); };
 
+  /* ---------- Mobile sheet state (sans portal) ---------- */
+  const [sheetOpen, setSheetOpen] = useState(false);
+
+  useEffect(() => {
+    if (sheetOpen) document.body.classList.add("has-sheet-open");
+    else document.body.classList.remove("has-sheet-open");
+  }, [sheetOpen]);
+
+  const badgeCount = Math.min(filteredSorted.length, 99);
+
   /* -------------------- Render -------------------- */
   return (
     <div className="category-page">
-      {/* BANNIÈRE */}
-      <section className="category-hero" style={{ "--hero-url": `url("${toMediaUrl(categoryBannerUrl)}")` }}>
+      {/* HERO */}
+      <section
+        className="category-hero"
+        style={{ "--hero-url": `url("${toMediaUrl(categoryBannerUrl)}")` }}
+      >
         <h1 className="category-hero__title">{getCatName(currentCategory)}</h1>
-        <div className="category-hero__count">
-          {filteredSorted.length} produit{filteredSorted.length > 1 ? "s" : ""}
-        </div>
       </section>
 
-      {/* ====== BARRE SOUS-CATÉGORIES (désormais AU-DESSUS de la recherche/tri) ====== */}
+      {/* PILLS sous-catégories */}
       {pills.length > 0 && (
         <div className="subcat-bar">
           <button
@@ -352,7 +359,7 @@ export const Category = () => {
         </div>
       )}
 
-      {/* BARRE D'OUTILS (recherche + tri) */}
+      {/* Toolbar desktop (cachée en mobile via CSS) */}
       <div className="category-toolbar">
         <input
           className="form-control category-search"
@@ -380,7 +387,7 @@ export const Category = () => {
         </select>
       </div>
 
-      {/* GRILLE PRODUITS */}
+      {/* Grille produits */}
       <section className="new-section" id="category-products">
         <div className="new-grid">
           {filteredSorted.length === 0 && (
@@ -450,7 +457,7 @@ export const Category = () => {
                         {priceRef.toLocaleString("fr-FR", { style: "currency", currency: "EUR" })}
                       </span>
                     )}
-                    <div className={`product-price ${hasAnyPromo ? "product-price--promo" : ""}`}>
+                    <div className={`price ${hasAnyPromo ? "price--promo" : ""}`}>
                       <span className="euros">{euros}€</span>
                       <sup className="cents">{cents}</sup>
                     </div>
@@ -478,6 +485,71 @@ export const Category = () => {
           { label: "Voir mon panier", variant: "primary", onClick: goToCart, autoFocus: true },
         ]}
       />
+
+      {/* espace pour ne pas masquer le bas par le bouton mobile */}
+      <div className="mobile-filter-spacer" />
+
+      {/* ===== Barre mobile + Sheet (rendu direct, sans portal) ===== */}
+      <div className="mobile-filter-bar" role="presentation">
+        <button
+          type="button"
+          className="mfb-btn"
+          onClick={() => setSheetOpen(true)}
+          aria-label="Affinez votre recherche"
+        >
+          Affinez votre recherche
+          <span className="mfb-badge">{badgeCount}</span>
+        </button>
+      </div>
+
+      <div
+        className={`mfb-overlay ${sheetOpen ? "is-open" : ""}`}
+        onClick={() => setSheetOpen(false)}
+      />
+      <div className={`mfb-sheet ${sheetOpen ? "is-open" : ""}`} role="dialog" aria-modal="true">
+        <div className="mfb-sheet__handle" />
+        <div className="mfb-sheet__title">Filtrer / Trier</div>
+
+        <div className="sheet-fields">
+          <input
+            className="form-control"
+            placeholder="Rechercher un produit…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <select
+            className={`form-select ${sortKey === "" ? "is-placeholder" : ""}`}
+            value={sortKey}
+            onChange={(e) => setSortKey(e.target.value)}
+          >
+            <option value="" disabled>Trier les produits</option>
+            <option value="date-desc">Nouveautés (récent → ancien)</option>
+            <option value="date-asc">Plus ancien → récent</option>
+            <option value="name-asc">Nom (A → Z)</option>
+            <option value="name-desc">Nom (Z → A)</option>
+            <option value="price-asc">Prix (moins cher → plus cher)</option>
+            <option value="price-desc">Prix (plus cher → moins cher)</option>
+            <option value="brand-asc">Marque (A → Z)</option>
+            <option value="brand-desc">Marque (Z → A)</option>
+            <option value="promo-first">Promotion (d’abord)</option>
+            <option value="discount-desc">Réduction (forte → faible)</option>
+          </select>
+        </div>
+
+        <div className="mfb-actions">
+          <button
+            type="button"
+            className="btn btn--light"
+            onClick={() => { setSearch(""); setSortKey(""); }}
+          >
+            Réinitialiser
+          </button>
+          <button type="button" className="btn btn--primary bg-primary" onClick={() => setSheetOpen(false)}>
+            Voir les résultats
+          </button>
+        </div>
+      </div>
+      {/* ===== Fin barre mobile ===== */}
     </div>
   );
 };

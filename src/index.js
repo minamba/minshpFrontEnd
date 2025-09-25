@@ -1,10 +1,14 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import './index.css';
+// import './index.css';
 import {BaseApp} from './views/components/index';
 import reportWebVitals from './reportWebVitals';
 import { Provider } from 'react-redux';
 import store from './lib/stores/store';
+import "./styles/globals.css";
+import "./styles/components/modal.css";
+import "./styles/components/footer.css";
+
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(

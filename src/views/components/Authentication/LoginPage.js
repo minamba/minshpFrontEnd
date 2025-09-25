@@ -1,7 +1,7 @@
 // src/pages/auth/LoginPage.jsx
 import React, { useEffect, useState, useMemo } from "react";
 import "bootstrap-icons/font/bootstrap-icons.css";
-import "../../../App.css";
+import "../../../styles/pages/auth.css";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { loginRequest } from "../../../lib/actions/AccountActions";
@@ -113,7 +113,10 @@ export default function LoginPage() {
   }, [forgotOpen]);
 
   return (
-    <div className="auth-page auth-page--photo">
+    <div
+    className="auth-page auth-page--photo"
+    style={{ '--auth-bg': 'url(/Images/login_background.png)' }}
+>
       <div className="auth-card" role="dialog" aria-labelledby="login-title">
         <h1 id="login-title" className="auth-title">Connexion</h1>
 
@@ -140,7 +143,7 @@ export default function LoginPage() {
 
           <label className="auth-field">
             <span>Mot de passe</span>
-            <div className="auth-pass-wrap">
+            <div className="auth-pass-wrap mb-3">
               <input
                 className="auth-input"
                 type={showPwd ? "text" : "password"}
@@ -182,7 +185,7 @@ export default function LoginPage() {
             </div>
           )}
 
-          <button type="submit" className="auth-btn" disabled={!canSubmit}>
+          <button type="submit" className="auth-btn mt-3 mb-3 bg-primary" disabled={!canSubmit}>
             {loading ? <span className="btn-spinner" aria-hidden="true" /> : "Se connecter"}
           </button>
         </form>

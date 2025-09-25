@@ -1,0 +1,137 @@
+/* ========= ADMIN / PRODUCT TABLE (full-bleed + scroll) ========= */
+
+/* 1) "Full-bleed" : on sort du container parent pour prendre 100vw */
+.admin-products{
+    --page-pad: clamp(12px, 2vw, 24px);
+    width: 100vw;
+    margin-left: calc(50% - 50vw);
+    margin-right: calc(50% - 50vw);
+    padding-left: var(--page-pad);
+    padding-right: var(--page-pad);
+    max-width: none !important;
+  }
+  
+  /* 2) Wrapper de scroll horizontal (remplace/complète .table-responsive) */
+  .admin-products .table-responsive{
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+    max-width: none !important;
+    border-radius: 12px;
+    background: #fff;
+    box-shadow: 0 10px 24px rgba(0,0,0,.06);
+  }
+  
+  /* 3) Table large : on évite l’écrasement des colonnes */
+  .admin-products .table{
+    width: 100%;
+    min-width: 1400px;               /* ajuste si besoin (1600px, 1800px…) */
+    border-collapse: separate;
+    border-spacing: 0;
+    background: #fff;
+  }
+  
+  /* 4) En-tête collant pour rester visible quand on scrolle horizontalement */
+  .admin-products thead th{
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: #111827;             /* cohérent avec .table-dark */
+    color: #fff;
+    white-space: nowrap;
+  }
+  
+  /* 5) Colonnes : largeurs utiles pour lisibilité */
+  .admin-products thead th:first-child,
+  .admin-products tbody td:first-child{   /* Image */
+    width: 120px;
+    text-align: center;
+    vertical-align: middle;
+  }
+  .admin-products .col-desc{              /* Description : colonne plus large */
+    max-width: 520px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  
+  /* 6) Images de la colonne "Image" */
+  .admin-products td:first-child img{
+    display: block;
+    width: 100px;
+    height: 66px;
+    object-fit: cover;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,.08);
+  }
+  
+  /* 7) Alignements agréables (prix à droite, quantités bold) */
+  .admin-products td:nth-child(6),
+  .admin-products td:nth-child(7){        /* Prix HT / TTC */
+    text-align: right;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  .admin-products td.fw-bold{ font-weight: 800 !important; }
+  
+  /* 8) Actions : empêcher la colonne de rapetisser */
+  .admin-products .table-actions{
+    white-space: nowrap;
+  }
+  
+  /* 9) Petites améliorations visuelles */
+  .admin-products .table tbody tr:hover{
+    background: #f8fafc;
+  }
+  .admin-products .table thead th,
+  .admin-products .table tbody td{
+    vertical-align: middle;
+  }
+  
+  /* 10) Mobile / petits écrans : on garde le scroll horizontal  */
+  @media (max-width: 768px){
+    .admin-products{
+      --page-pad: 12px;
+    }
+    .admin-products .table{
+      min-width: 1000px;              /* un peu plus compact en mobile */
+    }
+  }
+
+
+
+  /* === Thumbnails non recadrées (montrer l’image entière) === */
+.admin-products thead th:first-child,
+.admin-products tbody td:first-child{
+  width: 120px;                 /* largeur de la colonne Image */
+}
+
+.admin-products tbody td:first-child a{
+  display: inline-grid;
+  place-items: center;
+  width: 100px;
+  height: 100px;                /* zone carrée */
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 6px;                 /* petite marge autour */
+  box-shadow: 0 4px 12px rgba(0,0,0,.06);
+}
+
+.admin-products tbody td:first-child img{
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;          /* 🔑 ne recadre plus, on voit tout */
+  border-radius: 6px;           /* optionnel, juste doux */
+}
+
+/* Alignement vertical propre sur la première colonne */
+.admin-products tbody td:first-child{
+  vertical-align: middle;
+}
+
+  

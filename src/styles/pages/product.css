@@ -1,0 +1,260 @@
+/* ===========================
+   PRODUCT PAGE
+   =========================== */
+
+   :root{
+    --shadow-1: 0 6px 18px rgba(0,0,0,.06);
+    --shadow-2: 0 10px 30px rgba(0,0,0,.08);
+  }
+  
+  /* Conteneur principal */
+  .product-page{
+    box-sizing:border-box;
+    max-width:1200px;
+    width:100%;
+    margin:0 auto;
+    padding:2rem;
+  }
+  
+  /* Zone haute: vignettes | image | détails */
+  .product-main{
+    display:grid;
+    grid-template-columns:140px minmax(0,1fr) 560px;
+    column-gap:40px;
+    align-items:start;
+  }
+  
+  /* Vignettes */
+  .thumbs-col{
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+    max-height:520px;
+    overflow:auto;
+  }
+  .thumbs-col .thumb{
+    padding:0;
+    border:0;
+    background:#f3f4f6;
+    border-radius:12px;
+    width:110px;
+    height:110px;
+    cursor:pointer;
+    box-shadow:var(--shadow-1);
+  }
+  .thumbs-col .thumb img{
+    width:100%;
+    height:100%;
+    object-fit:contain;
+    border-radius:12px;
+  }
+  
+  /* Image principale */
+  .product-main-image-wrap{
+    justify-self:center;
+    width:100%;
+    min-height:460px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:#f6f7f9;
+    border-radius:18px;
+    padding:18px;
+    box-shadow:var(--shadow-2);
+    overflow:hidden;
+  }
+  .product-main-image{
+    display:block;
+    width:100%;
+    height:auto;
+    max-height:520px;
+    object-fit:contain;
+  }
+  
+  /* Colonne détails */
+  .product-details{
+    border-left:1px solid #e5e7eb;
+    padding-left:40px;
+    max-width:560px;
+    position:sticky;
+    top:1rem;
+    align-self:flex-start;
+  }
+  .product-brand{ color:#666; margin:0 0 .25rem; }
+  .product-title.product-title--center{ grid-column:1 / -1; text-align:center; }
+  
+  /* ------- Prix / Promo ------- */
+  .refprice-wrap{ margin:4px 0 8px; }
+  .refprice-label{ font-weight:800; color:#6b7280; font-size:.9rem; margin-bottom:4px; }
+  .refprice-row{ display:flex; align-items:center; gap:8px; }
+  .refprice-old{ color:#6b7280; text-decoration:line-through; font-weight:700; }
+  .refprice-badge{
+    display:inline-flex; align-items:center; justify-content:center;
+    background:#ef4444; color:#fff; font-weight:900; border-radius:8px;
+    padding:2px 8px; font-size:.85rem;
+  }
+  .price--big{ font-weight:900; line-height:1; }
+  .price--big .euros{ font-size:2.2rem; }
+  .price--big .cents{ font-size:1rem; margin-left:2px; }
+  .promo-until{
+    display:inline-block; margin-top:4px; padding:4px 8px; border-radius:8px;
+    background:#fff7ed; color:#b45309; border:1px solid #fde68a; font-weight:800;
+  }
+  
+  .product-description{ font-size:1.1rem; color:#555; }
+  
+  /* ------- Stock / Achat ------- */
+  .stock-row{ display:flex; align-items:center; gap:8px; margin:.75rem 0 1rem; font-weight:700; }
+  .stock-row.stock-in{ color:#138a36; }
+  .stock-row.stock-out{ color:#dc2626; }
+  .stock-row.stock-warn{ color:#b45309; }
+  .stock-dot{ width:10px; height:10px; border-radius:50%; display:inline-block; background:#d1d5db; }
+  .stock-dot.in{ background:#22c55e; } .stock-dot.out{ background:#ef4444; } .stock-dot.warn{ background:#f59e0b; }
+  
+  .buy-row{ display:flex; gap:12px; align-items:center; }
+  .qty-select{
+    padding:.6rem .8rem; border-radius:12px; border:1px solid #ddd; background:#fff;
+  }
+  .buy-button{
+    padding:.8rem 2rem; background:#000; color:#fff; border:0; border-radius:50px;
+    font-size:1rem; cursor:pointer;
+  }
+  .buy-button.buy-accent{ background:linear-gradient(135deg,#416bf5,#4364f8); }
+  .buy-button:disabled{ opacity:.5; cursor:not-allowed; }
+  
+  .trust-list{ margin-top:24px; display:flex; flex-direction:column; gap:6px; color:#374151; font-weight:500; }
+  .trust-ico{ font-size:18px; }
+  
+  /* ------- Description / Vidéo ------- */
+  .product-desc{ margin-top:2.5rem; }
+  .product-desc h2{ font-size:1.8rem; margin:0 0 .75rem; }
+  .product-desc p{ font-size:1.1rem; color:#374151; line-height:1.65; margin:0; }
+  
+  .product-video{ width:100%; height:clamp(240px,45vw,560px); border-radius:16px; background:#000; display:block; box-shadow:var(--shadow-2); object-fit:cover; }
+  
+  /* =========================================================
+     PRODUCT — Caractéristiques techniques (SPEC SHEET)
+     ========================================================= */
+  
+  /* Bloc global */
+  .specs-wrap{ margin-top:2.5rem; }
+  .specs-title{ font-size:1.8rem; font-weight:900; margin:0 0 1rem; }
+  
+  /* Grille nav (ancres) + contenu */
+  .specs-layout{
+    display:grid;
+    grid-template-columns:260px 1fr;
+    gap:24px;
+  }
+  
+  /* Navigation (ancres) */
+  .specs-nav{
+    position:sticky;
+    top:110px; /* sous la navbar */
+    align-self:start;
+    display:flex; flex-direction:column; gap:10px;
+  }
+  .specs-nav a{
+    color:#2b3ff0; text-decoration:none; font-weight:700;
+  }
+  .specs-nav a:hover{ text-decoration:underline; }
+  
+  /* Panneau specs */
+  .specs-content{
+    background:#ffffffcc;
+    border-radius:12px;
+    padding:16px;
+  }
+  .specs-section{ margin-bottom:18px; }
+  .specs-section h3{ margin:1.5rem 0 .75rem; font-size:1.6rem; font-weight:900; }
+  
+  /* ===== Lignes "label — ligne — valeur" (desktop par défaut) ===== */
+  .specs-table{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .specs-row{
+    display:grid;
+    grid-template-columns:220px 1fr max-content; /* label | ligne | valeur */
+    align-items:baseline;
+    gap:12px;
+  }
+  .specs-label{
+    min-width:220px;
+    color:#333;
+    font-weight:800;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .specs-line{
+    height:1px;
+    background:#cfcfcf;
+    align-self:center;
+    transform:translateY(2px);
+  }
+  .specs-value{
+    min-width:160px;
+    justify-self:end;
+    text-align:right;
+    color:#0f172a;
+    font-weight:700;
+    white-space:nowrap;
+  }
+  .specs-value code, .specs-label code{
+    font-family:ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  
+  /* ===== Responsive ===== */
+  
+  /* <= 1200px : réduire un peu la grille haute */
+  @media (max-width:1200px){
+    .product-main{ grid-template-columns:84px minmax(0,1fr) 520px; column-gap:28px; }
+  }
+  
+  /* <= 992px : stack la zone haute et la nav des specs */
+  @media (max-width:992px){
+    .product-main{ grid-template-columns:1fr; row-gap:16px; }
+    .product-main-image-wrap{ min-height:300px; padding:12px; }
+    .thumbs-col{ order:2; flex-direction:row; gap:8px; overflow-x:auto; overflow-y:hidden; padding:0 4px 6px; }
+    .thumbs-col .thumb{ flex:0 0 72px; width:72px; height:72px; }
+    .product-details{ grid-column:1/-1; border-left:0; border-top:1px solid #e5e7eb; padding-left:0; padding-top:16px; max-width:100%; }
+  
+    .specs-layout{ grid-template-columns:1fr; }
+    .specs-nav{
+      position:static;
+      flex-direction:row;
+      flex-wrap:wrap;
+      gap:8px 16px;
+    }
+  }
+  
+  /* <= 640px : conserver 3 colonnes pour les specs (label | ligne | valeur) */
+  @media (max-width:640px){
+    .product-page{ padding-left:12px; padding-right:12px; }
+  
+    .specs-content{ padding:12px; border-radius:10px; }
+    .specs-section h3{ font-size:1.2rem; margin:1rem 0 .5rem; }
+  
+    .specs-row{
+      grid-template-columns:minmax(120px, auto) 1fr max-content;
+      column-gap:10px;
+      align-items:baseline;
+    }
+    .specs-label{ min-width:unset; }
+    .specs-line{ display:block; height:1px; background:#e5e7eb; }
+    .specs-value{ justify-self:end; text-align:right; white-space:nowrap; color:#0f172a; }
+  }
+  
+  /* Très petits écrans */
+  @media (max-width:380px){
+    .specs-content{ padding:10px; }
+    .specs-section h3{ font-size:1.05rem; }
+  }
+  
+  /* <= 560px : mini vignettes + padding */
+  @media (max-width:560px){
+    .thumbs-col .thumb{ flex:0 0 64px; width:64px; height:64px; }
+  }
+  

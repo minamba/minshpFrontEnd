@@ -42,7 +42,6 @@ function* deleteInvoice(action) {
             yield call(api.deleteInvoice, action.payload);
             console.log("Invoice deleted :",action.payload);
             const response = yield call(api.getInvoices);
-
             yield put (actions.getInvoiceSuccess({invoices : response.data}));
     }
     catch (error) {

@@ -1,7 +1,6 @@
 // src/pages/auth/Register.jsx
 import React, { useMemo, useState, useEffect } from "react";
 import "bootstrap-icons/font/bootstrap-icons.css";
-import "../../../App.css";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { registerRequest, registerClear } from "../../../lib/actions/AccountActions";
@@ -45,7 +44,7 @@ function composeE164(dial, local) {
 
 function PhoneInput({ dial, local, onChange, disabled = false, required = false }) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 8 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: 8 }}>
       <select
         className="form-control"
         value={dial || DEFAULT_DIAL}
@@ -60,7 +59,7 @@ function PhoneInput({ dial, local, onChange, disabled = false, required = false 
       </select>
       <input
         className="form-control"
-        placeholder="n° national (ex: 06 24 95 75 58)"
+        placeholder="N° national"
         value={local || ""}
         onChange={(e) => onChange({ dial, local: cleanDigits(e.target.value) })}
         inputMode="tel"
@@ -156,14 +155,14 @@ export const Register = () => {
 
   dispatch(getCustomerRequest());
 
-  const exampleNote = useMemo(
-    () => (
-      <small style={{ color: "#6b7280" }}>
-        Exemple FR : tapez <b>06…</b> — sera enregistré <b>+336…</b>
-      </small>
-    ),
-    []
-  );
+  // const exampleNote = useMemo(
+  //   () => (
+  //     <small style={{ color: "#6b7280" }}>
+  //       Exemple FR : tapez <b>06…</b> — sera enregistré <b>+336…</b>
+  //     </small>
+  //   ),
+  //   []
+  // );
 
   return (
     <div className="auth-page auth-page--photo">
@@ -181,9 +180,9 @@ export const Register = () => {
                 checked={form.civility === "M"}
                 onChange={onChange}
               />
-              <span>M.</span>
+              <span className="ms-2">M.</span>
             </label>
-            <label className="auth-remember">
+            <label className="auth-remember ms-3">
               <input
                 type="radio"
                 name="civility"
@@ -191,12 +190,12 @@ export const Register = () => {
                 checked={form.civility === "Mme"}
                 onChange={onChange}
               />
-              <span>Mme</span>
+              <span className="ms-2">Mme</span>
             </label>
           </div>
 
           {/* prénom / nom */}
-          <label className="auth-field">
+          <label className="auth-field mt-4">
             <span>Prénom *</span>
             <input
               className="auth-input"
@@ -305,7 +304,7 @@ export const Register = () => {
               onChange={handlePhoneChange}
               required
             />
-            {exampleNote}
+            {/* {exampleNote} */}
           </label>
 
           {/* erreurs / succès */}
@@ -332,7 +331,7 @@ export const Register = () => {
 
           <button
             type="submit"
-            className="auth-btn"
+            className="auth-btn bg-primary"
             disabled={loadingRegister || disabled}
           >
             {loadingRegister ? "Création…" : "Créer mon compte"}

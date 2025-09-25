@@ -1,0 +1,22 @@
+/* ===========================
+   FOOTER
+   =========================== */
+   footer,.footer-container{ position:relative; z-index:1; }
+   .footer-container{ background:#000; color:#fff; padding:3rem 1rem; text-align:center; }
+   .footer-content{ max-width:1200px; margin:0 auto; }
+   .footer-links{ margin:1.5rem 0; display:flex; justify-content:center; gap:2rem; flex-wrap:wrap; }
+   .footer-links a{ color:#fff; font-weight:800; }
+   
+   .footer-newsletter form{ gap:.5rem; flex-wrap:wrap; justify-content:center; display:flex; }
+   .footer-newsletter input[type="email"]{
+     height:44px; padding:.6rem 1rem; border-radius:999px; background:#fff; color:#111; border:none; outline:none; width:min(340px,90vw);
+   }
+   .footer-newsletter button{
+     height:44px; padding:0 16px; border-radius:999px; border:0; background:#0d6efd; color:#fff; font-weight:900;
+     transition:filter .2s, transform .05s;
+   }
+   .footer-newsletter button:hover{ filter:brightness(.96); transform:translateY(-1px); }
+   .footer-socials{ gap:1rem; display:flex; align-items:center; justify-content:center; }
+   .footer-socials a{ font-size:1.25rem; display:inline-flex; align-items:center; }
+   .footer-socials a:hover{ transform:translateY(-2px); }
+   

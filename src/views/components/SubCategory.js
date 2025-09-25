@@ -1,6 +1,5 @@
 // src/views/components/SubCategory.jsx
 import React, { useMemo, useState, useEffect, useRef } from "react";
-import "../../App.css";
 import { useSelector, useDispatch } from "react-redux";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { addToCartRequest, saveCartRequest } from "../../lib/actions/CartActions";
@@ -49,6 +48,10 @@ export const SubCategory = () => {
   const { id: routeSubCategoryId } = useParams();
   const dispatch = useDispatch();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, [routeSubCategoryId]);
 
   // Store
   const products      = useSelector((s) => s.products?.products) || [];
@@ -237,6 +240,15 @@ export const SubCategory = () => {
   const closeAdded = () => setShowAdded(false);
   const goToCart   = () => { setShowAdded(false); navigate("/cart"); };
 
+  /* ---------- Mobile sheet state (option A) ---------- */
+  const [sheetOpen, setSheetOpen] = useState(false);
+  useEffect(() => {
+    if (sheetOpen) document.body.classList.add("has-sheet-open");
+    else document.body.classList.remove("has-sheet-open");
+  }, [sheetOpen]);
+
+  const badgeCount = Math.min(filteredSorted.length, 99);
+
   return (
     <div className="category-page">
       {/* Bannière */}
@@ -244,10 +256,12 @@ export const SubCategory = () => {
         <h1 className="category-hero__title">
           {currentSubCategory?.name || currentSubCategory?.title || "Sous-catégorie"}
         </h1>
-        <div className="category-hero__count">
-          {filteredSorted.length} produit{filteredSorted.length > 1 ? "s" : ""}
-        </div>
       </section>
+
+      {/* Compteur déplacé en dehors du hero pour ne pas perturber le centrage */}
+      {/* <div className="category-hero__count" style={{ textAlign: "center", margin: "8px 0 0" }}>
+        {filteredSorted.length} produit{filteredSorted.length > 1 ? "s" : ""}
+      </div> */}
 
       {/* Barre sous-catégories (pills) avec la catégorie parente en PREMIER */}
       {pills.length > 0 && (
@@ -292,7 +306,7 @@ export const SubCategory = () => {
         </div>
       )}
 
-      {/* Toolbar recherche/tri */}
+      {/* Toolbar recherche/tri (masquée en mobile via CSS) */}
       <div className="category-toolbar">
         <input
           className="form-control category-search"
@@ -402,6 +416,71 @@ export const SubCategory = () => {
           { label: "Voir mon panier", variant: "primary", onClick: goToCart, autoFocus: true },
         ]}
       />
+
+      {/* espace pour ne pas masquer le bas par la barre mobile */}
+      <div className="mobile-filter-spacer" />
+
+      {/* ===== Barre mobile + Sheet (rendu direct, sans portal) ===== */}
+      <div className="mobile-filter-bar" role="presentation">
+        <button
+          type="button"
+          className="mfb-btn"
+          onClick={() => setSheetOpen(true)}
+          aria-label="Affinez votre recherche"
+        >
+          Affinez votre recherche
+          <span className="mfb-badge">{badgeCount}</span>
+        </button>
+      </div>
+
+      <div
+        className={`mfb-overlay ${sheetOpen ? "is-open" : ""}`}
+        onClick={() => setSheetOpen(false)}
+      />
+      <div className={`mfb-sheet ${sheetOpen ? "is-open" : ""}`} role="dialog" aria-modal="true">
+        <div className="mfb-sheet__handle" />
+        <div className="mfb-sheet__title">Filtrer / Trier</div>
+
+        <div className="sheet-fields">
+          <input
+            className="form-control"
+            placeholder="Rechercher un produit…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <select
+            className={`form-select ${sortKey === "" ? "is-placeholder" : ""}`}
+            value={sortKey}
+            onChange={(e) => setSortKey(e.target.value)}
+          >
+            <option value="" disabled>Trier les produits</option>
+            <option value="date-desc">Nouveautés (récent → ancien)</option>
+            <option value="date-asc">Plus ancien → récent</option>
+            <option value="name-asc">Nom (A → Z)</option>
+            <option value="name-desc">Nom (Z → A)</option>
+            <option value="price-asc">Prix (moins cher → plus cher)</option>
+            <option value="price-desc">Prix (plus cher → moins cher)</option>
+            <option value="brand-asc">Marque (A → Z)</option>
+            <option value="brand-desc">Marque (Z → A)</option>
+            <option value="promo-first">Promotion (d’abord)</option>
+            <option value="discount-desc">Réduction (forte → faible)</option>
+          </select>
+        </div>
+
+        <div className="mfb-actions">
+          <button
+            type="button"
+            className="btn btn--light"
+            onClick={() => { setSearch(""); setSortKey(""); }}
+          >
+            Réinitialiser
+          </button>
+          <button type="button" className="btn btn--primary bg-primary" onClick={() => setSheetOpen(false)}>
+            Voir les résultats
+          </button>
+        </div>
+      </div>
+      {/* ===== Fin barre mobile ===== */}
     </div>
   );
 };

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import '../App.css';
-import { FaFacebookF, FaInstagram, FaTwitter, FaLinkedin } from 'react-icons/fa';
+import "../styles/components/navbar.css";
+import { FaFacebookF, FaInstagram, FaTwitter, FaLinkedin, FaCheckCircle, FaTimesCircle } from 'react-icons/fa';
 import {Link, NavLink, useParams} from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { updateProductUserRequest } from '../lib/actions/ProductActions';
@@ -21,50 +21,50 @@ import { calculPrice } from '../lib/utils/Helpers';
 import { getUserRoles } from '../lib/utils/jwt';
 import { RequireRole } from '../views/components/Authentication/RequireRole';
 import { toMediaUrl } from '../lib/utils/mediaUrl';
+import { addNewsletterRequest } from '../lib/actions/NewLetterActions';
+
+
 
 
 
 export const Navbar = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+
+  // --- Auth / rôles
   const token = localStorage.getItem("access_token");
-  const roles = getUserRoles(token);
-
-  const isAdmin = roles
-  .map(r => String(r).toLowerCase())
-  .includes("admin");
-
-  // Store
-  const categories =
-    useSelector((s) => s.categories?.categories) || [];
-  const subCategories =
-    useSelector((s) => s.subCategories?.subCategories) || [];
-
-  // Auth
+  const roles = getUserRoles?.(token) || [];
+  const isAdmin = roles.map((r) => String(r).toLowerCase()).includes("admin");
   const { isAuth } = useSelector((s) => s.account) || { isAuth: false };
 
-  // Cart
+  // --- Données catalogue
+  const categories    = useSelector((s) => s.categories?.categories) || [];
+  const subCategories = useSelector((s) => s.subCategories?.subCategories) || [];
+
+  // --- Panier
   const cartItems = useSelector((s) => s.items?.items) || [];
-  const cartCount = cartItems.reduce(
-    (acc, it) => acc + Number(it.qty ?? it.quantity ?? 1),
-    0
-  );
+  const cartCount = cartItems.reduce((acc, it) => acc + Number(it.qty ?? it.quantity ?? 1), 0);
 
-  // UI state
-  const [isOpen, setIsOpen] = useState(false);
-  const [productsOpen, setProductsOpen] = useState(false);
-  const [accountOpen, setAccountOpen] = useState(false);
-  const [adminOpen, setAdminOpen] = useState(false);
+  const [bump, setBump] = useState(false);
+  useEffect(() => {
+    if (cartCount > 0) {
+      setBump(true);
+      const t = setTimeout(() => setBump(false), 300);
+      return () => clearTimeout(t);
+    }
+  }, [cartCount]);
 
-  // flyout states
-  const [hoverCatId, setHoverCatId] = useState(null);
-
-  // map subcats by category id (robust to casing)
+  // Map sous-cat par cat
   const subsByCat = useMemo(() => {
     const m = {};
     for (const sc of subCategories) {
       const cid =
-        sc?.idCategory ?? sc?.IdCategory ?? sc?.categoryId ?? sc?.CategoryId;
+        sc?.idCategory ??
+        sc?.IdCategory ??
+        sc?.categoryId ??
+        sc?.CategoryId ??
+        sc?.parentCategoryId ??
+        null;
       if (cid == null) continue;
       const k = String(cid);
       if (!m[k]) m[k] = [];
@@ -73,19 +73,17 @@ export const Navbar = () => {
     return m;
   }, [subCategories]);
 
-  // little bump on cart badge
-  const [bump, setBump] = useState(false);
-  useEffect(() => {
-    if (cartCount <= 0) return;
-    setBump(true);
-    const t = setTimeout(() => setBump(false), 300);
-    return () => clearTimeout(t);
-  }, [cartCount]);
+  // --- UI states
+  const [isOpen, setIsOpen]         = useState(false); // drawer mobile
+  const [productsOpen, setPOpen]    = useState(false);
+  const [accountOpen, setAOpen]     = useState(false);
+  const [adminOpen, setAdOpen]      = useState(false);
+  const [hoverCatId, setHoverCatId] = useState(null);
 
   const closeAllDropdowns = () => {
-    setAdminOpen(false);
-    setProductsOpen(false);
-    setAccountOpen(false);
+    setPOpen(false);
+    setAOpen(false);
+    setAdOpen(false);
     setHoverCatId(null);
   };
 
@@ -95,232 +93,506 @@ export const Navbar = () => {
     if (!next) closeAllDropdowns();
   };
 
+  // Ferme les dropdowns quand on passe d’un viewport à l’autre
   useEffect(() => {
     const onResize = () => closeAllDropdowns();
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  // helpers for mobile accordions
-  const toggleProducts = () => {
+  // ====== Verrouillage du scroll (mobile) ======
+  // Technique robuste: position:fixed + mémorisation du scrollY
+  const scrollYRef = useRef(0);
+  useEffect(() => {
+    const b = document.body;
+    const html = document.documentElement;
+
+    if (isOpen) {
+      scrollYRef.current = window.scrollY || window.pageYOffset || 0;
+
+      b.style.position = "fixed";
+      b.style.top = `-${scrollYRef.current}px`;
+      b.style.left = "0";
+      b.style.right = "0";
+      b.style.width = "100%";
+      b.style.overflow = "hidden";
+
+      // Limite l’overscroll “élastique”
+      html.style.overscrollBehavior = "contain";
+    } else {
+      const y = Math.abs(parseInt(b.style.top || "0", 10)) || scrollYRef.current;
+
+      b.style.position = "";
+      b.style.top = "";
+      b.style.left = "";
+      b.style.right = "";
+      b.style.width = "";
+      b.style.overflow = "";
+
+      document.documentElement.style.overscrollBehavior = "";
+
+      // Retour à la position initiale
+      window.scrollTo(0, y);
+    }
+
+    return () => {
+      // cleanup safe
+      b.style.position = "";
+      b.style.top = "";
+      b.style.left = "";
+      b.style.right = "";
+      b.style.width = "";
+      b.style.overflow = "";
+      document.documentElement.style.overscrollBehavior = "";
+    };
+  }, [isOpen]);
+
+  // Helpers mobile: toggles robustes (tap + touch)
+  const touchToggle =
+    (fn) =>
+    (e) => {
+      if (e?.type === "touchend") {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      fn((v) => !v);
+    };
+
+  const mobileToggleProducts = touchToggle(setPOpen);
+  const mobileToggleAccount  = touchToggle(setAOpen);
+  const mobileToggleAdmin    = touchToggle(setAdOpen);
+
+  // Click handlers (ne togglent en mobile qu’en dessous de 901px)
+  const onClickProducts = () => {
     if (window.innerWidth <= 900) {
-      setProductsOpen((v) => !v);
-      setAdminOpen(false);
-      setAccountOpen(false);
+      setPOpen((v) => !v);
+      setAOpen(false);
+      setAdOpen(false);
     }
   };
-  const toggleAccount = () => {
+  const onClickAccount = () => {
     if (window.innerWidth <= 900) {
-      setAccountOpen((v) => !v);
-      setAdminOpen(false);
-      setProductsOpen(false);
+      setAOpen((v) => !v);
+      setPOpen(false);
+      setAdOpen(false);
     }
   };
-  const toggleAdmin = () => {
+  const onClickAdmin = () => {
     if (window.innerWidth <= 900) {
-      setAdminOpen((v) => !v);
-      setProductsOpen(false);
-      setAccountOpen(false);
+      setAdOpen((v) => !v);
+      setPOpen(false);
+      setAOpen(false);
     }
+  };
+
+  // Liens qui ferment tout
+  const onNavLink = () => {
+    setIsOpen(false);
+    closeAllDropdowns();
   };
 
   return (
-    <nav className="navbar-container">
-      <div className="navbar-content">
-        {/* Logo */}
-        <div className="navbar-logo">
-          <Link to="/" onClick={() => setIsOpen(false)}>
-            <img className="logo-img" src="../images/logo_16.png" alt="Logo" />
-          </Link>
-        </div>
-
-        {/* Links */}
-        <div className={`navbar-links ${isOpen ? "active" : ""}`}>
-          {/* ======= ALL PRODUCTS with 2-level flyout ======= */}
-          <div
-            className="navbar-dropdown"
-            onMouseEnter={() => {
-              if (window.innerWidth > 900) setProductsOpen(true);
-            }}
-            onMouseLeave={() => {
-              if (window.innerWidth > 900) {
-                setProductsOpen(false);
-                setHoverCatId(null);
-              }
-            }}
-          >
-            <button className="navbar-dropdown-toggle" onClick={toggleProducts}>
-              Tous nos produits <span className={`arrow ${productsOpen ? "up" : "down"}`}>▾</span>
+    <>
+      {/* ===== NAVBAR ===== */}
+      <nav className="navbar-container" role="navigation" aria-label="Navigation principale">
+        <div className="navbar-content">
+          {/* --- Mobile row --- */}
+          <div className="navbar-row navbar-row-mobile">
+            <button
+              className="navbar-toggle"
+              type="button"
+              aria-label="Ouvrir le menu"
+              onClick={toggleMenu}
+              onTouchEnd={toggleMenu}
+            >
+              <span className="bar" />
+              <span className="bar" />
+              <span className="bar" />
             </button>
 
-            {productsOpen && (
-              <div className="flyout-root" /* main panel */>
-                {/* Invisible bridge so the menu doesn't close when moving the mouse
-                    from L1 to L2 */}
-                <div className="flyout-bridge" />
+            <div className="navbar-logo">
+              <Link to="/" onClick={onNavLink} aria-label="Accueil">
+                <img className="logo-img" src="/Images/logo_16.png" alt="Min's" />
+              </Link>
+            </div>
 
-                {/* Level 1: categories */}
-                <ul className="flyout-level1">
-                  {categories.map((cat) => {
-                    const hasSubs = (subsByCat[String(cat.id)] || []).length > 0;
-                    const active = String(hoverCatId) === String(cat.id);
-                    return (
-                      <li
-                        key={cat.id}
-                        className={`flyout-item ${active ? "is-active" : ""}`}
-                        onMouseEnter={() => setHoverCatId(cat.id)}
-                      >
-                        <Link
-                          to={`/category/${cat.id}`}
-                          className="flyout-link"
-                          onClick={() => {
-                            setIsOpen(false);
-                            setProductsOpen(false);
-                          }}
-                        >
-                          <span className="flyout-label">{cat.name}</span>
-                          {hasSubs && <span className="flyout-arrow">›</span>}
-                        </Link>
-
-                        {/* Level 2: subcategories (shown only if present) */}
-                        {hasSubs && active && (
-                          <ul className="flyout-level2">
-                            {subsByCat[String(cat.id)].map((sc) => (
-                              <li key={sc.id} className="flyout-subitem">
-                                <Link
-                                  to={`/subCategory/${sc.id}`}
-                                  className="flyout-sublink"
-                                  onClick={() => {
-                                    setIsOpen(false);
-                                    setProductsOpen(false);
-                                  }}
-                                >
-                                  {sc.name}
-                                </Link>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            )}
+            <div className="navbar-right-icons">
+              <Link className="nav-ico-btn" to="/account" aria-label="Mon compte" onClick={onNavLink}>
+                <i className="bi bi-person-fill nav-icon nav-icon--blue" aria-hidden="true" />
+              </Link>
+              <Link className="nav-ico-btn nav-cart-btn" to="/cart" aria-label="Panier" onClick={onNavLink}>
+                <i className="bi bi-cart-fill nav-icon" aria-hidden="true" />
+                {cartCount > 0 && <span className={`nav-badge ${bump ? "bump" : ""}`}>{cartCount}</span>}
+              </Link>
+            </div>
           </div>
 
-          <Link to="/news" onClick={() => setIsOpen(false)}>Nouveautés</Link>
-          <Link to="/promotion" onClick={() => setIsOpen(false)}>Soldes & promos</Link>
+          {/* --- Desktop row --- */}
+          <div className="navbar-row navbar-row-desktop">
+            <div className="navbar-left">
+              <div className="navbar-logo">
+                <Link to="/" onClick={closeAllDropdowns} aria-label="Accueil">
+                  <img className="logo-img" src="/Images/logo_16.png" alt="Min's" />
+                </Link>
+              </div>
+            </div>
 
-          {/* ======= Account ======= */}
-          <div
-            className="navbar-dropdown"
-            onMouseEnter={() => window.innerWidth > 900 && setAccountOpen(true)}
-            onMouseLeave={() => window.innerWidth > 900 && setAccountOpen(false)}
-          >
-            <button className="navbar-dropdown-toggle" onClick={toggleAccount}>
-              <i className="bi bi-person-fill nav-icon nav-icon--blue" aria-hidden="true" />
-              <span>Compte</span>
-              <span className={`arrow ${accountOpen ? "up" : "down"}`}>▾</span>
-            </button>
-            {accountOpen && (
-              <div className="navbar-dropdown-menu">
-                {!isAuth ? (
-                  <Link
-                    to="/login"
-                    onClick={() => {
-                      setIsOpen(false);
-                      setAccountOpen(false);
-                    }}
-                  >
-                    <i className="bi bi-box-arrow-in-right" style={{ marginRight: 6 }} />
-                    Se connecter
-                  </Link>
-                ) : (
-                  <>
-                    <Link
-                      to="/account"
-                      onClick={() => { setIsOpen(false); setAccountOpen(false); }}
-                    >
-                      <i className="bi bi-person-circle" style={{ marginRight: 6 }} />
-                      Mon compte
-                    </Link>
+            <div className="navbar-links">
+              {/* PRODUITS (desktop + tap) */}
+              <div
+                className="navbar-dropdown"
+                onMouseEnter={() => window.innerWidth > 900 && setPOpen(true)}
+                onMouseLeave={() => {
+                  if (window.innerWidth > 900) {
+                    setPOpen(false);
+                    setHoverCatId(null);
+                  }
+                }}
+                onTouchStart={() => setPOpen((v) => !v)} // iPad/écrans tactiles
+              >
+                <button
+                  className="navbar-dropdown-toggle"
+                  type="button"
+                  onClick={onClickProducts}
+                  aria-haspopup="true"
+                  aria-expanded={productsOpen}
+                >
+                  Tous nos produits <span className={`arrow ${productsOpen ? "up" : ""}`}>▾</span>
+                </button>
 
-                    <button
-                      className="logout-btn"
-                      onClick={() => {
-                        dispatch(logout());
-                        setIsOpen(false);
-                        setAccountOpen(false);
-                        navigate("/login");
-                      }}
-                    >
-                      <i className="bi bi-power" style={{ marginRight: 6 }} />
-                      Déconnexion
-                    </button>
-                  </>
+                {productsOpen && (
+                  <div className="flyout-root">
+                    <div className="flyout-bridge" />
+                    <ul className="flyout-level1">
+                      {categories.length === 0 && (
+                        <li className="flyout-item">
+                          <span className="flyout-link" aria-disabled>Chargement…</span>
+                        </li>
+                      )}
+                      {categories.map((cat) => {
+                        const list    = subsByCat[String(cat.id)] || [];
+                        const hasSubs = list.length > 0;
+                        const active  = String(hoverCatId) === String(cat.id);
+                        return (
+                          <li
+                            key={cat.id}
+                            className={`flyout-item ${active ? "is-active" : ""}`}
+                            onMouseEnter={() => setHoverCatId(cat.id)}
+                          >
+                            <Link
+                              to={`/category/${cat.id}`}
+                              className="flyout-link"
+                              onClick={onNavLink}
+                            >
+                              <span>{cat.name}</span>
+                              {hasSubs && <span className="flyout-arrow">›</span>}
+                            </Link>
+
+                            {hasSubs && active && (
+                              <div className="flyout-level2">
+                                {list.map((sc) => (
+                                  <Link
+                                    key={sc.id}
+                                    className="flyout-sublink"
+                                    to={`/subcategory/${sc.id}`}
+                                    onClick={onNavLink}
+                                  >
+                                    {sc.name}
+                                  </Link>
+                                ))}
+                              </div>
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
                 )}
               </div>
-            )}
-          </div>
 
-          {/* Cart */}
-          <Link to="/cart" onClick={() => setIsOpen(false)} className="nav-cart-link">
-            <span className="nav-cart-ico">
-              <i className="bi bi-cart-fill nav-icon" aria-hidden="true" />
-              {cartCount > 0 && (
-                <span className={`nav-badge ${bump ? "bump" : ""}`}>{cartCount}</span>
-              )}
-            </span>
-            <span>Panier</span>
-          </Link>
+              <Link to="/news" onClick={closeAllDropdowns}>Nouveautés</Link>
+              <Link to="/promotion" onClick={closeAllDropdowns}>Soldes & promos</Link>
 
-          {/* Admin */}
-          <div
-            className="navbar-dropdown"
-            onMouseEnter={() => window.innerWidth > 900 && setAdminOpen(true)}
-            onMouseLeave={() => window.innerWidth > 900 && setAdminOpen(false)}
-          >
-            {isAdmin && (
-            <button className="navbar-dropdown-toggle" onClick={toggleAdmin}>
-              Admin <span className={`arrow ${adminOpen ? "up" : "down"}`}>▾</span>
-            </button>
-            )}
-            {adminOpen &&  (
-              <div className="navbar-dropdown-menu">
-                <Link to="/admin/application" onClick={() => setIsOpen(false)}>Application</Link>
-                <Link to="/admin/billingAddress" onClick={() => setIsOpen(false)}>Adresses de facturation</Link>
-                <Link to="/admin/deliveryAddress" onClick={() => setIsOpen(false)}>Adresses de livraison</Link>
-                <Link to="/admin/categories" onClick={() => setIsOpen(false)}>Catégories</Link>
-                <Link to="/admin/subCategory" onClick={() => setIsOpen(false)}>Sous catégories</Link>
-                <Link to="/admin/features" onClick={() => setIsOpen(false)}>Caractéristiques</Link>
-                <Link to="/admin/featureProducts" onClick={() => setIsOpen(false)}>Caractéristiques produits</Link>
-                <Link to="/admin/featureCategories" onClick={() => setIsOpen(false)}>Catégories des caractéristiques</Link>
-                <Link to="/admin/customers" onClick={() => setIsOpen(false)}>Clients</Link>
-                <Link to="/admin/invoices" onClick={() => setIsOpen(false)}>Factures</Link>
-                <Link to="/admin/customerPromotions" onClick={() => setIsOpen(false)}>Codes promo clients</Link>
-                <Link to="/admin/promotionCodes" onClick={() => setIsOpen(false)}>Codes promo produits</Link>
-                <Link to="/admin/orders" onClick={() => setIsOpen(false)}>Commandes</Link>
-                <Link to="/admin/products" onClick={() => setIsOpen(false)}>Produits</Link>
-                <Link to="/admin/images" onClick={() => setIsOpen(false)}>Images</Link>
-                <Link to="/admin/videos" onClick={() => setIsOpen(false)}>Vidéos</Link>
-                <Link to="/admin/stocks" onClick={() => setIsOpen(false)}>Stocks</Link>
-                <Link to="/admin/promotions" onClick={() => setIsOpen(false)}>Promotions</Link>
-                <Link to="/admin/taxes" onClick={() => setIsOpen(false)}>Taxes</Link>
-                <Link to="/admin/packageProfil" onClick={() => setIsOpen(false)}>Profils de colis</Link>
+              {/* COMPTE */}
+              <div
+                className="navbar-dropdown"
+                onMouseEnter={() => window.innerWidth > 900 && setAOpen(true)}
+                onMouseLeave={() => window.innerWidth > 900 && setAOpen(false)}
+                onTouchStart={() => setAOpen((v) => !v)}
+              >
+                <button
+                  className="navbar-dropdown-toggle"
+                  type="button"
+                  onClick={onClickAccount}
+                  aria-haspopup="true"
+                  aria-expanded={accountOpen}
+                >
+                  <i className="bi bi-person-fill nav-icon nav-icon--blue" aria-hidden="true" />
+                  <span>Compte</span>
+                  <span className={`arrow ${accountOpen ? "up" : ""}`}>▾</span>
+                </button>
+
+                {accountOpen && (
+                  <div className="navbar-dropdown-menu" style={{ display: "flex" }}>
+                    {!isAuth ? (
+                      <Link to="/login" onClick={() => { setAOpen(false); }}>
+                        <i className="bi bi-box-arrow-in-right" style={{ marginRight: 6 }} />
+                        Se connecter
+                      </Link>
+                    ) : (
+                      <>
+                        <Link to="/account" onClick={() => { setAOpen(false); }}>
+                          <i className="bi bi-person-circle" style={{ marginRight: 6 }} />
+                          Mon compte
+                        </Link>
+                        <button
+                          className="logout-btn"
+                          onClick={() => {
+                            dispatch(logout());
+                            setAOpen(false);
+                            navigate("/login");
+                          }}
+                        >
+                          <i className="bi bi-power" style={{ marginRight: 6 }} />
+                          Déconnexion
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
-            )}
+
+              {/* PANIER */}
+              <Link to="/cart" onClick={closeAllDropdowns} className="nav-cart-link">
+                <span className="nav-cart-ico">
+                  <i className="bi bi-cart-fill nav-icon" aria-hidden="true" />
+                  {cartCount > 0 && <span className={`nav-badge ${bump ? "bump" : ""}`}>{cartCount}</span>}
+                </span>
+                <span>Panier</span>
+              </Link>
+
+              {/* ADMIN */}
+              {isAdmin && (
+                <div
+                  className="navbar-dropdown"
+                  onMouseEnter={() => window.innerWidth > 900 && setAdOpen(true)}
+                  onMouseLeave={() => window.innerWidth > 900 && setAdOpen(false)}
+                  onTouchStart={() => setAdOpen((v) => !v)}
+                >
+                  <button
+                    className="navbar-dropdown-toggle"
+                    type="button"
+                    onClick={onClickAdmin}
+                    aria-haspopup="true"
+                    aria-expanded={adminOpen}
+                  >
+                    Admin <span className={`arrow ${adminOpen ? "up" : ""}`}>▾</span>
+                  </button>
+
+                  {adminOpen && (
+                    <div
+                      className="navbar-dropdown-menu admin-menu"
+                      style={{ display: "flex" }}
+                      role="menu"
+                      aria-label="Menu admin"
+                    >
+                      <Link to="/admin/application" onClick={closeAllDropdowns}>Application</Link>
+                      <Link to="/admin/billingAddress" onClick={closeAllDropdowns}>Adresses de facturation</Link>
+                      <Link to="/admin/deliveryAddress" onClick={closeAllDropdowns}>Adresses de livraison</Link>
+                      <Link to="/admin/categories" onClick={closeAllDropdowns}>Catégories</Link>
+                      <Link to="/admin/subCategory" onClick={closeAllDropdowns}>Sous catégories</Link>
+                      <Link to="/admin/features" onClick={closeAllDropdowns}>Caractéristiques</Link>
+                      <Link to="/admin/featureProducts" onClick={closeAllDropdowns}>Caractéristiques produits</Link>
+                      <Link to="/admin/featureCategories" onClick={closeAllDropdowns}>Catégories des caractéristiques</Link>
+                      <Link to="/admin/customers" onClick={closeAllDropdowns}>Clients</Link>
+                      <Link to="/admin/invoices" onClick={closeAllDropdowns}>Factures</Link>
+                      <Link to="/admin/customerPromotions" onClick={closeAllDropdowns}>Codes promo clients</Link>
+                      <Link to="/admin/promotionCodes" onClick={closeAllDropdowns}>Codes promo produits</Link>
+                      <Link to="/admin/orders" onClick={closeAllDropdowns}>Commandes</Link>
+                      <Link to="/admin/products" onClick={closeAllDropdowns}>Produits</Link>
+                      <Link to="/admin/images" onClick={closeAllDropdowns}>Images</Link>
+                      <Link to="/admin/videos" onClick={closeAllDropdowns}>Vidéos</Link>
+                      <Link to="/admin/stocks" onClick={closeAllDropdowns}>Stocks</Link>
+                      <Link to="/admin/promotions" onClick={closeAllDropdowns}>Promotions</Link>
+                      <Link to="/admin/taxes" onClick={closeAllDropdowns}>Taxes</Link>
+                      <Link to="/admin/packageProfil" onClick={closeAllDropdowns}>Profils de colis</Link>
+                      <Link to="/admin/newsletter" onClick={closeAllDropdowns}>Newsletter</Link>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
+      </nav>
 
-        {/* Burger */}
-        <div className="navbar-toggle" onClick={toggleMenu} aria-label="Ouvrir le menu">
-          <span className="bar"></span>
-          <span className="bar"></span>
-          <span className="bar"></span>
+      {/* ===== Overlay + Drawer mobile (GAUCHE) ===== */}
+      <div
+        className={`mm-overlay ${isOpen ? "show" : ""}`}
+        onClick={() => setIsOpen(false)}
+        onWheel={(e) => e.preventDefault()}
+        onTouchMove={(e) => e.preventDefault()}  // bloque le scroll de fond
+      />
+
+      <aside
+        className={`mm-panel ${isOpen ? "show" : ""}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Menu"
+        onTouchMove={(e) => e.stopPropagation()} // le panneau peut scroller sans propager
+      >
+        <div className="mm-head" style={{ paddingTop: "calc(14px + env(safe-area-inset-top,0px))" }}>
+          <div className="mm-title">Menu</div>
+          <button
+            className="btn-light"
+            onClick={() => setIsOpen(false)}
+            onTouchEnd={() => setIsOpen(false)}
+            aria-label="Fermer"
+          >
+            ✕
+          </button>
         </div>
-      </div>
-    </nav>
+
+        <div className="mm-scroller">
+          {/* PRODUITS */}
+          <div className="mm-section">
+            <button
+              className="mm-sec-btn"
+              onClick={onClickProducts}
+              onTouchEnd={mobileToggleProducts}
+              aria-expanded={productsOpen}
+              aria-controls="mm-products"
+            >
+              <span>Tous nos produits</span>
+              <span className="mm-chevron">▾</span>
+            </button>
+
+            <div id="mm-products" className={`mm-sub ${productsOpen ? "open" : ""}`}>
+              {categories.length === 0 && (
+                <div className="mm-item" aria-disabled>
+                  Chargement…
+                </div>
+              )}
+
+              {categories.map((cat) => {
+                const list = subsByCat[String(cat.id)] || [];
+                const hasSubs = list.length > 0;
+                return (
+                  <div key={cat.id} className="mm-sub-block">
+                    <Link className="mm-item" to={`/category/${cat.id}`} onClick={onNavLink}>
+                      <span>{cat.name}</span>
+                      {!hasSubs ? <span>›</span> : null}
+                    </Link>
+
+                    {hasSubs && (
+                      <div className="mm-sub" style={{ maxHeight: "none" }}>
+                        {list.map((sc) => (
+                          <Link
+                            key={sc.id}
+                            className="mm-item"
+                            to={`/subcategory/${sc.id}`}
+                            onClick={onNavLink}
+                            style={{ paddingLeft: 22 }}
+                          >
+                            {sc.name} <span>›</span>
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Liens simples */}
+          <div className="mm-section">
+            <Link className="mm-link" to="/news" onClick={onNavLink}>Nouveautés</Link>
+            <Link className="mm-link" to="/promotion" onClick={onNavLink}>Soldes & promos</Link>
+          </div>
+
+          {/* COMPTE */}
+          <div className="mm-section">
+            {!isAuth ? (
+              <Link className="mm-item" to="/login" onClick={onNavLink}>
+                Se connecter <span>›</span>
+              </Link>
+            ) : (
+              <>
+                <Link className="mm-item" to="/account" onClick={onNavLink}>
+                  Mon compte <span>›</span>
+                </Link>
+                <button
+                  className="mm-item"
+                  onClick={() => {
+                    dispatch(logout());
+                    setIsOpen(false);
+                    navigate("/login");
+                  }}
+                  onTouchEnd={() => {
+                    dispatch(logout());
+                    setIsOpen(false);
+                    navigate("/login");
+                  }}
+                  style={{ width: "100%", background: "transparent", border: 0, textAlign: "left" }}
+                >
+                  Déconnexion <span>↩︎</span>
+                </button>
+              </>
+            )}
+          </div>
+
+          {/* PANIER */}
+          <div className="mm-section">
+            <Link className="mm-item" to="/cart" onClick={onNavLink}>
+              Panier
+              {cartCount > 0 && <span className="mm-badge">{cartCount}</span>}
+            </Link>
+          </div>
+
+          {/* ADMIN */}
+          {isAdmin && (
+            <div className="mm-section">
+              <button
+                className="mm-sec-btn"
+                onClick={onClickAdmin}
+                onTouchEnd={mobileToggleAdmin}
+                aria-expanded={adminOpen}
+                aria-controls="mm-admin"
+              >
+                <span>Admin</span>
+                <span className="mm-chevron">▾</span>
+              </button>
+              <div id="mm-admin" className={`mm-sub ${adminOpen ? "open" : ""}`}>
+                <Link className="mm-item" to="/admin/application" onClick={onNavLink}>Application <span>›</span></Link>
+                <Link className="mm-item" to="/admin/billingAddress" onClick={onNavLink}>Adresses de facturation <span>›</span></Link>
+                <Link className="mm-item" to="/admin/deliveryAddress" onClick={onNavLink}>Adresses de livraison <span>›</span></Link>
+                <Link className="mm-item" to="/admin/categories" onClick={onNavLink}>Catégories <span>›</span></Link>
+                <Link className="mm-item" to="/admin/subCategory" onClick={onNavLink}>Sous catégories <span>›</span></Link>
+                <Link className="mm-item" to="/admin/features" onClick={onNavLink}>Caractéristiques <span>›</span></Link>
+                <Link className="mm-item" to="/admin/featureProducts" onClick={onNavLink}>Caractéristiques produits <span>›</span></Link>
+                <Link className="mm-item" to="/admin/featureCategories" onClick={onNavLink}>Catégories des caractéristiques <span>›</span></Link>
+                <Link className="mm-item" to="/admin/customers" onClick={onNavLink}>Clients <span>›</span></Link>
+                <Link className="mm-item" to="/admin/invoices" onClick={onNavLink}>Factures <span>›</span></Link>
+                <Link className="mm-item" to="/admin/customerPromotions" onClick={onNavLink}>Codes promo clients <span>›</span></Link>
+                <Link className="mm-item" to="/admin/promotionCodes" onClick={onNavLink}>Codes promo produits <span>›</span></Link>
+                <Link className="mm-item" to="/admin/orders" onClick={onNavLink}>Commandes <span>›</span></Link>
+                <Link className="mm-item" to="/admin/products" onClick={onNavLink}>Produits <span>›</span></Link>
+                <Link className="mm-item" to="/admin/images" onClick={onNavLink}>Images <span>›</span></Link>
+                <Link className="mm-item" to="/admin/videos" onClick={onNavLink}>Vidéos <span>›</span></Link>
+                <Link className="mm-item" to="/admin/stocks" onClick={onNavLink}>Stocks <span>›</span></Link>
+                <Link className="mm-item" to="/admin/promotions" onClick={onNavLink}>Promotions <span>›</span></Link>
+                <Link className="mm-item" to="/admin/taxes" onClick={onNavLink}>Taxes <span>›</span></Link>
+                <Link className="mm-item" to="/admin/packageProfil" onClick={onNavLink}>Profils de colis<span>›</span></Link>
+                <Link className="mm-item" to="/admin/newsletter" onClick={onNavLink}>Newsletter <span>›</span></Link>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div style={{ padding: 10 }} />
+      </aside>
+    </>
   );
 };
 
@@ -639,7 +911,7 @@ export const ProductTable = () => {
                 <tr key={prod.id}>
                   <td>
                     <Link to={`/product/${prod.id}`}>
-                      <img src={toMediaUrl(prod.images?.[0]?.url)} alt={prod.name} width={100} />
+                      <img src={ toMediaUrl(prod.images?.[0]?.url)} alt={prod.name} width={100} />
                     </Link>
                   </td>
                   <td>{prod.name}</td>
@@ -652,9 +924,9 @@ export const ProductTable = () => {
                   {/* 🔹 affichage sous-catégorie */}
                   <td>{getSubCategoryNameForProduct(prod)}</td>
                   <td>{getPackageProfilNameForProduct(prod)}</td>
-                  <td>{prod.stocks?.quantity ? prod.stocks.quantity : "Rupture"}</td>
-                  <td>{prod.promotions?.length > 0 ? "Oui" : "Non"}</td>
-                  <td>{prod.main ? "Oui" : "Non"}</td>
+                  <td className={prod.stocks?.quantity ? "fw-bold" : "fw-bold text-danger"}>{prod.stocks?.quantity ? prod.stocks.quantity : "Rupture"}</td>
+                  <td className={prod.promotions?.length > 0 ? "fw-bold text-success" : "fw-bold"}>{prod.promotions?.length > 0 ? "Oui" : "Non"}</td>
+                  <td className={prod.main ? "fw-bold text-success" : "fw-bold"}>{prod.main ? "Oui" : "Non"}</td>
                   <td>{prod.creationDate ? new Date(prod.creationDate).toLocaleDateString() : "—"}</td>
                   <td>{prod.modificationDate ? new Date(prod.modificationDate).toLocaleDateString() : "NM"}</td>
 
@@ -676,7 +948,7 @@ export const ProductTable = () => {
                     </button>
 
                     <button
-                      className='btn btn-primary'
+                      className='btn btn-secondary me-2'
                       title="Caractéristiques"
                       onClick={() => setSelectedProduct(prod)}
                     >
@@ -874,7 +1146,7 @@ export const GenericModal = ({
   message,
   icon,
   variant = "default",   // "success" | "danger" | "warning" | "info" | "default"
-  actions = [],           // [{ label, onClick, variant: "primary"|"danger"|"light", autoFocus }]
+  actions = [],          // [{ label, onClick, variant: "primary"|"danger"|"light", autoFocus }]
   closeOnBackdrop = true,
   closeOnEsc = true,
 }) => {
@@ -923,7 +1195,7 @@ export const GenericModal = ({
     default: null,
   };
 
-  // classes buttons isolées
+  // classes buttons → utilise tes styles .gbtn
   const btnClass = (v) =>
     v === "primary" ? "gbtn gbtn--primary" :
     v === "danger"  ? "gbtn gbtn--danger"  :
@@ -978,40 +1250,124 @@ export const GenericModal = ({
 //////////////////////// Footer ////////////////////////
 
 export const Footer = () => {
-    const year = new Date().getFullYear();
-  
-    return (
-      <footer className="footer-container">
-        <div className="footer-content">
-          {/* <div className="footer-logo">
-            <a href="/">MinShp</a>
-          </div> */}
-  
-          <div className="footer-links">
-            <a href="#conditions">Conditions</a>
-            <a href="#privacy">Confidentialité</a>
-            <a href="#contact">Contact</a>
-          </div>
-  
-          <div className="footer-newsletter">
-            <form>
-              <input type="email" placeholder="Votre email" />
-              <button type="submit">S'abonner</button>
-            </form>
-          </div>
-  
-          <div className="footer-socials">
-            <a href="https://facebook.com" target="_blank" rel="noopener noreferrer"><FaFacebookF /></a>
-            <a href="https://instagram.com" target="_blank" rel="noopener noreferrer"><FaInstagram /></a>
-            <a href="https://twitter.com" target="_blank" rel="noopener noreferrer"><FaTwitter /></a>
-            <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer"><FaLinkedin /></a>
-          </div>
-  
-          <div className="footer-copy">
-            &copy; {year} Min's. Tous droits réservés.
+  const year = new Date().getFullYear();
+  const dispatch = useDispatch();
+
+  // Sélecteurs : adapte le chemin selon ton store
+  const error           = useSelector(s => s.newsletters.error);          // null | ...
+  const successMessage  = useSelector(s => s.newsletters.successMessage); // null | string
+  const errorMessage    = useSelector(s => s.newsletters.errorMessage);   // null | string
+
+  const [email, setEmail] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [modalMsg, setModalMsg] = useState("");
+  const [modalType, setModalType] = useState("success"); // "success" | "error"
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!email) return;
+    setSubmitted(true);
+    dispatch(addNewsletterRequest({ Mail: email, Suscribe: true }));
+  };
+
+
+// Ouvre la popup quand un message arrive
+useEffect(() => {
+  if (!submitted) return;
+
+  if (successMessage) {
+    setModalMsg(successMessage);
+    setModalType("success");
+    setEmail("");
+    setShowModal(true);
+    setSubmitted(false);
+  } else if (errorMessage || error) {
+    setModalMsg(errorMessage || "Ajout échoué");
+    setModalType("error");
+    setShowModal(true);
+    setSubmitted(false);
+  }
+}, [submitted, successMessage, errorMessage, error]);
+
+  return (
+    <footer className="footer-container">
+      <div className="footer-content">
+        <div className="footer-links">
+          <a href="#conditions">Conditions</a>
+          <a href="#privacy">Confidentialité</a>
+          <a href="#contact">Contact</a>
+        </div>
+
+        <div className="footer-newsletter mt-5">
+          <form onSubmit={handleSubmit}>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Votre email pour recevoir les nouveautés"
+            />
+            <button type="submit">S'abonner</button>
+          </form>
+        </div>
+
+        <div className="footer-socials mt-5">
+          <a href="https://facebook.com" target="_blank" rel="noopener noreferrer"><FaFacebookF /></a>
+          <a href="https://instagram.com" target="_blank" rel="noopener noreferrer"><FaInstagram /></a>
+          <a href="https://twitter.com" target="_blank" rel="noopener noreferrer"><FaTwitter /></a>
+          <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer"><FaLinkedin /></a>
+        </div>
+
+        <div className="footer-copy mt-5">
+          &copy; {year} Min's. Tous droits réservés.
+        </div>
+      </div>
+
+      {/* Popup */}
+      {showModal && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <div className={`modal-card ${modalType}`}>
+            <div className="modal-icon">
+              {modalType === "success" ? (
+                <FaCheckCircle className="icon success" />
+              ) : (
+                <FaTimesCircle className="icon error" />
+              )}
+            </div>
+            <h3 className="text-muted mt-4">{modalMsg}</h3>
+            <div className="modal-actions">
+              <button className="mt-4" onClick={() => setShowModal(false)}>OK</button>
+            </div>
           </div>
         </div>
-      </footer>
+      )}
+
+      {/* Styles minimaux pour la popup */}
+      <style jsx>{`
+        .modal-backdrop {
+          position: fixed; inset: 0;
+          display: flex; align-items: center; justify-content: center;
+          background: rgba(0,0,0,0.5);
+          z-index: 9999;
+        }
+        .modal-card {
+          background: #fff;
+          border-radius: 16px;
+          padding: 24px;
+          max-width: 600px;
+          width: 90%;
+          text-align: center;
+          box-shadow: 0 12px 40px rgba(0,0,0,0.2);
+        }
+        .modal-icon { font-size: 64px; }
+        .icon.success { color: #16a34a; }
+        .icon.error { color: #dc2626; }
+        .modal-actions button {
+          padding: 10px 20px; border: none; border-radius: 8px;
+          background: #0d6efd; color: #fff; cursor: pointer;
+        }
+      `}</style>
+    </footer>
     );
   };
 

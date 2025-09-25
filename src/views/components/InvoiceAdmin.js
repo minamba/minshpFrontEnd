@@ -212,8 +212,16 @@ export const InvoiceAdmin = () => {
   const handleDelete = async (inv) => {
     const label = getInvoiceNumber(inv);
     if (!window.confirm(`Supprimer la facture ${label} ?`)) return;
+    let id = getId(inv);
+    await dispatch(deleteInvoiceRequest({Id: id, HardDelete: false}));
+    await dispatch(getInvoiceRequest?.());
+  };
 
-    await dispatch(deleteInvoiceRequest(getId(inv)));
+  const handleDeleteHard = async (inv) => {
+    const label = getInvoiceNumber(inv);
+    if (!window.confirm(`Supprimer la facture de maniere hard (suppression physique) ${label} ?`)) return;
+    let id = getId(inv);
+    await dispatch(deleteInvoiceRequest({Id: id, HardDelete: true}));
     await dispatch(getInvoiceRequest?.());
   };
 
@@ -279,6 +287,13 @@ export const InvoiceAdmin = () => {
                       className="btn btn-sm btn-danger"
                       title="Supprimer"
                       onClick={() => handleDelete(r._raw)}
+                    >
+                      <i className="bi bi-trash" />
+                    </button>
+                    <button
+                      className="btn btn-sm btn-secondary"
+                      title="Supprimer"
+                      onClick={() => handleDeleteHard(r._raw)}
                     >
                       <i className="bi bi-trash" />
                     </button>

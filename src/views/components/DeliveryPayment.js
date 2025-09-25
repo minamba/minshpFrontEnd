@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useLocation } from "react-router-dom";
 import "bootstrap-icons/font/bootstrap-icons.css";
-import "../../App.css";
+import "../../styles/pages/deliveryPayment.css";
 
 import { saveCartRequest } from "../../lib/actions/CartActions";
 
@@ -36,8 +36,6 @@ import {
 /* ------------------------------------------------------------------ */
 /* --------------------------- Helpers & UI -------------------------- */
 /* ------------------------------------------------------------------ */
-
-
 
 const carrierToOperator = (carrier, fallbackNetwork) => {
   const s = String(carrier || "").toLowerCase();
@@ -223,7 +221,7 @@ function cleanPhoneLocal(s) {
 }
 function PhoneInputWithCountry({ valueDial, valueLocal, onChange }) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: 8 }}>
+    <div className="dp-phone-row">
       <select
         className="form-control"
         value={valueDial || DEFAULT_DIAL}
@@ -235,8 +233,9 @@ function PhoneInputWithCountry({ valueDial, valueLocal, onChange }) {
           </option>
         ))}
       </select>
+
       <input
-        className="form-control"
+        className="form-control dp-phone-number"
         placeholder="Numéro (ex: 6 12 34 56 78)"
         value={valueLocal || ""}
         onChange={(e) =>
@@ -249,6 +248,7 @@ function PhoneInputWithCountry({ valueDial, valueLocal, onChange }) {
     </div>
   );
 }
+
 
 /* ----------------------- Address autocomplete (BAN) ---------------------- */
 function AddressAutocomplete({
@@ -493,6 +493,7 @@ function SimpleModal({ open, title, children, onClose, footer }) {
       onClick={onClose}
     >
       <div
+        className="dp-modal__panel"
         role="dialog"
         aria-modal="true"
         onClick={(e) => e.stopPropagation()}
@@ -520,15 +521,13 @@ function SimpleModal({ open, title, children, onClose, footer }) {
             ×
           </button>
         </div>
+
         <div style={{ marginTop: 12 }}>{children}</div>
+
         {footer && (
           <div
-            style={{
-              display: "flex",
-              gap: 10,
-              justifyContent: "flex-end",
-              marginTop: 16,
-            }}
+            className="dp-modal__footer"
+            style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}
           >
             {footer}
           </div>
@@ -734,9 +733,7 @@ function AddressBookModal({ open, addresses, onChoose, onEdit, onClose }) {
                 onClick={() => onChoose(idx)}
                 disabled={a.favorite === true}
                 title={
-                  a.favorite
-                    ? "Déjà l’adresse préférée"
-                    : "Définir comme préférée"
+                  a.favorite ? "Déjà l’adresse préférée" : "Définir comme préférée"
                 }
               >
                 Choisir
@@ -760,9 +757,8 @@ function Field({ label, children }) {
 
 function getPromoMapArray() {
   try {
-    const raw = localStorage.getItem('promo_map') || '{}';
-    const obj = JSON.parse(raw); // ex: { "1":"PRO10", "2954":"SS10" }
-    // -> [{ idPromo: "1", value: "PRO10" }, { idPromo: "2954", value: "SS10" }]
+    const raw = localStorage.getItem("promo_map") || "{}";
+    const obj = JSON.parse(raw);
     return Object.entries(obj).map(([Id, Name]) => ({ Id, Name }));
   } catch {
     return [];
@@ -779,7 +775,6 @@ export const DeliveryPayment = () => {
   const { state } = location;
 
   const promoUseCodes = getPromoMapArray();
-  console.log("zoba",promoUseCodes);
 
   // Lecture slice payment
   const payment = useSelector((s) => s?.payment) || {};
@@ -849,10 +844,6 @@ export const DeliveryPayment = () => {
     }
   });
 
-
-
-
-
   // PREFILL: une ligne depuis la favorite
   const preferredRelayAddress = useMemo(() => {
     if (!deliveryFavoriteAddress) return "";
@@ -892,7 +883,7 @@ export const DeliveryPayment = () => {
   const baseTotal = totalFromState > 0 ? totalFromState : lsItemsAmount;
 
   // Poids panier
-  const cartWeightKg = useMemo(() => {
+  useMemo(() => {
     const items = readLsItems();
     return items.reduce((s, it) => s + (it.weightKg ?? 0.25) * getQty(it), 0);
   }, []);
@@ -905,32 +896,29 @@ export const DeliveryPayment = () => {
           ? [
               {
                 Type: "PARCEL",
-                Value :{
-                  Value : parseFloat(p.price ?? 0),
-                  Currency : "EUR"
+                Value: {
+                  Value: parseFloat(p.price ?? 0),
+                  Currency: "EUR",
                 },
                 PackageWidth: String(p.packageProfil.width ?? ""),
                 PackageHeight: String(p.packageProfil.height ?? ""),
                 PackageLonger: String(p.packageProfil.longer ?? ""),
                 PackageWeight: String(p.packageProfil.weight ?? ""),
-                Content : {
+                Content: {
                   Id: p.containedCode ? `content:v1:${p.containedCode}` : "MERCHANDISE",
-                  Description : "Object high tech"
+                  Description: "Object high tech",
                 },
-                Stackable : true,
-                ExternalId : String(p.id),
+                Stackable: true,
+                ExternalId: String(p.id),
                 PackageValue: parseFloat(p.price ?? 0) || null,
                 PackageStackable: true,
-                PackageId : String(p.packageProfil.id ?? ""), // bonus
-             
+                PackageId: String(p.packageProfil.id ?? ""),
               },
             ]
           : []
       ),
     [products]
   );
-
-
 
   const packagesForRates = useMemo(
     () =>
@@ -939,22 +927,19 @@ export const DeliveryPayment = () => {
           ? [
               {
                 Type: "PARCEL",
-                Id : String(p.id ?? ""),
-                ContainedCode : String(p.containedCode ?? ""),
+                Id: String(p.id ?? ""),
+                ContainedCode: String(p.containedCode ?? ""),
                 PackageWidth: String(p.packageProfil.width ?? ""),
                 PackageHeight: String(p.packageProfil.height ?? ""),
                 PackageLonger: String(p.packageProfil.longer ?? ""),
                 PackageWeight: String(p.packageProfil.weight ?? ""),
-                PackageValue : parseFloat(p.price ?? 0) || null    
+                PackageValue: parseFloat(p.price ?? 0) || null,
               },
             ]
           : []
       ),
     [products]
   );
-
-
-
 
   /* === 1) Tarifs domicile (auto) === */
   const depZip = deliveryFavoriteAddress?.postalCode || billingAddress?.postalCode || null;
@@ -1101,43 +1086,39 @@ export const DeliveryPayment = () => {
   };
 
   const chosenRate =
-  deliveryMode === "relay"
-    ? selectedRelayRate || relayRates[0] || null
-    : homeRates.find((r) => r.code === selectedRateCode) || homeRates[0] || null;
+    deliveryMode === "relay"
+      ? selectedRelayRate || relayRates[0] || null
+      : homeRates.find((r) => r.code === selectedRateCode) || homeRates[0] || null;
 
+  const operatorCode = carrierToOperator(chosenRate?.carrier, selectedRelay?.network);
+  const serviceCode = chosenRate?.code || "";
+  const shippingCodesMissing = !operatorCode || !serviceCode;
 
-const operatorCode = carrierToOperator(chosenRate?.carrier, selectedRelay?.network);
-const serviceCode = chosenRate?.code || "";
-const shippingCodesMissing = !operatorCode || !serviceCode;
+  const today = new Date().toISOString().slice(0, 10);
+  const toIsRelay = deliveryMode === "relay";
+  const toAddressLine = deliveryFavoriteAddress?.address || "";
+  const toZip = String(deliveryFavoriteAddress?.postalCode || "");
+  const toCity = deliveryFavoriteAddress?.city || "";
+  const toCountry = "FR";
 
-const today = new Date().toISOString().slice(0, 10);
-const toIsRelay = deliveryMode === "relay";
-const toAddressLine = deliveryFavoriteAddress?.address || "";
-const toZip = String(deliveryFavoriteAddress?.postalCode || "");
-const toCity = deliveryFavoriteAddress?.city || "";
-const toCountry = "FR";
-
-const pickupPointCode = toIsRelay ? String(selectedRelay?.id || "") : null;
-const declaredValue = Number(baseTotal) || 0;
-
+  const pickupPointCode = toIsRelay ? String(selectedRelay?.id || "") : null;
+  const declaredValue = Number(baseTotal) || 0;
 
   /* --------------------------------- STRIPE -------------------------------- */
 
   const buildCheckoutPayload = () => {
+    const currentCustomerId = currentCustomer?.id;
+    if (!currentCustomerId) {
+      alert("Veuillez vous connecter pour finaliser votre commande.");
+      return null;
+    }
 
-  const currentCustomerId = currentCustomer?.id;
-  if (!currentCustomerId) {
-    alert("Veuillez vous connecter pour finaliser votre commande.");
-    return null;
-  }
-
-
-    const chosenRate =
+    const chosenRateLocal =
       deliveryMode === "relay"
         ? selectedRelayRate || relayRates[0] || null
         : homeRates.find((r) => r.code === selectedRateCode) || homeRates[0] || null;
 
-    if (!chosenRate) {
+    if (!chosenRateLocal) {
       alert("Veuillez choisir un mode de livraison.");
       return null;
     }
@@ -1146,91 +1127,46 @@ const declaredValue = Number(baseTotal) || 0;
       return null;
     }
 
-
     return {
+      Shipment: {
+        Packages: packages,
+        toAddress: {
+          type: "particulier",
+          contact: {
+            email: currentCustomer?.email,
+            phone: String(deliveryFavoriteAddress?.phone),
+            lastName: deliveryFavoriteAddress?.lastName,
+            firstName: deliveryFavoriteAddress?.firstName,
+            civility: currentCustomer?.civilite,
+          },
+          location: {
+            city: deliveryFavoriteAddress?.city,
+            street: deliveryFavoriteAddress?.address,
+            postalCode: String(deliveryFavoriteAddress?.postalCode),
+            countryIsoCode: "FR",
+          },
+        },
+      },
 
-      //V1
-      // //creation de la commande
-      // CustomerId: currentCustomerId,
-      // Amount: Number(grandTotal),
-      // DeliveryAmount: shippingPrice,
-      // PaymentMethod: "carte",
-      // DeliveryMode: deliveryMode,
+      Insured: false,
+      LabelType: "PDF_A4",
+      ShippingOfferCode: serviceCode,
+      ExpectedTakingOverDate: today,
 
-      // //creation de orderProduct
-      // OperatorCode: operatorCode,
-      // ServiceCode: serviceCode,
-      // IsRelay: toIsRelay,
-      // PickupPointCode: pickupPointCode,
-      // DropOffPointCode: chosenRate?.dropOffPointCodes?.[0] || null,
-      // ContentDescription: "Object high tech",
-      // DeclaredValue: declaredValue,
-      // Packages: packages,
-      // UseCodes: promoUseCodes,
-      
-      // // Destinataire
-      // ToType: "particulier",
-      // ToCivility: currentCustomer?.civilite || null,
-      // ToLastName: currentCustomer?.lastName || "",
-      // ToFirstName: currentCustomer?.firstName || "",
-      // ToEmail: user?.email || null,
-      // ToPhone: currentCustomer?.phoneNumber || null,
-      // ToAddress: toAddressLine,
-      // ToZip: toZip,
-      // ToCity: toCity,
-      // ToCountry: toCountry,
-      
-      // TakeOverDate: today,
+      CustomerId: currentCustomerId,
+      CustomerNumber: currentCustomer?.clientNumber,
+      Amount: Number(grandTotal),
+      DeliveryAmount: shippingPrice,
+      PaymentMethod: "carte",
+      DeliveryMode: deliveryMode,
+      UseCodes: promoUseCodes,
+      ContentDescription: "Object high tech",
+      ServiceCode: serviceCode,
+      OperatorCode: operatorCode,
+      PickupPointCode: pickupPointCode,
+      DropOffPointCode: chosenRateLocal?.dropOffPointCodes?.[0] || null,
 
-
-
-//V3
-Shipment:{
-// --- Colis ---
-Packages : packages,
-
-  // --- Adresses ---
-  toAddress : {
-    type: "particulier",
-    contact: {
-      email: currentCustomer?.email,
-      phone: String(deliveryFavoriteAddress?.phone),
-      lastName: deliveryFavoriteAddress?.lastName,
-      firstName: deliveryFavoriteAddress?.firstName,
-      civility: currentCustomer?.civilite
-    },
-    location: {
-      city: deliveryFavoriteAddress?.city,
-      street: deliveryFavoriteAddress?.address,
-      postalCode: String(deliveryFavoriteAddress?.postalCode),
-      countryIsoCode: "FR",
-    }
-  },         
-},
-
-// --- Options ---
-Insured : false,
-LabelType : "PDF_A4",
-ShippingOfferCode : serviceCode ,                   
-ExpectedTakingOverDate : today,
-
-
-//info complementaire
-CustomerId: currentCustomerId,
-CustomerNumber: currentCustomer?.clientNumber,
-Amount: Number(grandTotal),
-DeliveryAmount: shippingPrice,
-PaymentMethod: "carte",
-DeliveryMode: deliveryMode,
-UseCodes: promoUseCodes,
-ContentDescription: "Object high tech",
-ServiceCode: serviceCode,
-OperatorCode: operatorCode,
-PickupPointCode: pickupPointCode,
-DropOffPointCode: chosenRate?.dropOffPointCodes?.[0] || null,
-
-// --- Commande ---
-OrderCustomerProducts: readLsItems().map((it) => ({
+      OrderCustomerProducts: readLsItems().map((it) => ({
         ProductId: getPid(it),
         CustomerId: Number(currentCustomerId),
         Quantity: getQty(it),
@@ -1241,7 +1177,7 @@ OrderCustomerProducts: readLsItems().map((it) => ({
 
   const handleStripePay = () => {
     if (shippingCodesMissing) {
-      console.warn("V1: operator/service manquants", { operatorCode, serviceCode, chosenRate, selectedRelay });
+      console.warn("operator/service manquants", { operatorCode, serviceCode, chosenRate, selectedRelay });
       alert("Impossible de déterminer l’opérateur ou le service pour l’expédition.");
       return;
     }
@@ -1258,7 +1194,6 @@ OrderCustomerProducts: readLsItems().map((it) => ({
     }
   }, [paymentConfirmed, dispatch]);
 
-  /* ===== Hauteur étendue pour la liste de relais ===== */
   const RELAY_LIST_MIN_HEIGHT = 340;
   const RELAY_LIST_MAX_HEIGHT = 540;
 
@@ -1407,7 +1342,9 @@ OrderCustomerProducts: readLsItems().map((it) => ({
             Recherche par adresse
           </div>
 
+          {/* <<< LIGNE DE RECHERCHE RELAIS >>> */}
           <div
+            className="relay-search"
             style={{
               display: "grid",
               gridTemplateColumns: "minmax(350px, 1fr) 60px",
@@ -1415,37 +1352,39 @@ OrderCustomerProducts: readLsItems().map((it) => ({
               alignItems: "end",
             }}
           >
-            <Field label="Adresse complète">
-              <AddressAutocomplete
-                value={relayFullAddress}
-                onChangeText={setRelayFullAddress}
-                onSelect={(addr) => {
-                  const line = [
-                    makeStreetLine(addr),
-                    [addr.postcode, addr.city].filter(Boolean).join(" "),
-                  ]
-                    .filter(Boolean)
-                    .join(", ");
-                  setRelayFullAddress(line);
-                  const parsed = parseRelayAddress(line, { countryIso: "FR" });
-                  setDeliveryMode("relay");
-                  dispatch(
-                    getRelaysByAddressRequest({
-                      number: parsed.number || undefined,
-                      street: parsed.street || undefined,
-                      city: parsed.city || undefined,
-                      postalCode: parsed.postalCode || undefined,
-                      state: parsed.state || undefined,
-                      countryIsoCode: parsed.countryIsoCode || "FR",
-                      limit: 30,
-                    })
-                  );
-                }}
-                placeholder="ex: 4 bd des Capucines, 75009 Paris"
-              />
-            </Field>
-            <div>
-              <button style={lightBtn} onClick={fetchRelaysByAddress}>
+            <div className="relay-address-input">
+              <Field label="Adresse complète">
+                <AddressAutocomplete
+                  value=""
+                  onChangeText={setRelayFullAddress}
+                  onSelect={(addr) => {
+                    const line = [
+                      makeStreetLine(addr),
+                      [addr.postcode, addr.city].filter(Boolean).join(" "),
+                    ]
+                      .filter(Boolean)
+                      .join(", ");
+                    setRelayFullAddress(line);
+                    const parsed = parseRelayAddress(line, { countryIso: "FR" });
+                    setDeliveryMode("relay");
+                    dispatch(
+                      getRelaysByAddressRequest({
+                        number: parsed.number || undefined,
+                        street: parsed.street || undefined,
+                        city: parsed.city || undefined,
+                        postalCode: parsed.postalCode || undefined,
+                        state: parsed.state || undefined,
+                        countryIsoCode: parsed.countryIsoCode || "FR",
+                        limit: 30,
+                      })
+                    );
+                  }}
+                  placeholder="ex: 4 bd des Capucines, 75009 Paris"
+                />
+              </Field>
+            </div>
+            <div style={{ display: "flex", alignItems: "end" }}>
+              <button className="dp-btn-light relay-ok" onClick={fetchRelaysByAddress}>
                 OK
               </button>
             </div>
@@ -1556,15 +1495,12 @@ OrderCustomerProducts: readLsItems().map((it) => ({
                     : ""}
                 </div>
                 <div>
-                  {billingAddress.postalCode} {billingAddress.city} —{" "}
-                  {billingAddress.country}
+                  {billingAddress.postalCode} {billingAddress.city} — {billingAddress.country}
                 </div>
                 <div>{currentCustomer.phoneNumber}</div>
               </>
             ) : (
-              <div style={{ color: "#6b7280" }}>
-                Aucune adresse de facturation.
-              </div>
+              <div style={{ color: "#6b7280" }}>Aucune adresse de facturation.</div>
             )}
           </div>
 
@@ -1593,8 +1529,7 @@ OrderCustomerProducts: readLsItems().map((it) => ({
 
           <>
             <div style={stripeInfo}>
-              Paiement sécurisé via Stripe. Vous serez redirigé pour renseigner
-              votre carte.
+              Paiement sécurisé via Stripe. Vous serez redirigé pour renseigner votre carte.
             </div>
             <button className="dp-pay-btn" onClick={handleStripePay}>
               Payer ma commande

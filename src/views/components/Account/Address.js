@@ -85,6 +85,13 @@ const S = {
   lightBtn: { border: "1px solid rgb(43, 113, 218)", background: "transparent", borderRadius: 999, padding: "8px 14px", color: "rgb(252, 253, 253)", backgroundColor: "rgb(57, 133, 247)" },
 };
 
+const primaryPillBtn = {
+  ...S.lightBtn,
+  width: 320,
+  display: "inline-flex",
+  justifyContent: "center",
+};
+
 /* =================== Address Autocomplete (BAN) =================== */
 function AddressAutocomplete({ value, onChangeText, onSelect, placeholder = "N° et rue" }) {
   const [q, setQ] = useState(value || "");
@@ -642,7 +649,7 @@ export const Address = () => {
 
         {!billingView && (
           <div>
-            <button className="btn btn-primary" style={{ width: 320 }} onClick={openAddBilling}>
+            <button className="btn btn-primary" style={primaryPillBtn} onClick={openAddBilling}>
               Ajouter une adresse de facturation
             </button>
           </div>
@@ -675,7 +682,7 @@ export const Address = () => {
       </div>
 
       <div className="mt-3">
-        <button className="btn btn-primary" style={{ width: 320 }} onClick={openAdd}>
+      <button className="btn btn-primary" style={primaryPillBtn} onClick={openAdd}>
           Ajouter une adresse de livraison
         </button>
       </div>
