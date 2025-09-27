@@ -6,6 +6,7 @@ import { ProductSpecs } from '../../components/index';
 import { addToCartRequest, saveCartRequest } from '../../lib/actions/CartActions';
 import { GenericModal } from '../../components/index';
 import { toMediaUrl } from '../../lib/utils/mediaUrl';
+import { getProductsPagedUserRequest } from "../../lib/actions/ProductActions"; // ✅ pagination
 import "../../styles/pages/product.css";
 
 export const Product = () => {
@@ -18,21 +19,41 @@ export const Product = () => {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
   }, [id]);
 
-  // ===== Store =====
-  const products        = useSelector((s) => s.products?.products) || [];
+  // ===== Store (✅ compatible pagination) =====
+  const prodState       = useSelector((s) => s.products) || {};
+  const fullProducts    = Array.isArray(prodState.products) ? prodState.products : [];
+  const pagedItems      = Array.isArray(prodState.items)    ? prodState.items    : [];
+  const productsAll     = fullProducts.length ? fullProducts : pagedItems; // ✅
   const images          = useSelector((s) => s.images?.images) || [];
   const videos          = useSelector((s) => s.videos?.videos) || [];
   const items           = useSelector((s) => s.items?.items) || [];
   const promotionCodes  = useSelector((s) => s.promotionCodes?.promotionCodes) || [];
-  const stocks          = useSelector((s) => s.stocks?.stocks) || []; // <- stocks du store
+  const stocks          = useSelector((s) => s.stocks?.stocks) || [];
 
   // Sauvegarde panier
   useEffect(() => { dispatch(saveCartRequest(items)); }, [items, dispatch]);
 
-  // Produit courant
+  // ✅ Si le produit n'est pas trouvé en mémoire, on lance un fetch ciblé
+  const requestedOnceRef = useRef(null);
+  useEffect(() => {
+    if (!id) return;
+    const found = Array.isArray(productsAll) && productsAll.some((p) => String(p.id) === String(id));
+    if (found) return;
+    // évite les redemandes en boucle (array recréé, StrictMode, etc.)
+    if (requestedOnceRef.current === String(id)) return;
+    requestedOnceRef.current = String(id);
+    dispatch(getProductsPagedUserRequest({
+      page: 1,
+      pageSize: 1,
+      sort: "CreationDate:desc",
+      filter: { Id: id } // <-- adapte si ton API attend un autre champ
+    }));
+  }, [dispatch, id, productsAll?.length]); // <- on dépend de la taille, pas de la référence
+
+  // Produit courant (✅ cherche dans full OU items)
   const product = useMemo(
-    () => products.find((p) => String(p.id) === String(id)) || products[0],
-    [products, id]
+    () => (productsAll || []).find((p) => String(p.id) === String(id)) || null,
+    [productsAll, id]
   );
 
   // Promo liée à la catégorie (optionnel)
@@ -43,7 +64,7 @@ export const Product = () => {
 
   // Images
   const productImages = useMemo(() => {
-    if (!product) return [];
+    if (!product) return [{ url: '/Images/placeholder.jpg', position: 1 }];
     const list = images.filter((i) => String(i.idProduct) === String(product.id));
     return list.length ? list : [{ url: '/Images/placeholder.jpg', position: 1 }];
   }, [images, product]);
@@ -173,7 +194,7 @@ export const Product = () => {
     } else {
       return price * (product?.tva / 100 + 1) + product?.taxWithoutTvaAmount;
     }
-  }, [priceFromCategoryCode, discountedPriceProduct]); // dépendances gardées telles quelles
+  }, [priceFromCategoryCode, discountedPriceProduct]); // (garde tes deps)
 
   const badgePct = pctFromCategoryCode ?? productPromoPct;
   const showBadge = Number.isFinite(badgePct) && badgePct > 0;
@@ -183,12 +204,11 @@ export const Product = () => {
   const euros = eurosStr;
   const cents = centsStr;
 
-  // ===== STOCK (statut + quantité disponible) =====
+  // ===== STOCK =====
   const stockStatusRaw = (product?.stockStatus ?? '').trim();
   const stockIn  = stockStatusRaw.toLowerCase() === 'en stock';
-  const stockOutStatus = stockStatusRaw.toLowerCase() === 'en rupture'; // d'après le statut texte
+  const stockOutStatus = stockStatusRaw.toLowerCase() === 'en rupture';
 
-  // Récupération du stock dispo depuis le store
   const stockForProduct = useMemo(() => {
     if (!product) return null;
     return stocks.find(
@@ -208,7 +228,6 @@ export const Product = () => {
     return Number.isFinite(q) && q > 0 ? q : 0;
   }, [stockForProduct]);
 
-  // On considère rupture si statut “en rupture” OU stock disponible = 0
   const isActuallyOut = stockOutStatus || availableQty <= 0;
 
   const stockStatusLabel =
@@ -219,10 +238,9 @@ export const Product = () => {
   // ===== Achat =====
   const [qty, setQty] = useState(1);
 
-  // Clamp la quantité quand le stock (ou le produit) change
   useEffect(() => {
     if (availableQty <= 0) {
-      setQty(1); // remet à 1, mais le sélecteur sera désactivé
+      setQty(1);
     } else if (qty > availableQty) {
       setQty(availableQty);
     } else if (qty < 1) {
@@ -232,8 +250,7 @@ export const Product = () => {
 
   const [showAdded, setShowAdded] = useState(false);
   const addToCart = () => {
-    if (isActuallyOut) return; // rien si rupture / 0 stock
-    if (!product) return;
+    if (isActuallyOut || !product) return;
     const payloadItem = {
       id: product.id,
       name: product.name || product.title,
@@ -249,7 +266,7 @@ export const Product = () => {
   const goToCart = () => { setShowAdded(false); navigate('/cart'); };
 
   // Specs
-  const specs = ProductSpecs(pid);
+  const { specs } = ProductSpecs(pid, product) || { specs: {} };
 
   // Vidéo autoplay — NE PAS TOUCHER
   const videoRef = useRef(null);
@@ -274,10 +291,31 @@ export const Product = () => {
   // Construit les options de quantité en fonction du stock
   const qtyOptions = useMemo(() => {
     const max = Math.max(0, availableQty);
-    // On peut mettre une limite de confort si besoin (ex: 50) :
     const cap = Math.min(max, 50);
     return Array.from({ length: cap }, (_, i) => i + 1);
   }, [availableQty]);
+
+  // ⛑️ garde un état minimal si le produit n'est pas encore chargé
+  if (!product) {
+    return (
+      <div className="product-page">
+        <div className="product-main">
+          <div className="thumbs-col" />
+          <div className="product-main-image-wrap">
+            <div className="img-skeleton" aria-hidden="true" />
+          </div>
+          <div className="product-details">
+            <p className="product-brand">&nbsp;</p>
+            <h1 className="product-title specs-title">Chargement du produit…</h1>
+            <div className="details-stack">
+              <div className="img-skeleton" style={{ height: 24, width: 180 }} />
+              <div className="img-skeleton" style={{ height: 18, width: 260, marginTop: 8 }} />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="product-page" onContextMenu={handleContextMenu}>
@@ -290,11 +328,9 @@ export const Product = () => {
               key={img.position || idx}
               className="thumb"
               onClick={() => {
-                // ✅ MOBILE : ouvrir la popup sans changer l'image principale
                 if (isMobile) {
                   openLightbox(idx);
                 } else {
-                  // Desktop : comportement inchangé
                   setCurrentIndex(idx);
                 }
               }}
@@ -326,10 +362,9 @@ export const Product = () => {
           </h1>
 
           <div className="details-stack">
-            {hasPrice && (
+            {Number.isFinite(displayPrice) && (
               <>
-                {/* Prix de référence + badge */}
-                {showBadge && (
+                {Number.isFinite(badgePct) && badgePct > 0 && (
                   <div className="refprice-wrap">
                     <div className="refprice-label">Prix de référence</div>
                     <div className="refprice-row">
@@ -341,13 +376,11 @@ export const Product = () => {
                   </div>
                 )}
 
-                {/* Prix affiché */}
                 <div className="price--big">
-                  <span className="euros">{euros}€</span>
-                  <sup className="cents">{cents}</sup>
+                  <span className="euros">{displayPrice.toFixed(2).split('.')[0]}€</span>
+                  <sup className="cents">{displayPrice.toFixed(2).split('.')[1]}</sup>
                 </div>
 
-                {/* Jusqu’au … */}
                 {activePromo && promoUntil && (
                   <div className="promo-until">
                     Jusqu'au {promoUntil} inclus
@@ -454,17 +487,17 @@ export const Product = () => {
 
         <div className="specs-layout">
           <nav className="specs-nav">
-            {Object.keys(ProductSpecs(pid)).map((s) => (
+          {Object.keys(specs || {}).map((s) => (
               <a key={s} href={`#${s.replace(/\s+/g, '')}`}>{s}</a>
             ))}
           </nav>
 
           <div className="specs-content">
-            {Object.entries(ProductSpecs(pid)).map(([section, rows]) => (
+          {(Object.entries(specs || {})).map(([section, rows]) => (
               <section key={section} id={section.replace(/\s+/g, '')} className="specs-section">
                 <h3>{section}</h3>
                 <div className="specs-table">
-                  {rows.map((row, i) => {
+                {(Array.isArray(rows) ? rows : []).map((row, i) => {
                     const value = row.value === undefined || row.value === null || row.value === '' ? '—' : row.value;
                     return (
                       <div key={i} className="specs-row">

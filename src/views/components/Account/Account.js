@@ -1,35 +1,40 @@
 // src/pages/account/Account.jsx
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import "bootstrap-icons/font/bootstrap-icons.css";
 import "../../../styles/pages/account.css";
 
 import { UserInformation } from "./UserInformation";
 import { Address } from "./Address";
 import { useSelector, useDispatch } from "react-redux";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
+
 import { logout } from "../../../lib/actions/AccountActions";
-import { downloadInvoiceRequest } from "../../../lib/actions/OrderActions";
-import { Link } from "react-router-dom";
-import { toMediaUrl } from '../../../lib/utils/mediaUrl';
+import { downloadInvoiceRequest, getOrderPagedUserRequest } from "../../../lib/actions/OrderActions";
+import { getOrderCustomerProductRequest } from "../../../lib/actions/OrderCustomerProductActions";
+import { getProductUserRequest } from "../../../lib/actions/ProductActions";
+import { toMediaUrl } from "../../../lib/utils/mediaUrl";
 
 /* ===== Helpers ===== */
+const getId = (x) => x?.id ?? x?.Id ?? x?.orderId ?? x?.OrderId ?? x?.orderID ?? null;
+const getOrderIdFromOP = (op) => op?.idOrder ?? op?.orderId ?? op?.OrderId ?? op?.IdOrder ?? null;
+const getProductIdFromOP = (op) => op?.idProduct ?? op?.productId ?? op?.ProductId ?? op?.IdProduct ?? null;
 
-const getId = (x) =>
-  x?.id ?? x?.Id ?? x?.orderId ?? x?.OrderId ?? x?.orderID ?? null;
-
-const getOrderIdFromOP = (op) =>
-  op?.idOrder ?? op?.orderId ?? op?.OrderId ?? op?.IdOrder ?? null;
-
-const getProductIdFromOP = (op) =>
-  op?.idProduct ?? op?.productId ?? op?.ProductId ?? op?.IdProduct ?? null;
+const getCustomerIdFromOrder = (o) => {
+  const root = o?.idCustomer ?? o?.IdCustomer ?? o?.customerId ?? o?.CustomerId ?? o?.CustomerID ?? null;
+  if (root != null) return root;
+  const c = o?.customer ?? o?.Customer ?? o?.customerNavigation ?? o?.CustomerNavigation ?? null;
+  if (c) return c.id ?? c.Id ?? c.customerId ?? c.CustomerId ?? c.customerID ?? c.CustomerID ?? null;
+  const uc = o?.user?.customer ?? o?.User?.Customer ?? null;
+  if (uc) return uc.id ?? uc.Id ?? uc.customerId ?? uc.CustomerId ?? null;
+  return null;
+};
 
 const getQtyFromOP = (op) => Number(op?.quantity ?? op?.qty ?? op?.Quantity ?? 1);
-
 const labelForProduct = (p) => {
-  const brand = p?.brand || "";
-  const model = p?.model || "";
+  const brand = p?.brand || p?.Brand || "";
+  const model = p?.model || p?.Model || "";
   const base = [brand, model].filter(Boolean).join(" ");
-  return base || p?.name || p?.title || `#${getId(p)}`;
+  return base || p?.name || p?.Name || p?.title || `#${getId(p)}`;
 };
 
 const fmtPrice = (n) =>
@@ -59,48 +64,121 @@ const orderNumber = (o) =>
 
 const orderStatus = (o) => o?.status ?? o?.orderStatus ?? "—";
 
-/* === Normalisation pour tester "livré" (sans accent / insensible à la casse) === */
 const norm = (s) =>
   String(s || "")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
 
-/* === Est-ce livré ? on couvre "livré", "delivré/delivre", et "delivered" === */
 const isDelivered = (status) => {
   const n = norm(status);
-  return n.includes("livre") || n.includes("delivre") || n.includes("delivered") || n.includes("effectuee") ;
+  return n.includes("livre") || n.includes("delivre") || n.includes("delivered") || n.includes("effectuee");
 };
+
+const toNum = (v) => (typeof v === "number" ? v : parseFloat(v)) || 0;
 
 /* ===== Component ===== */
 export const Account = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
+  // Store
   const { user } = useSelector((s) => s.account);
   const customers = useSelector((s) => s?.customers?.customers) || [];
-  const orders = useSelector((s) => s?.orders?.orders) || [];
-  const products = useSelector((s) => s?.products?.products) || [];
+
+  // Produits (paged-aware)
+  const productsSlice = useSelector((s) => s?.products) || {};
+  const products = useMemo(() => {
+    const full = Array.isArray(productsSlice.products) ? productsSlice.products : null;
+    const paged = Array.isArray(productsSlice.items) ? productsSlice.items : null;
+    return (full && full.length) ? full : (paged || []);
+  }, [productsSlice]);
+
   const orderProducts = useSelector((s) => s?.orderProducts?.orderProducts) || [];
   const images = useSelector((s) => s?.images?.images) || [];
 
-  console.log("fdsfsdfdfsffdfsfds",images);
+  // Orders (paged)
+  const orderSlice = useSelector((s) => s?.orders) || {};
+  const pagedOrders = Array.isArray(orderSlice.items) ? orderSlice.items : [];
+  const totalCount = Number(orderSlice.totalCount ?? 0);
+  const loading = !!orderSlice.loading;
 
+  // Courant
   const uid = user?.id || null;
-  const currentCustomer = customers.find((c) => c.idAspNetUser === uid);
+  const currentCustomer = customers.find((c) => c.idAspNetUser === uid) || null;
 
-  const currentOrders = (orders || []).filter(
-    (o) => o?.customer?.id === currentCustomer?.id
-  );
-
-  /* Compteur des commandes en cours = hors "livré" */
-  const ongoingOrders = currentOrders.filter((o) => !isDelivered(orderStatus(o)));
-  const [activeMenu, setActiveMenu] = useState("orders"); // "profile" | "orders" | "addresses"
+  // UI
+  const [activeMenu, setActiveMenu] = useState("orders");
   const [period, setPeriod] = useState("6m");
   const [openId, setOpenId] = useState(null);
-  const currentCount = ongoingOrders.length;
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
 
-  /* Maps utiles */
+  // Période -> minDate ISO
+  const minDateISO = useMemo(() => {
+    const now = new Date();
+    const d = new Date(now);
+    if (period === "3m") d.setMonth(now.getMonth() - 3);
+    else if (period === "6m") d.setMonth(now.getMonth() - 6);
+    else if (period === "12m") d.setFullYear(now.getFullYear() - 1);
+    else d.setFullYear(1970);
+    return d.toISOString();
+  }, [period]);
+
+  // === Fix F5 : charge PIVOTS + PRODUITS dès le montage
+  useEffect(() => {
+    dispatch(getOrderCustomerProductRequest());
+    dispatch(getProductUserRequest());
+  }, [dispatch]);
+
+  // Fetch paginé des commandes (filtré client + période)
+  const lastQueryRef = useRef("");
+  useEffect(() => {
+    if (!currentCustomer || activeMenu !== "orders") return;
+
+    const payload = {
+      page,
+      pageSize,
+      sort: "CreationDate:desc",
+      filter: {
+        IdCustomer: currentCustomer.id,
+        CustomerId: currentCustomer.id,
+        "Customer.Id": currentCustomer.id,
+        MinDate: minDateISO,
+        minDate: minDateISO,
+      },
+    };
+
+    const sig = JSON.stringify(payload);
+    if (lastQueryRef.current === sig) return;
+    lastQueryRef.current = sig;
+
+    dispatch(getOrderPagedUserRequest(payload));
+    setOpenId(null);
+  }, [dispatch, currentCustomer, activeMenu, page, pageSize, minDateISO]);
+
+  // Filtre local (safety)
+  const currentOrders = useMemo(() => {
+    if (!currentCustomer) return [];
+    const list = Array.isArray(pagedOrders) ? pagedOrders : [];
+    const hasCustomerField = list.some((o) => getCustomerIdFromOrder(o) != null);
+    const byClient = hasCustomerField
+      ? list.filter((o) => String(currentCustomer.id) === String(getCustomerIdFromOrder(o)))
+      : list;
+    const min = new Date(minDateISO).getTime();
+    return byClient.filter((o) => {
+      const t = orderDate(o)?.getTime();
+      return t == null || t >= min;
+    });
+  }, [pagedOrders, currentCustomer?.id, minDateISO]);
+
+  // Compteur “en cours”
+  const currentCount = useMemo(
+    () => currentOrders.filter((o) => !isDelivered(orderStatus(o))).length,
+    [currentOrders]
+  );
+
+  // Maps
   const productsById = useMemo(() => {
     const m = new Map();
     for (const p of products) {
@@ -110,7 +188,6 @@ export const Account = () => {
     return m;
   }, [products]);
 
-  // orderId -> [pivot lines]
   const opByOrder = useMemo(() => {
     const m = new Map();
     for (const op of orderProducts) {
@@ -122,59 +199,97 @@ export const Account = () => {
     return m;
   }, [orderProducts]);
 
-  /* Filtrage période (via date robuste) */
-  const filteredOrders = useMemo(() => {
-    const now = new Date();
-    const minDate = new Date(now);
-    if (period === "3m") minDate.setMonth(now.getMonth() - 3);
-    else if (period === "6m") minDate.setMonth(now.getMonth() - 6);
-    else if (period === "12m") minDate.setFullYear(now.getFullYear() - 1);
-    else minDate.setFullYear(1970);
-
-    return (currentOrders || []).filter((o) => {
-      const d = orderDate(o);
-      return d ? d >= minDate : true; // si pas de date, on montre quand même
-    });
-  }, [currentOrders, period]);
-
-  /* Construit les items (nom + quantité) pour une commande */
+  // Détails: n’EMPÊCHE PAS le rendu si un produit manque.
   const itemsForOrder = (order) => {
     const oid = String(getId(order));
-    const lines = opByOrder.get(oid) || [];
-    return lines
-      .map((l) => {
+
+    // 1) pivots (source principale)
+    const pivots = opByOrder.get(oid) || [];
+    if (pivots.length > 0) {
+      return pivots.map((l) => {
         const pid = String(getProductIdFromOP(l));
         const prod = productsById.get(pid);
-        if (!prod) return null;
-        // note: on pourrait retourner productId si tu veux lier au produit
-        return { name: labelForProduct(prod), qty: getQtyFromOP(l), productId: prod.id, price: priceForItem(prod, order) };
-      })
-      .filter(Boolean);
+        const qty = getQtyFromOP(l);
+        const unit = toNum(l?.productUnitPrice ?? l?.price ?? l?.priceTtc ?? prod?.priceTtc ?? prod?.price);
+
+        return {
+          name: prod ? labelForProduct(prod) : `Article #${pid}`,
+          qty,
+          productId: prod?.id ?? prod?.Id ?? Number(pid),
+          price: unit,
+        };
+      });
+    }
+
+    // 2) fallback: produits *inline* (si un jour la page renvoie les produits)
+    const inline = Array.isArray(order?.products)
+      ? order.products
+      : Array.isArray(order?.Products)
+      ? order.Products
+      : [];
+    return inline.map((p) => ({
+      name: labelForProduct(p),
+      qty: toNum(p?.quantity ?? p?.Quantity) || 1,
+      productId: p?.id ?? p?.Id,
+      price: toNum(p?.priceTtc ?? p?.PriceTtc ?? p?.price ?? p?.Price),
+    }));
   };
 
-  /* Montant: priorité à o.amount, sinon 0 (on peut additionner les lignes si besoin) */
-  const amountForOrder = (order) => {
-    if (order?.amount != null) return Number(order.amount);
-    return 0;
-  };
+  const amountForOrder = (order) => (order?.amount != null ? Number(order.amount) : 0);
 
-  const priceForItem = (item, order) => {
-    const line = orderProducts.find(
-      (op) => op.productId === item.id && op.orderId === order.id
+  // Image avec fallbacks (placeholder si rien)
+  const getImage = (id) => {
+    const pid = String(id);
+
+    const imgRec = images.find(
+      (i) => String(i?.idProduct ?? i?.IdProduct ?? i?.productId ?? i?.ProductId ?? "") === pid
     );
-    const unitPriceWhenOrder = line?.productUnitPrice;
-    return unitPriceWhenOrder ?? 0;
+
+    const prod = productsById.get(pid);
+    const prodUrl =
+      prod?.images?.[0]?.url ??
+      prod?.Images?.[0]?.url ??
+      prod?.image ??
+      prod?.Image ??
+      null;
+
+    const url = imgRec?.url ?? prodUrl ?? "/Images/placeholder.jpg";
+    return toMediaUrl(url);
+  };
+
+  // Pagination
+  const totalPages = Math.max(1, Math.ceil((totalCount || 0) / pageSize));
+  const startIdx = totalCount ? (page - 1) * pageSize + 1 : (page - 1) * pageSize + 1;
+  const endIdx = totalCount ? Math.min(totalCount, page * pageSize) : (page - 1) * pageSize + currentOrders.length;
+
+  const renderPagination = () => {
+    if (totalPages <= 1) return null;
+    const windowSize = 5;
+    let start = Math.max(1, page - Math.floor(windowSize / 2));
+    let end = Math.min(totalPages, start + windowSize - 1);
+    if (end - start + 1 < windowSize) start = Math.max(1, end - windowSize + 1);
+    const pages = [];
+    for (let p = start; p <= end; p++) pages.push(p);
+    return (
+      <nav className="orders-pagination" aria-label="Pagination des commandes">
+        <button className="pg-btn" disabled={page <= 1 || loading} onClick={() => setPage((x) => Math.max(1, x - 1))}>
+          ← Précédente
+        </button>
+        {pages.map((p) => (
+          <button key={p} className={`pg-btn ${p === page ? "is-active" : ""}`} onClick={() => setPage(p)} disabled={loading}>
+            {p}
+          </button>
+        ))}
+        <button className="pg-btn" disabled={page >= totalPages || loading} onClick={() => setPage((x) => Math.min(totalPages, x + 1))}>
+          Suivante →
+        </button>
+      </nav>
+    );
   };
 
   const deconnect = () => {
     dispatch(logout());
     navigate("/");
-  };
-
-  const getImage = (id) => {
-    const getImage = images.find((i) => i.idProduct === id);
-    if (!getImage) return null;
-    return getImage.url;
   };
 
   return (
@@ -260,7 +375,10 @@ export const Account = () => {
                 <select
                   className="form-select account-select"
                   value={period}
-                  onChange={(e) => setPeriod(e.target.value)}
+                  onChange={(e) => {
+                    setPeriod(e.target.value);
+                    setPage(1);
+                  }}
                 >
                   <option value="3m">Depuis les 3 derniers mois</option>
                   <option value="6m">Depuis les 6 derniers mois</option>
@@ -279,47 +397,62 @@ export const Account = () => {
                 <span className="col-actions">Détails</span>
               </div>
 
-              {filteredOrders.length === 0 && (
+              {loading && <div className="orders-empty">Chargement…</div>}
+
+              {!loading && currentOrders.length === 0 && (
                 <div className="orders-empty">Aucune commande sur la période sélectionnée.</div>
               )}
 
-              {filteredOrders.map((o) => {
-                const open = openId === o.id || openId === getId(o);
-                const items = itemsForOrder(o);
-                const amount = amountForOrder(o);
+              {!loading &&
+                currentOrders.map((o) => {
+                  const oid = String(getId(o));
+                  const open = openId === oid;
+                  const items = itemsForOrder(o);
+                  const amount = amountForOrder(o);
 
-                return (
-                  <div key={getId(o) ?? o.id} className="order-row">
-                    <div className="order-grid">
-                      <span className="order-id">N° {orderNumber(o)}</span>
-                      <span className="order-price">{fmtPrice(amount)} TTC</span>
-                      <span>{orderDateFR(o)}</span>
-                      <span className="order-status ">{orderStatus(o)}</span>
-                      <button
-                        className="order-detail-btn"
-                        onClick={() => setOpenId(open ? null : (getId(o) ?? o.id))}
-                        aria-expanded={open}
-                      >
-                        Détails <i className={`bi bi-chevron-${open ? "up" : "down"}`} />
-                      </button>
-                    </div>
+                  return (
+                    <div key={oid} className="order-row pb-2 ">
+                      <div className="order-grid">
+                        <span className="order-id">N° {orderNumber(o)}</span>
+                        <span className="order-price">{fmtPrice(amount)} TTC</span>
+                        <span>{orderDateFR(o)}</span>
+                        <span className="order-status ">{orderStatus(o)}</span>
+                        <button
+                          className="order-detail-btn"
+                          onClick={() => setOpenId(open ? null : oid)}
+                          aria-expanded={open}
+                        >
+                          Détails <i className={`bi bi-chevron-${open ? "up" : "down"}`} />
+                        </button>
+                      </div>
 
-                    {open && (
+                      {open && (
                         <div className="order-details">
-                          {items.map((it, i) => (
-                            <React.Fragment key={i}>
-                              <div className="order-item lineBackgroundColor">
-                                <span>
-                                  <Link to={`/product/${it.productId}`}>
-                                    <img src={ toMediaUrl(getImage(it.productId))} alt={it.name} width={60} />                   
-                                  </Link>
-                                </span>
-                                <span className="text-dark fw-bold">{fmtPrice(it.price * it.qty)}</span>
-                                <span>x{it.qty}</span>
-                              </div>
-                              <hr />
-                            </React.Fragment>
-                          ))}
+                          {items.length === 0 ? (
+                            <div className="orders-empty">Aucun article pour cette commande.</div>
+                          ) : (
+                            items.map((it, i) => (
+                              <React.Fragment key={`${oid}-${it.productId}-${i}`}>
+                                <div className="order-item lineBackgroundColor">
+                                  <span>
+                                    <Link to={`/product/${it.productId}`}>
+                                      <img
+                                        src={getImage(it.productId)}
+                                        alt={it.name}
+                                        width={60}
+                                        onError={(e) => {
+                                          e.currentTarget.src = "/Images/placeholder.jpg";
+                                        }}
+                                      />
+                                    </Link>
+                                  </span>
+                                  <span className="text-dark fw-bold">{fmtPrice(it.price * it.qty)}</span>
+                                  <span>x{it.qty}</span>
+                                </div>
+                                <hr />
+                              </React.Fragment>
+                            ))
+                          )}
 
                           <div className="order-item order-item--shipping lineBackgroundColor">
                             <span className="shipping-label text-success">Prix de Livraison</span>
@@ -329,7 +462,6 @@ export const Account = () => {
                             <span className="order-item__qty" aria-hidden="true">&nbsp;</span>
                           </div>
                           <hr />
-
                           <div className="order-item order-item--shipping lineBackgroundColor">
                             <span className="shipping-label text-success">N° de suivi</span>
                             <span className="text-dark fw-bold">
@@ -351,25 +483,41 @@ export const Account = () => {
                           </div>
                         </div>
                       )}
-                  </div>
-                );
-              })}
+                    </div>
+                  );
+                })}
+            </div>
+
+            {/* Pagination (style mobile) */}
+            {renderPagination()}
+
+            {/* Infos + page size */}
+            <div className="d-flex align-items-center gap-3 mt-2">
+              <span className="ms-auto">
+                {startIdx}–{endIdx} {totalCount ? `sur ${totalCount}` : ""}
+              </span>
+              <select
+                className="form-select"
+                style={{ width: 110 }}
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setPage(1);
+                }}
+              >
+                {[5, 10, 20].map((n) => (
+                  <option key={n} value={n}>
+                    {n} / page
+                  </option>
+                ))}
+              </select>
             </div>
           </>
         )}
 
         {activeMenu === "profile" && <UserInformation user={user} />}
-
-        {/* ✅ On passe des props à Address :
-            - enableAddressAutocomplete : pour activer l’auto-complétion dans la popup (à implémenter dans Address.jsx)
-            - preservePhoneOnFavorite   : pour que la bascule d’adresse préférée n’écrase pas le Phone (mise à jour minimale)
-         */}
         {activeMenu === "addresses" && (
-          <Address
-            user={user}
-            enableAddressAutocomplete={true}
-            preservePhoneOnFavorite={true}
-          />
+          <Address user={user} enableAddressAutocomplete={true} preservePhoneOnFavorite={true} />
         )}
 
         {["carts", "credits", "settings"].includes(activeMenu) && (

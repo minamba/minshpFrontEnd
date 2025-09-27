@@ -309,3 +309,81 @@
     justify-self:stretch;
   }
 }
+
+
+.pagination {
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.pagination .page-link {
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 14px;
+}
+
+.pagination .active .page-link {
+  background-color: #0d6efd; /* bleu bootstrap */
+  border-color: #0d6efd;
+  color: #fff;
+}
+
+@media (max-width: 576px) {
+  .pagination {
+    justify-content: center;
+    font-size: 13px;
+  }
+  .pagination .page-link {
+    padding: 5px 10px;
+  }
+}
+
+
+
+/* ===== Séparation des commandes sous forme de cartes ===== */
+
+/* Le conteneur n'est plus une grosse carte */
+.orders-table{
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0;     /* pas d'espace parasite */
+}
+
+/* L'en-tête devient une carte autonome */
+.orders-head{
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  margin-bottom: 12px;          /* espace sous l'en-tête */
+  box-shadow: 0 8px 24px rgba(0,0,0,.06);
+}
+
+/* Chaque commande = une carte séparée */
+.order-row{
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.06);
+  margin: 12px 0;               /* <<< l’espace entre les commandes */
+  overflow: hidden;             /* pour arrondis propres entre .order-grid et .order-details */
+  border-bottom: 0 !important;  /* on annule l'ancien trait séparateur */
+}
+
+/* Le header de la ligne a un fin trait interne, pas en bas de la carte */
+.order-grid{
+  padding: 12px 14px;
+  border-bottom: 1px dashed #f0f0f0;
+}
+
+/* Les détails restent nets */
+.order-details{
+  padding: 12px 14px;
+}
+
+/* Un peu plus d'air en mobile aussi */
+@media (max-width:560px){
+  .order-row{ margin: 10px 0; }
+}
+
+

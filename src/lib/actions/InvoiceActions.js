@@ -3,9 +3,16 @@ export const actionsInvoice = {
     GET_INVOICE_SUCCESS : "GET_INVOICE_SUCCESS",
     GET_INVOICE_FAILURE : "GET_INVOICE_FAILURE",
 
+
+    
+    GET_INVOICE_PAGED_USER_REQUEST : "GET_INVOICE_PAGED_USER_REQUEST",
+    GET_INVOICE_PAGED_USER_SUCCESS : "GET_INVOICE_PAGED_USER_SUCCESS",
+    GET_INVOICE_PAGED_USER_FAILURE : "GET_INVOICE_PAGED_USER_FAILURE",
+
     UPDATE_INVOICE_REQUEST : "UPDATE_INVOICE_REQUEST",
     UPDATE_INVOICE_SUCCESS : "UPDATE_INVOICE_SUCCESS",
     UPDATE_INVOICE_FAILURE : "UPDATE_INVOICE_FAILURE",
+    
 
     DELETE_INVOICE_REQUEST : "DELETE_INVOICE_REQUEST",
     DELETE_INVOICE_SUCCESS : "DELETE_INVOICE_SUCCESS",
@@ -37,6 +44,18 @@ export function getInvoiceFailure(error) {
         payload: error,
     }
 }
+
+
+//get paged
+export function getInvoicePagedUserRequest(payload) {
+    return { type: actionsInvoice.GET_INVOICE_PAGED_USER_REQUEST, payload };
+  }
+  export function getInvoicePagedUserSuccess(pageResult) {
+    return { type: actionsInvoice.GET_INVOICE_PAGED_USER_SUCCESS, payload: pageResult };
+  }
+  export function getInvoicePagedUserFailure(error) {
+    return { type: actionsInvoice.GET_INVOICE_PAGED_USER_FAILURE, payload: { error } };
+  }
 
 
 //update

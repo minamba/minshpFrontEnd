@@ -1,7 +1,7 @@
 // src/views/pages/Promotion.jsx
 import React, { useMemo, useState, useEffect } from "react";
-import ReactDOM from "react-dom";
 import "../../App.css";
+import "../../styles/pages/category.css";
 import { useSelector, useDispatch } from "react-redux";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -12,7 +12,7 @@ import {
 } from "../../lib/actions/CartActions";
 import { GenericModal } from "../../components";
 import { toMediaUrl } from "../../lib/utils/mediaUrl";
-import "../../styles/pages/category.css";
+import { getProductsPagedUserRequest } from "../../lib/actions/ProductActions";
 
 /* ---------- Helpers ---------- */
 const parseDate = (val) => {
@@ -32,10 +32,31 @@ export const Promotion = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
-  // Store
-  const products = useSelector((s) => s.products?.products) || [];
-  const images   = useSelector((s) => s.images?.images)     || [];
-  const items    = useSelector((s) => s.items?.items)       || [];
+  // Store (même lecture que Category/News : plein ou paginé)
+  const prodState    = useSelector((s) => s.products) || {};
+  const fullProducts = Array.isArray(prodState.products) ? prodState.products : [];
+  const pagedItems   = Array.isArray(prodState.items)    ? prodState.items    : [];
+  let productsAll  = fullProducts.length ? fullProducts : pagedItems;
+  productsAll = productsAll.filter((p) => p.display === true);
+
+  const images = useSelector((s) => s.images?.images) || [];
+  const items  = useSelector((s) => s.items?.items) || [];
+
+  // Chargement initial (paginé, sans filtre de catégorie)
+  useEffect(() => {
+    dispatch(getProductsPagedUserRequest({
+      page: 1,
+      pageSize: 24,
+      sort: "CreationDate:desc",
+      // si tu as un flag côté API pour ne renvoyer que les promos, tu peux ajouter:
+      // filter: { HasPromotion: true }
+    }));
+  }, [dispatch]);
+
+  // Remonter en haut
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, []);
 
   // Sauvegarde panier Redux -> LS à chaque changement
   useEffect(() => { dispatch(saveCartRequest(items)); }, [items, dispatch]);
@@ -46,7 +67,7 @@ export const Promotion = () => {
     return productImages.length > 0 ? productImages[0].url : "/Images/placeholder.jpg";
   };
 
-  // ==== Calcul du prix affiché (même logique que la grille) ====
+  // ==== Calcul du prix affiché (identique mais sans dépendre de calculPrice externe) ====
   const computeDisplayPrice = (product) => {
     if (!product) return 0;
 
@@ -130,7 +151,7 @@ export const Promotion = () => {
 
     ls.forEach((it) => {
       const productId = it.productId ?? it.id;
-      const prod = products.find((p) => String(p.id) === String(productId));
+      const prod = productsAll.find((p) => String(p.id) === String(productId));
       if (!prod) return;
 
       const newPrice = computeDisplayPrice(prod);
@@ -139,7 +160,7 @@ export const Promotion = () => {
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [products]);
+  }, [productsAll]);
 
   /* ---------- Recherche + tri ---------- */
   const [search, setSearch]   = useState("");
@@ -147,7 +168,7 @@ export const Promotion = () => {
 
   // Pré-calculs (prix/promo) puis filtre: on ne garde QUE les produits en promo
   const augmented = useMemo(() => {
-    return (products || [])
+    return (productsAll || [])
       .map((product, index) => {
         const name  =
           product.name ||
@@ -169,7 +190,7 @@ export const Promotion = () => {
         return { product, name, brand, priceRef, displayPrice, hasAnyPromo, discountRate, creationTs };
       })
       .filter((a) => a.hasAnyPromo);
-  }, [products]);
+  }, [productsAll]);
 
   // Recherche + tri
   const filteredSorted = useMemo(() => {
@@ -188,12 +209,12 @@ export const Promotion = () => {
       case "promo-first":
       case "discount-desc":
         list.sort((a, b) => (b.discountRate - a.discountRate) || (b.creationTs - a.creationTs)); break;
-      default: break;
+      default: break; // on garde l'ordre backend (CreationDate:desc)
     }
     return list;
   }, [augmented, search, sortKey]);
 
-  // Bannière
+  // Bannière = image du premier produit en promo
   const bannerUrl = useMemo(() => {
     const firstPromo = filteredSorted[0]?.product;
     return firstPromo ? getProductImage(firstPromo.id) : "/Images/placeholder.jpg";
@@ -205,18 +226,8 @@ export const Promotion = () => {
   const closeAdded = () => setShowAdded(false);
   const goToCart   = () => { setShowAdded(false); navigate("/cart"); };
 
-  /* ---------- Barre filtre mobile (sticky bottom) ---------- */
+  /* ---------- Barre filtre mobile (inline, pas de portal) ---------- */
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [portalNode, setPortalNode] = useState(null);
-
-  useEffect(() => {
-    const node = document.createElement("div");
-    node.id = "mfb-portal-root";
-    document.body.appendChild(node);
-    setPortalNode(node);
-    return () => { document.body.removeChild(node); };
-  }, []);
-
   useEffect(() => {
     if (sheetOpen) document.body.classList.add("has-sheet-open");
     else document.body.classList.remove("has-sheet-open");
@@ -224,73 +235,7 @@ export const Promotion = () => {
 
   const badgeCount = Math.min(filteredSorted.length, 99);
 
-  const MobileFilterPortal = portalNode
-    ? ReactDOM.createPortal(
-        <>
-          <div className="mobile-filter-bar" role="presentation">
-            <button
-              type="button"
-              className="mfb-btn"
-              onClick={() => setSheetOpen(true)}
-              aria-label="Affinez votre recherche"
-            >
-              Affinez votre recherche
-              <span className="mfb-badge">{badgeCount}</span>
-            </button>
-          </div>
-
-          <div
-            className={`mfb-overlay ${sheetOpen ? "is-open" : ""}`}
-            onClick={() => setSheetOpen(false)}
-          />
-          <div className={`mfb-sheet ${sheetOpen ? "is-open" : ""}`} role="dialog" aria-modal="true">
-            <div className="mfb-sheet__handle" />
-            <div className="mfb-sheet__title">Filtrer / Trier</div>
-
-            <div className="sheet-fields">
-              <input
-                className="form-control"
-                placeholder="Rechercher un produit…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-              <select
-                className={`form-select ${sortKey === "" ? "is-placeholder" : ""}`}
-                value={sortKey}
-                onChange={(e) => setSortKey(e.target.value)}
-              >
-                <option value="" disabled>Trier les produits</option>
-                <option value="date-desc">Nouveautés (récent → ancien)</option>
-                <option value="date-asc">Plus ancien → récent</option>
-                <option value="name-asc">Nom (A → Z)</option>
-                <option value="name-desc">Nom (Z → A)</option>
-                <option value="price-asc">Prix (moins cher → plus cher)</option>
-                <option value="price-desc">Prix (plus cher → moins cher)</option>
-                <option value="brand-asc">Marque (A → Z)</option>
-                <option value="brand-desc">Marque (Z → A)</option>
-                <option value="promo-first">Promotion (d’abord)</option>
-                <option value="discount-desc">Réduction (forte → faible)</option>
-              </select>
-            </div>
-
-            <div className="mfb-actions">
-              <button
-                type="button"
-                className="btn btn--light"
-                onClick={() => { setSearch(""); setSortKey(""); }}
-              >
-                Réinitialiser
-              </button>
-              <button type="button" className="btn btn--primary" onClick={() => setSheetOpen(false)}>
-                Voir les résultats
-              </button>
-            </div>
-          </div>
-        </>,
-        portalNode
-      )
-    : null;
-
+  /* ---------- Render ---------- */
   return (
     <div className="category-page">
       {/* BANNIÈRE */}
@@ -412,8 +357,67 @@ export const Promotion = () => {
       {/* Espace pour ne pas masquer le bas par le bouton mobile */}
       <div className="mobile-filter-spacer" />
 
-      {/* Portail mobile (bouton + sheet) */}
-      {MobileFilterPortal}
+      {/* ===== Barre mobile + Sheet (inline) ===== */}
+      <div className="mobile-filter-bar" role="presentation">
+        <button
+          type="button"
+          className="mfb-btn"
+          onClick={() => setSheetOpen(true)}
+          aria-label="Affinez votre recherche"
+        >
+          Affinez votre recherche
+          <span className="mfb-badge">{badgeCount}</span>
+        </button>
+      </div>
+
+      <div
+        className={`mfb-overlay ${sheetOpen ? "is-open" : ""}`}
+        onClick={() => setSheetOpen(false)}
+      />
+      <div className={`mfb-sheet ${sheetOpen ? "is-open" : ""}`} role="dialog" aria-modal="true">
+        <div className="mfb-sheet__handle" />
+        <div className="mfb-sheet__title">Filtrer / Trier</div>
+
+        <div className="sheet-fields">
+          <input
+            className="form-control"
+            placeholder="Rechercher un produit…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <select
+            className={`form-select ${sortKey === "" ? "is-placeholder" : ""}`}
+            value={sortKey}
+            onChange={(e) => setSortKey(e.target.value)}
+          >
+            <option value="" disabled>Trier les produits</option>
+            <option value="date-desc">Nouveautés (récent → ancien)</option>
+            <option value="date-asc">Plus ancien → récent</option>
+            <option value="name-asc">Nom (A → Z)</option>
+            <option value="name-desc">Nom (Z → A)</option>
+            <option value="price-asc">Prix (moins cher → plus cher)</option>
+            <option value="price-desc">Prix (plus cher → moins cher)</option>
+            <option value="brand-asc">Marque (A → Z)</option>
+            <option value="brand-desc">Marque (Z → A)</option>
+            <option value="promo-first">Promotion (d’abord)</option>
+            <option value="discount-desc">Réduction (forte → faible)</option>
+          </select>
+        </div>
+
+        <div className="mfb-actions">
+          <button
+            type="button"
+            className="btn btn--light"
+            onClick={() => { setSearch(""); setSortKey(""); }}
+          >
+            Réinitialiser
+          </button>
+          <button type="button" className="btn btn--primary" onClick={() => setSheetOpen(false)}>
+            Voir les résultats
+          </button>
+        </div>
+      </div>
+      {/* ===== Fin barre mobile ===== */}
 
       {/* MODALE ajout panier */}
       <GenericModal

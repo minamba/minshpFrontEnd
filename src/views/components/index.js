@@ -75,6 +75,7 @@ import MaintenanceGate from './Authentication/MaintenanceGate';
 import { getCustomerPromotionCodeRequest } from "../../lib/actions/CustomerPromotionCodeActions";
 import { getNewsletterRequest } from "../../lib/actions/NewLetterActions";
 import { hasConsent } from "./CookieConsent";
+import { getProductsPagedUserRequest} from "../../lib/actions/ProductActions";
 
 
 export const BaseApp = () => {
@@ -95,8 +96,16 @@ useEffect(() => {
     const dispatch = useDispatch();
     useEffect(() => {
         dispatch(getApplicationRequest());
-        dispatch(getProductUserRequest());
+        //dispatch(getProductUserRequest());
+            dispatch(getProductsPagedUserRequest({
+              page: 1,
+              pageSize: 1000,
+              sort: "CreationDate:desc",
+              // si tu as un flag côté API pour ne renvoyer que les promos, tu peux ajouter:
+              // filter: { HasPromotion: true }
+            }));
         dispatch(getCategoryRequest());
+        dispatch(getProductUserRequest());
         dispatch(getStockRequest());
         dispatch(getFeatureProductRequest());
         dispatch(getImageRequest());

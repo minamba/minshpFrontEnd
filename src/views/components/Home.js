@@ -7,9 +7,16 @@ import { addToCartRequest, saveCartRequest } from '../../lib/actions/CartActions
 import { GenericModal } from '../../components';
 import { calculPrice } from '../../lib/utils/Helpers';
 import { toMediaUrl } from '../../lib/utils/mediaUrl';
+import { getProductsPagedUserRequest } from '../../lib/actions/ProductActions';
 
 export const Home = () => {
-  const products  = useSelector((state) => state.products.products) || [];
+  const prodState     = useSelector((s) => s.products) || {};
+  const fullProducts  = Array.isArray(prodState.products) ? prodState.products : [];
+  const pagedItems    = Array.isArray(prodState.items)    ? prodState.items    : [];
+  let allProducts   = fullProducts.length ? fullProducts : pagedItems;
+
+  allProducts = allProducts.filter((p) => p.display === true);
+
   const images    = useSelector((state) => state.images.images) || [];
   const videos    = useSelector((state) => state.videos.videos) || [];
   const categoriesFromStore = useSelector((state) => state.categories.categories) || [];
@@ -26,6 +33,18 @@ export const Home = () => {
       : false
   );
 
+
+  useEffect(() => {
+    if (!fullProducts.length && !pagedItems.length) {
+      dispatch(getProductsPagedUserRequest({
+        page: 1,
+        pageSize: 4,
+        sort: "CreationDate:desc",
+      }));
+    }
+  }, [dispatch, fullProducts.length, pagedItems.length]);
+
+
   useEffect(() => {
     const mm = window.matchMedia('(max-width: 768px)');
     const handler = (e) => setIsMobile(e.matches);
@@ -41,8 +60,8 @@ export const Home = () => {
 
   const NEW_MAX = 4;
 
-  const mainProduct = products.find((p) => p.main === true) || null;
-  const galleryProducts = products.filter((p) => p.id !== mainProduct?.id);
+  const mainProduct      = allProducts.find((p) => p.main === true) || null;
+  const galleryProducts  = allProducts.filter((p) => p.id !== mainProduct?.id);
 
   // --- Media du produit principal ---
   const mainProductImages = mainProduct
@@ -88,10 +107,10 @@ export const Home = () => {
   };
 
   const newestProducts = useMemo(() => {
-    return [...galleryProducts]
-      .sort((a, b) => new Date(b.creationDate) - new Date(a.creationDate))
+    return [...allProducts]
+      .sort((a, b) => (Date.parse(b?.creationDate || 0) - Date.parse(a?.creationDate || 0)))
       .slice(0, NEW_MAX);
-  }, [galleryProducts]);
+  }, [allProducts]);
 
   const closeAdded = () => setShowAdded(false);
   const goToCart = () => { setShowAdded(false); navigate('/cart'); };

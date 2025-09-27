@@ -5,6 +5,30 @@ import * as api from "../api/products";
 import * as apiStocks from "../api/stocks";
 
 
+function* onGetProductsPaged(action) {
+    try {
+      const { page, pageSize, search, sort, filter } = action.payload || {};
+      const response = yield call(api.getProductsPaged, { page, pageSize, search, sort, filter });
+      const data = response.data; // { items, totalCount, page, pageSize }
+      console.log("Products Paged :",data);
+      yield put(
+        actions.getProductsPagedUserSuccess({
+          items: data.items || data.Items || [],
+          totalCount: data.totalCount || data.TotalCount || 0,
+          page: data.page || data.Page || page || 1,
+          pageSize: data.pageSize || data.PageSize || pageSize || 20,
+        })
+      );
+  
+      const stocks = yield call (apiStocks.getStocks);
+      yield put (actionsStocks.getStockSuccess({stocks : stocks.data}));
+    } catch (err) {
+      console.log("Error product paged :",err?.response?.data);
+      yield put(actions.getProductsPagedUserFailure(err?.response?.data || err?.message || String(err)));
+    }
+  }
+
+
 
 function* getProducts() {
     try {
@@ -80,11 +104,16 @@ function* watchDeleteProduct() {
     yield takeLatest(actions.actionsProduct.DELETE_PRODUCT_USER_REQUEST, deleteProduct);
 }
 
+function* watchGetProductsPaged() {
+    yield takeLatest(actions.actionsProduct.GET_PRODUCT_PAGED_USER_REQUEST, onGetProductsPaged);
+}
+
 function* productsSaga() {
     yield fork(watchGetProducts);
     yield fork(watchAddProduct);
     yield fork(watchUpdateProduct);
     yield fork(watchDeleteProduct);
+    yield fork(watchGetProductsPaged);
 }
 
 export default productsSaga;

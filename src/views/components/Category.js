@@ -7,6 +7,7 @@ import { addToCartRequest, saveCartRequest } from "../../lib/actions/CartActions
 import { GenericModal } from "../../components";
 import { toMediaUrl } from "../../lib/utils/mediaUrl";
 import { calculPrice } from "../../lib/utils/Helpers";
+import { getProductsPagedUserRequest } from "../../lib/actions/ProductActions";
 
 
 /* -------------------- Helpers (définis ici) -------------------- */
@@ -76,11 +77,34 @@ export const Category = () => {
   const navigate = useNavigate();
 
   /* Store */
-  const products   = useSelector((s) => s.products?.products) || [];
+  // ----- products can be in 'products' (full) or 'items' (paged)
+  const prodState    = useSelector((s) => s.products) || {};
+  const fullProducts = Array.isArray(prodState.products) ? prodState.products : [];
+  const pagedItems   = Array.isArray(prodState.items)    ? prodState.items    : [];
+  let productsAll  = fullProducts.length ? fullProducts : pagedItems;
+  const loading      = !!prodState.loading;
+
+  productsAll = productsAll.filter((p) => p.display === true);
+  
+
   const images     = useSelector((s) => s.images?.images) || [];
   const items      = useSelector((s) => s.items?.items) || [];
   const categories = useSelector((s) => s.categories?.categories) || [];
   const subcategories = useSelector((s) => s.subCategories?.subCategories) || [];
+
+
+
+  useEffect(() => {
+    if (!routeCategoryId) return;
+    dispatch(getProductsPagedUserRequest({
+      page: 1,
+      pageSize: 24,
+      sort: "CreationDate:desc",
+      filter: { IdCategory: routeCategoryId },
+    }));
+  }, [dispatch, routeCategoryId]);
+
+
 
     useEffect(() => {
       window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
@@ -109,10 +133,10 @@ export const Category = () => {
   /* Produits de la catégorie */
   const categoryProducts = useMemo(() => {
     if (!routeCategoryId) return [];
-    return (products || []).filter(
+    return (productsAll || []).filter(
       (p) => String(getCategoryIdFromProduct(p, categories)) === String(routeCategoryId)
     );
-  }, [products, categories, routeCategoryId]);
+  }, [productsAll, categories, routeCategoryId]);
 
   /* ---------- Recherche + tri ---------- */
   const [search, setSearch]   = useState("");

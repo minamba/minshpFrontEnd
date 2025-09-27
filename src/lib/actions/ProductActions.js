@@ -3,6 +3,10 @@ export const actionsProduct = {
     GET_PRODUCT_USER_SUCCESS : "GET_PRODUCT_USER_SUCCESS",
     GET_PRODUCT_USER_FAILURE : "GET_PRODUCT_USER_FAILURE",
 
+    GET_PRODUCT_PAGED_USER_REQUEST : "GET_PRODUCT_PAGED_USER_REQUEST",
+    GET_PRODUCT_PAGED_USER_SUCCESS : "GET_PRODUCT_PAGED_USER_SUCCESS",
+    GET_PRODUCT_PAGED_USER_FAILURE : "GET_PRODUCT_PAGED_USER_FAILURE",
+
     UPDATE_PRODUCT_USER_REQUEST : "UPDATE_PRODUCT_USER_REQUEST",
     UPDATE_PRODUCT_USER_SUCCESS : "UPDATE_PRODUCT_USER_SUCCESS",
     UPDATE_PRODUCT_USER_FAILURE : "UPDATE_PRODUCT_USER_FAILURE",
@@ -38,6 +42,18 @@ export function getProductUserFailure(error) {
     }
 }
 
+
+
+//get paged
+export function getProductsPagedUserRequest(payload) {
+    return { type: actionsProduct.GET_PRODUCT_PAGED_USER_REQUEST, payload };
+  }
+  export function getProductsPagedUserSuccess(pageResult) {
+    return { type: actionsProduct.GET_PRODUCT_PAGED_USER_SUCCESS, payload: pageResult };
+  }
+  export function getProductsPagedUserFailure(error) {
+    return { type: actionsProduct.GET_PRODUCT_PAGED_USER_FAILURE, payload: { error } };
+  }
 
 //update
 export function updateProductUserRequest(product) {

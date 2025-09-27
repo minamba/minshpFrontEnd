@@ -6,55 +6,39 @@ import { addToCartRequest, saveCartRequest } from "../../lib/actions/CartActions
 import { GenericModal } from "../../components";
 import { calculPrice } from "../../lib/utils/Helpers";
 import { toMediaUrl } from "../../lib/utils/mediaUrl";
+import { getProductsPagedUserRequest } from "../../lib/actions/ProductActions";
 
-/* -------- Helpers communs -------- */
-const parseDate = (val) => {
-  if (!val) return null;
-  const d = new Date(val);
-  return Number.isNaN(d.getTime()) ? null : d;
-};
+/* -------- Helpers -------- */
+const parseDate = (v) => (v ? (isNaN(new Date(v)) ? null : new Date(v)) : null);
 const toNumOrNull = (v) => {
   if (v === null || v === undefined) return null;
   const n = typeof v === "number" ? v : parseFloat(v);
   return Number.isFinite(n) ? n : null;
 };
-/* Récup id sous-cat depuis un produit */
 const getSubCategoryIdFromProduct = (p) =>
-  p?.idSubCategory ??
-  p?.subCategoryId ??
-  p?.IdSubCategory ??
-  p?.subcategoryId ??
-  p?.subCategory?.id ??
-  null;
-
-/* ---- Helpers sous-catégorie + catégorie ---- */
+  p?.idSubCategory ?? p?.subCategoryId ?? p?.IdSubCategory ?? p?.subcategoryId ?? p?.subCategory?.id ?? null;
 const getSubcatParentId = (sc) =>
-  sc?.parentCategoryId ??
-  sc?.idCategory ??
-  sc?.categoryId ??
-  sc?.idCategorie ??
-  sc?.categorieId ??
-  sc?.parentId ??
-  sc?.idParent ??
-  null;
+  sc?.parentCategoryId ?? sc?.idCategory ?? sc?.categoryId ?? sc?.idCategorie ?? sc?.categorieId ?? sc?.parentId ?? sc?.idParent ?? null;
 
-const getSubcatName = (sc) =>
-  sc?.name ?? sc?.title ?? `Sous-catégorie ${sc?.id ?? ""}`;
-
-const getCatName = (c) =>
-  c?.name ?? c?.title ?? `Catégorie ${c?.id ?? ""}`;
-
+/* -------- Component -------- */
 export const SubCategory = () => {
   const { id: routeSubCategoryId } = useParams();
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
   useEffect(() => {
-    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
   }, [routeSubCategoryId]);
 
-  // Store
-  const products      = useSelector((s) => s.products?.products) || [];
+  // --- Store produits: full (products) OU paginé (items)
+  const prodState    = useSelector((s) => s.products) || {};
+  const fullProducts = Array.isArray(prodState.products) ? prodState.products : [];
+  const pagedItems   = Array.isArray(prodState.items)    ? prodState.items    : [];
+  let productsAll  = fullProducts.length ? fullProducts : pagedItems;
+  const loading      = !!prodState.loading;
+
+  productsAll = productsAll.filter((p) => p.display === true);
+
   const images        = useSelector((s) => s.images?.images) || [];
   const items         = useSelector((s) => s.items?.items) || [];
   const subCategories = useSelector((s) => s.subCategories?.subCategories) || [];
@@ -63,13 +47,32 @@ export const SubCategory = () => {
   // Sauvegarde panier
   useEffect(() => { dispatch(saveCartRequest(items)); }, [items, dispatch]);
 
-  // Sous-catégorie courante
-  const currentSubCategory = useMemo(
-    () => (subCategories || []).find((sc) => String(sc.id) === String(routeSubCategoryId)) || null,
-    [subCategories, routeSubCategoryId]
-  );
+  // ---------- (Re)fetch quand l’onglet change ----------
+  useEffect(() => {
+    if (!routeSubCategoryId) return;
 
-  // Catégorie parente (ex: "Projecteur")
+    const isSub = subCategories.some((sc) => String(sc.id) === String(routeSubCategoryId));
+    const isCat = categories.some((c) => String(c.id) === String(routeSubCategoryId));
+
+    // On recharge toujours la page 1 filtrée par l’onglet courant (évite le “vide après navigation”).
+    dispatch(
+      getProductsPagedUserRequest({
+        page: 1,
+        pageSize: 24,               // ajuste si besoin
+        sort: "CreationDate:desc",
+        filter: isSub
+          ? { IdSubCategory: routeSubCategoryId }
+          : isCat
+          ? { IdCategory: routeSubCategoryId }
+          : undefined,
+      })
+    );
+  }, [dispatch, routeSubCategoryId, categories, subCategories]);
+
+  // ---------- Sous-catégorie / parent / pills ----------
+  const currentSubCategory =
+    (subCategories || []).find((sc) => String(sc.id) === String(routeSubCategoryId)) || null;
+
   const parentCategory = useMemo(() => {
     if (!currentSubCategory) return null;
     const pid = getSubcatParentId(currentSubCategory);
@@ -77,26 +80,22 @@ export const SubCategory = () => {
     return (categories || []).find((c) => String(c.id) === String(pid)) || null;
   }, [currentSubCategory, categories]);
 
-  // Liste des sœurs (même parent)
   const siblingSubcats = useMemo(() => {
     if (!currentSubCategory) return [];
     const parentId = getSubcatParentId(currentSubCategory);
-    return (subCategories || []).filter(
-      (sc) => String(getSubcatParentId(sc)) === String(parentId)
-    );
+    return (subCategories || []).filter((sc) => String(getSubcatParentId(sc)) === String(parentId));
   }, [subCategories, currentSubCategory]);
 
-  // Pills = [catégorie parente] + [courante] + [sœurs]
   const pills = useMemo(() => {
     if (!currentSubCategory) return [];
     const res = [];
     if (parentCategory) {
-      res.push({ id: String(parentCategory.id), name: getCatName(parentCategory), type: "category" });
+      res.push({ id: String(parentCategory.id), name: parentCategory.name || parentCategory.title || "Catégorie", type: "category" });
     }
-    res.push({ id: String(currentSubCategory.id), name: getSubcatName(currentSubCategory), type: "sub" });
+    res.push({ id: String(currentSubCategory.id), name: currentSubCategory.name || currentSubCategory.title || "Sous-catégorie", type: "sub" });
     for (const sc of siblingSubcats) {
       if (String(sc.id) !== String(currentSubCategory.id)) {
-        res.push({ id: String(sc.id), name: getSubcatName(sc), type: "sub" });
+        res.push({ id: String(sc.id), name: sc.name || sc.title || `Sous-catégorie ${sc.id}`, type: "sub" });
       }
     }
     return res;
@@ -129,10 +128,7 @@ export const SubCategory = () => {
     const delta = Math.round(el.clientWidth * 0.8) * (dir === "right" ? 1 : -1);
     el.scrollBy({ left: delta, behavior: "smooth" });
   };
-  const goTo = (p) => {
-    if (p.type === "category") navigate(`/category/${p.id}`);
-    else navigate(`/subcategory/${p.id}`);
-  };
+  const goTo = (p) => navigate(p.type === "category" ? `/category/${p.id}` : `/subcategory/${p.id}`);
 
   // Bannière
   const subCategoryBannerUrl = useMemo(() => {
@@ -140,19 +136,36 @@ export const SubCategory = () => {
     return bySubCat?.url || "/Images/placeholder.jpg";
   }, [images, routeSubCategoryId]);
 
-  // Image principale du produit
   const getProductImage = (productId) => {
     const productImages = images.filter((i) => String(i.idProduct) === String(productId));
     return productImages.length > 0 ? productImages[0].url : "/Images/placeholder.jpg";
   };
 
-  // Produits de la sous-catégorie
+  // ---------- Sélection produits (si on a déjà une liste full en mémoire, on filtre côté client) ----------
   const subCategoryProducts = useMemo(() => {
     if (!routeSubCategoryId) return [];
-    return (products || []).filter(
-      (p) => String(getSubCategoryIdFromProduct(p)) === String(routeSubCategoryId)
-    );
-  }, [products, routeSubCategoryId]);
+
+    const isSub = subCategories.some((sc) => String(sc.id) === String(routeSubCategoryId));
+    const isCat = categories.some((c) => String(c.id) === String(routeSubCategoryId));
+
+    if (!productsAll.length) return []; // on attend la réponse serveur (items filtrés)
+
+    // si la liste vient d’un fetch filtré, elle est déjà bonne; sinon on filtre fullProducts
+    return productsAll.filter((p) => {
+      const subId = getSubCategoryIdFromProduct(p);
+      const catId = p?.idCategory ?? p?.categoryId;
+
+      if (isSub) return String(subId) === String(routeSubCategoryId);
+
+      if (isCat) {
+        const subIds = subCategories
+          .filter((sc) => String(getSubcatParentId(sc)) === String(routeSubCategoryId))
+          .map((sc) => String(sc.id));
+        return String(catId) === String(routeSubCategoryId) || subIds.includes(String(subId));
+      }
+      return false;
+    });
+  }, [productsAll, routeSubCategoryId, categories, subCategories]);
 
   /* ---------- Recherche + tri ---------- */
   const [search, setSearch]   = useState("");
@@ -164,11 +177,8 @@ export const SubCategory = () => {
       const brand = (product.brand || "").toString();
 
       const priceRef =
-        toNumOrNull(
-          typeof product.priceTtc === "number" ? product.priceTtc : parseFloat(product.priceTtc)
-        ) ?? 0;
+        toNumOrNull(typeof product.priceTtc === "number" ? product.priceTtc : parseFloat(product.priceTtc)) ?? 0;
 
-      // Promo produit
       const p0 = product?.promotions?.[0];
       const hasProductPromo = (() => {
         if (!p0) return false;
@@ -183,9 +193,6 @@ export const SubCategory = () => {
         return true;
       })();
 
-      const computedPromo = +(priceRef * (1 - (hasProductPromo ? Number(p0.purcentage) : 0) / 100)).toFixed(2);
-
-      // Promo par code catégorie
       const priceCat = (() => {
         const { priceHtSubCategoryCodePromoted, priceHtCategoryCodePromoted, priceHtPromoted } = product;
         let dPrice = null;
@@ -196,14 +203,15 @@ export const SubCategory = () => {
       })();
 
       const displayPrice = calculPrice(product);
-      const hasAnyPromo = priceCat != null || hasProductPromo;
-      const discountRate = priceRef > 0 ? (priceRef - displayPrice) / priceRef : 0;
-      const discountPct  = +(discountRate * 100).toFixed(2);
+      const hasAnyPromo  = priceCat != null || hasProductPromo;
 
       const creationTs = (() => {
         const d = parseDate(product?.creationDate);
         return d ? d.getTime() : 0;
       })();
+
+      const discountRate = priceRef > 0 ? (priceRef - displayPrice) / priceRef : 0;
+      const discountPct  = +(discountRate * 100).toFixed(2);
 
       return { product, name, brand, priceRef, displayPrice, hasAnyPromo, discountRate, discountPct, creationTs };
     });
@@ -214,33 +222,34 @@ export const SubCategory = () => {
     let list = augmented.filter((a) => a.name.toLowerCase().includes(q));
 
     switch (sortKey) {
-      case "name-asc": list.sort((a, b) => a.name.localeCompare(b.name, "fr", { sensitivity: "base" })); break;
-      case "name-desc": list.sort((a, b) => b.name.localeCompare(a.name, "fr", { sensitivity: "base" })); break;
-      case "price-asc": list.sort((a, b) => a.displayPrice - b.displayPrice); break;
+      case "name-asc":   list.sort((a, b) => a.name.localeCompare(b.name, "fr", { sensitivity: "base" })); break;
+      case "name-desc":  list.sort((a, b) => b.name.localeCompare(a.name, "fr", { sensitivity: "base" })); break;
+      case "price-asc":  list.sort((a, b) => a.displayPrice - b.displayPrice); break;
       case "price-desc": list.sort((a, b) => b.displayPrice - a.displayPrice); break;
-      case "brand-asc": list.sort((a, b) => a.brand.localeCompare(b.brand, "fr", { sensitivity: "base" })); break;
+      case "brand-asc":  list.sort((a, b) => a.brand.localeCompare(b.brand, "fr", { sensitivity: "base" })); break;
       case "brand-desc": list.sort((a, b) => b.brand.localeCompare(a.brand, "fr", { sensitivity: "base" })); break;
-      case "date-asc": list.sort((a, b) => a.creationTs - b.creationTs); break;
-      case "date-desc": list.sort((a, b) => b.creationTs - a.creationTs); break;
+      case "date-asc":   list.sort((a, b) => a.creationTs - b.creationTs); break;
+      case "date-desc":  list.sort((a, b) => b.creationTs - a.creationTs); break;
       case "promo-first":
         list.sort((a, b) =>
           (Number(b.hasAnyPromo) - Number(a.hasAnyPromo)) ||
           (b.discountRate - a.discountRate) ||
           (b.creationTs - a.creationTs)
         ); break;
-      case "discount-desc": list.sort((a, b) => (b.discountRate - a.discountRate) || (b.creationTs - a.creationTs)); break;
+      case "discount-desc":
+        list.sort((a, b) => (b.discountRate - a.discountRate) || (b.creationTs - a.creationTs)); break;
       default: break;
     }
     return list;
   }, [augmented, search, sortKey]);
 
-  /* ---------- Modal “ajouté au panier” ---------- */
+  /* ---------- Modal panier ---------- */
   const [showAdded, setShowAdded] = useState(false);
   const [lastAdded, setLastAdded] = useState(null);
   const closeAdded = () => setShowAdded(false);
   const goToCart   = () => { setShowAdded(false); navigate("/cart"); };
 
-  /* ---------- Mobile sheet state (option A) ---------- */
+  /* ---------- Mobile sheet ---------- */
   const [sheetOpen, setSheetOpen] = useState(false);
   useEffect(() => {
     if (sheetOpen) document.body.classList.add("has-sheet-open");
@@ -252,41 +261,26 @@ export const SubCategory = () => {
   return (
     <div className="category-page">
       {/* Bannière */}
-      <section className="category-hero" style={{ "--hero-url": `url("${toMediaUrl(subCategoryBannerUrl)}")` }}>
+      <section
+        className="category-hero"
+        style={{ "--hero-url": `url("${toMediaUrl(subCategoryBannerUrl)}")` }}
+      >
         <h1 className="category-hero__title">
           {currentSubCategory?.name || currentSubCategory?.title || "Sous-catégorie"}
         </h1>
       </section>
 
-      {/* Compteur déplacé en dehors du hero pour ne pas perturber le centrage */}
-      {/* <div className="category-hero__count" style={{ textAlign: "center", margin: "8px 0 0" }}>
-        {filteredSorted.length} produit{filteredSorted.length > 1 ? "s" : ""}
-      </div> */}
-
-      {/* Barre sous-catégories (pills) avec la catégorie parente en PREMIER */}
+      {/* Pills */}
       {pills.length > 0 && (
         <div className="subcat-bar" style={{ marginBottom: 16 }}>
-          <button
-            type="button"
-            className={`pill-nav pill-nav--left ${canScrollLeft ? "" : "is-disabled"}`}
-            onClick={() => scrollPills("left")}
-            aria-label="Défiler vers la gauche"
-          >
-            ‹
-          </button>
-
+          <button type="button" className={`pill-nav pill-nav--left ${canScrollLeft ? "" : "is-disabled"}`} onClick={() => scrollPills("left")} aria-label="Défiler vers la gauche">‹</button>
           <div className="pill-scroll" ref={pillsRef}>
             <ul className="pill-list" role="tablist" aria-label="Navigation sous-catégories">
               {pills.map((p) => {
                 const isActive = p.type === "sub" && String(p.id) === String(routeSubCategoryId);
                 return (
                   <li key={`${p.type}-${p.id}`} className="pill-item">
-                    <button
-                      type="button"
-                      className={`pill ${isActive ? "pill--active" : ""}`}
-                      onClick={() => goTo(p)}
-                      title={p.name}
-                    >
+                    <button type="button" className={`pill ${isActive ? "pill--active" : ""}`} onClick={() => goTo(p)} title={p.name}>
                       {p.name}
                     </button>
                   </li>
@@ -294,19 +288,11 @@ export const SubCategory = () => {
               })}
             </ul>
           </div>
-
-          <button
-            type="button"
-            className={`pill-nav pill-nav--right ${canScrollRight ? "" : "is-disabled"}`}
-            onClick={() => scrollPills("right")}
-            aria-label="Défiler vers la droite"
-          >
-            ›
-          </button>
+          <button type="button" className={`pill-nav pill-nav--right ${canScrollRight ? "" : "is-disabled"}`} onClick={() => scrollPills("right")} aria-label="Défiler vers la droite">›</button>
         </div>
       )}
 
-      {/* Toolbar recherche/tri (masquée en mobile via CSS) */}
+      {/* Toolbar */}
       <div className="category-toolbar">
         <input
           className="form-control category-search"
@@ -333,16 +319,21 @@ export const SubCategory = () => {
         </select>
       </div>
 
-      {/* Grille produits */}
+      {/* Grille */}
       <section className="new-section" id="subcategory-products">
         <div className="new-grid">
-          {filteredSorted.length === 0 && (
+          {loading && !productsAll.length && (
+            <div style={{ padding: "2rem 0" }}>Chargement…</div>
+          )}
+
+          {!loading && filteredSorted.length === 0 && (
             <div style={{ padding: "2rem 0" }}>Aucun produit ne correspond à votre recherche.</div>
           )}
+
           {filteredSorted.map(({ product, name, priceRef, displayPrice, hasAnyPromo }) => {
             const img = getProductImage(product.id);
             const [euros, cents] = displayPrice.toFixed(2).split(".");
-            const raw   = (product?.stockStatus ?? "").trim();
+            const raw = (product?.stockStatus ?? "").trim();
             const lower = raw.toLowerCase();
             const isIn  = lower === "en stock";
             const isOut = lower === "en rupture";
@@ -363,14 +354,7 @@ export const SubCategory = () => {
                       className="thumb-add-btn"
                       onClick={(e) => {
                         e.preventDefault(); e.stopPropagation();
-                        const payloadItem = {
-                          id: product.id,
-                          name,
-                          price: displayPrice,
-                          image: img,
-                          packageProfil: product.packageProfil,
-                          containedCode: product.containedCode
-                        };
+                        const payloadItem = { id: product.id, name, price: displayPrice, image: img, packageProfil: product.packageProfil, containedCode: product.containedCode };
                         dispatch(addToCartRequest(payloadItem, 1));
                         setLastAdded({ id: product.id, name });
                         setShowAdded(true);
@@ -417,42 +401,23 @@ export const SubCategory = () => {
         ]}
       />
 
-      {/* espace pour ne pas masquer le bas par la barre mobile */}
       <div className="mobile-filter-spacer" />
 
-      {/* ===== Barre mobile + Sheet (rendu direct, sans portal) ===== */}
+      {/* Barre mobile */}
       <div className="mobile-filter-bar" role="presentation">
-        <button
-          type="button"
-          className="mfb-btn"
-          onClick={() => setSheetOpen(true)}
-          aria-label="Affinez votre recherche"
-        >
+        <button type="button" className="mfb-btn" onClick={() => setSheetOpen(true)} aria-label="Affinez votre recherche">
           Affinez votre recherche
           <span className="mfb-badge">{badgeCount}</span>
         </button>
       </div>
 
-      <div
-        className={`mfb-overlay ${sheetOpen ? "is-open" : ""}`}
-        onClick={() => setSheetOpen(false)}
-      />
+      <div className={`mfb-overlay ${sheetOpen ? "is-open" : ""}`} onClick={() => setSheetOpen(false)} />
       <div className={`mfb-sheet ${sheetOpen ? "is-open" : ""}`} role="dialog" aria-modal="true">
         <div className="mfb-sheet__handle" />
         <div className="mfb-sheet__title">Filtrer / Trier</div>
-
         <div className="sheet-fields">
-          <input
-            className="form-control"
-            placeholder="Rechercher un produit…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          <select
-            className={`form-select ${sortKey === "" ? "is-placeholder" : ""}`}
-            value={sortKey}
-            onChange={(e) => setSortKey(e.target.value)}
-          >
+          <input className="form-control" placeholder="Rechercher un produit…" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <select className={`form-select ${sortKey === "" ? "is-placeholder" : ""}`} value={sortKey} onChange={(e) => setSortKey(e.target.value)}>
             <option value="" disabled>Trier les produits</option>
             <option value="date-desc">Nouveautés (récent → ancien)</option>
             <option value="date-asc">Plus ancien → récent</option>
@@ -466,13 +431,8 @@ export const SubCategory = () => {
             <option value="discount-desc">Réduction (forte → faible)</option>
           </select>
         </div>
-
         <div className="mfb-actions">
-          <button
-            type="button"
-            className="btn btn--light"
-            onClick={() => { setSearch(""); setSortKey(""); }}
-          >
+          <button type="button" className="btn btn--light" onClick={() => { setSearch(""); setSortKey(""); }}>
             Réinitialiser
           </button>
           <button type="button" className="btn btn--primary bg-primary" onClick={() => setSheetOpen(false)}>
@@ -480,7 +440,6 @@ export const SubCategory = () => {
           </button>
         </div>
       </div>
-      {/* ===== Fin barre mobile ===== */}
     </div>
   );
 };

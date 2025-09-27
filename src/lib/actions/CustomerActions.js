@@ -3,6 +3,10 @@ export const actionsCustomer = {
     GET_CUSTOMER_SUCCESS : "GET_CUSTOMER_SUCCESS",
     GET_CUSTOMER_FAILURE : "GET_CUSTOMER_FAILURE",
 
+    GET_PAGED_CUSTOMER_REQUEST : "GET_PAGED_CUSTOMER_REQUEST",
+    GET_PAGED_CUSTOMER_SUCCESS : "GET_PAGED_CUSTOMER_SUCCESS",
+    GET_PAGED_CUSTOMER_FAILURE : "GET_PAGED_CUSTOMER_FAILURE",
+
     UPDATE_CUSTOMER_REQUEST : "UPDATE_CUSTOMER_REQUEST",
     UPDATE_CUSTOMER_SUCCESS : "UPDATE_CUSTOMER_SUCCESS",
     UPDATE_CUSTOMER_FAILURE : "UPDATE_CUSTOMER_FAILURE",
@@ -37,6 +41,18 @@ export function getCustomerFailure(error) {
         payload: error,
     }
 }
+
+
+//get paged
+export function getPagedCustomerRequest(payload) {
+    return { type: actionsCustomer.GET_PAGED_CUSTOMER_REQUEST, payload };
+  }
+  export function getPagedCustomerSuccess(pageResult) {
+    return { type: actionsCustomer.GET_PAGED_CUSTOMER_SUCCESS, payload: pageResult };
+  }
+  export function getPagedCustomerFailure(error) {
+    return { type: actionsCustomer.GET_PAGED_CUSTOMER_FAILURE, payload: { error } };
+  }
 
 
 //update

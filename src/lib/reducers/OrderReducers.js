@@ -2,6 +2,14 @@ import { actionsOrder } from "../actions/OrderActions";
 
 const initialState = {
     orders: [],
+
+    // liste paginée (admin)
+    items: [],
+    page: 1,
+    pageSize: 20,
+    totalCount: 0,
+
+
     addOrderSuccess: false,
     addOrderError: null,
     updateOrderSuccess: false,
@@ -13,6 +21,41 @@ const initialState = {
 
 export default function orderReducer(state = initialState, action) {
     switch (action.type) {
+          /* ---------------- PAGES (ADMIN) ---------------- */
+            case actionsOrder.GET_ORDER_PAGED_USER_REQUEST:
+              return {
+                ...state,
+                loading: true,
+                error: null,
+                // reset flags d’édition pour éviter des affichages “fantômes”
+                addOrderSuccess: false,
+                updateOrderSuccess: false,
+                deleteOrderSuccess: false,
+                addOrderError: null,
+                updateOrderError: null,
+                deleteOrderError: null,
+                items: [],
+                totalCount: 0,
+              };
+        
+            case actionsOrder.GET_ORDER_PAGED_USER_SUCCESS:
+              return {
+                ...state,
+                loading: false,
+                items: Array.isArray(action.payload?.items) ? action.payload.items : [],
+                totalCount: action.payload?.totalCount ?? 0,
+                page: action.payload?.page ?? 1,
+                pageSize: action.payload?.pageSize ?? state.pageSize,
+                error: null,
+              };
+        
+            case actionsOrder.GET_ORDER_PAGED_USER_FAILURE:
+              return {
+                ...state,
+                loading: false,
+                error: action.payload?.error || "Erreur chargement (paged)",
+              };
+
 
         case actionsOrder.GET_ORDER_SUCCESS:
             return {
