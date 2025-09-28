@@ -2,9 +2,9 @@
 import { useEffect, useMemo } from "react";
 import { useDispatch } from "react-redux";
 import { Link, useSearchParams } from "react-router-dom";
-import "../../styles/pages/success.css";
 import { confirmCheckoutSessionRequest } from "../../lib/actions/StripeActions";
 import { saveCartRequest } from "../../lib/actions/CartActions";
+import "../../styles/pages/success.css";
 
 export default function Success() {
   const [params] = useSearchParams();

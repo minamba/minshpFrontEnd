@@ -35,7 +35,7 @@ export const Navbar = () => {
 
   // --- Auth / rôles
   const token = localStorage.getItem("access_token");
-  const roles = getUserRoles?.(token) || [];
+  const roles = (typeof getUserRoles === "function" ? getUserRoles(token) : []) || [];
   const isAdmin = roles.map((r) => String(r).toLowerCase()).includes("admin");
   const { isAuth } = useSelector((s) => s.account) || { isAuth: false };
 
@@ -47,6 +47,7 @@ export const Navbar = () => {
   const cartItems = useSelector((s) => s.items?.items) || [];
   const cartCount = cartItems.reduce((acc, it) => acc + Number(it.qty ?? it.quantity ?? 1), 0);
 
+  // --- Effet badge
   const [bump, setBump] = useState(false);
   useEffect(() => {
     if (cartCount > 0) {
@@ -56,7 +57,7 @@ export const Navbar = () => {
     }
   }, [cartCount]);
 
-  // Map sous-cat par cat
+  // --- Map sous-cat par cat
   const subsByCat = useMemo(() => {
     const m = {};
     for (const sc of subCategories) {
@@ -89,21 +90,43 @@ export const Navbar = () => {
     setHoverCatId(null);
   };
 
-  const toggleMenu = () => {
-    const next = !isOpen;
-    setIsOpen(next);
-    if (!next) closeAllDropdowns();
+  // ===== Helpers “environnement souris” =====
+  const isMousePointerEnv = () =>
+    typeof window !== "undefined" &&
+    window.matchMedia?.("(hover:hover) and (pointer:fine)")?.matches;
+
+  // ===== Hover desktop via Pointer Events (souris uniquement) =====
+  const onPointerEnterMouse = (openSetter) => (e) => {
+    if (e.pointerType === "mouse" && isMousePointerEnv() && window.innerWidth > 900) {
+      openSetter(true);
+    }
+  };
+  const onPointerLeaveMouse = (closeSetter) => (e) => {
+    if (e.pointerType === "mouse" && isMousePointerEnv() && window.innerWidth > 900) {
+      closeSetter(false);
+      if (closeSetter === setPOpen) setHoverCatId(null);
+    }
   };
 
-  // Ferme les dropdowns quand on passe d’un viewport à l’autre
-  useEffect(() => {
-    const onResize = () => closeAllDropdowns();
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
+  // ===== Toggles tactiles fiables (sur BOUTONS uniquement) =====
+  const onTouchToggle = (setter) => (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setter((v) => !v);
+  };
+
+  // ===== Clicks desktop (souris uniquement) =====
+  const clickToggleMouseOnly = (setter) => () => {
+    if (isMousePointerEnv()) setter((v) => !v);
+  };
+
+  // ===== Liens qui ferment tout =====
+  const onNavLink = () => {
+    setIsOpen(false);
+    closeAllDropdowns();
+  };
 
   // ====== Verrouillage du scroll (mobile) ======
-  // Technique robuste: position:fixed + mémorisation du scrollY
   const scrollYRef = useRef(0);
   useEffect(() => {
     const b = document.body;
@@ -119,7 +142,6 @@ export const Navbar = () => {
       b.style.width = "100%";
       b.style.overflow = "hidden";
 
-      // Limite l’overscroll “élastique”
       html.style.overscrollBehavior = "contain";
     } else {
       const y = Math.abs(parseInt(b.style.top || "0", 10)) || scrollYRef.current;
@@ -133,12 +155,10 @@ export const Navbar = () => {
 
       document.documentElement.style.overscrollBehavior = "";
 
-      // Retour à la position initiale
       window.scrollTo(0, y);
     }
 
     return () => {
-      // cleanup safe
       b.style.position = "";
       b.style.top = "";
       b.style.left = "";
@@ -149,49 +169,24 @@ export const Navbar = () => {
     };
   }, [isOpen]);
 
-  // Helpers mobile: toggles robustes (tap + touch)
-  const touchToggle =
-    (fn) =>
-    (e) => {
-      if (e?.type === "touchend") {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-      fn((v) => !v);
-    };
-
-  const mobileToggleProducts = touchToggle(setPOpen);
-  const mobileToggleAccount  = touchToggle(setAOpen);
-  const mobileToggleAdmin    = touchToggle(setAdOpen);
-
-  // Click handlers (ne togglent en mobile qu’en dessous de 901px)
-  const onClickProducts = () => {
-    if (window.innerWidth <= 900) {
-      setPOpen((v) => !v);
-      setAOpen(false);
-      setAdOpen(false);
-    }
-  };
-  const onClickAccount = () => {
-    if (window.innerWidth <= 900) {
-      setAOpen((v) => !v);
-      setPOpen(false);
-      setAdOpen(false);
-    }
-  };
-  const onClickAdmin = () => {
-    if (window.innerWidth <= 900) {
-      setAdOpen((v) => !v);
-      setPOpen(false);
-      setAOpen(false);
-    }
+  // ----- Burger -----
+  const toggleMenu = () => {
+    const next = !isOpen;
+    setIsOpen(next);
+    if (!next) closeAllDropdowns();
   };
 
-  // Liens qui ferment tout
-  const onNavLink = () => {
-    setIsOpen(false);
-    closeAllDropdowns();
-  };
+  // Ferme les dropdowns quand on change de viewport
+  useEffect(() => {
+    const onResize = () => closeAllDropdowns();
+    window.addEventListener("resize", onResize, { passive: true });
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  // ===== Détection tactile simple =====
+  const isTouchEnv = () =>
+    (typeof window !== "undefined" &&
+      (window.matchMedia?.("(hover:none)")?.matches || navigator.maxTouchPoints > 0));
 
   return (
     <>
@@ -204,8 +199,8 @@ export const Navbar = () => {
               className="navbar-toggle"
               type="button"
               aria-label="Ouvrir le menu"
-              onClick={toggleMenu}
-              onTouchEnd={toggleMenu}
+              onClick={toggleMenu}                                 // souris
+              onTouchEnd={(e) => { e.preventDefault(); toggleMenu(); }} // tactile
             >
               <span className="bar" />
               <span className="bar" />
@@ -240,22 +235,17 @@ export const Navbar = () => {
             </div>
 
             <div className="navbar-links">
-              {/* PRODUITS (desktop + tap) */}
+              {/* ===== PRODUITS ===== */}
               <div
                 className="navbar-dropdown"
-                onMouseEnter={() => window.innerWidth > 900 && setPOpen(true)}
-                onMouseLeave={() => {
-                  if (window.innerWidth > 900) {
-                    setPOpen(false);
-                    setHoverCatId(null);
-                  }
-                }}
-                onTouchStart={() => setPOpen((v) => !v)} // iPad/écrans tactiles
+                onPointerEnter={onPointerEnterMouse(setPOpen)}   // hover souris
+                onPointerLeave={onPointerLeaveMouse(setPOpen)}   // leave souris
               >
                 <button
                   className="navbar-dropdown-toggle"
                   type="button"
-                  onClick={onClickProducts}
+                  onClick={clickToggleMouseOnly(setPOpen)}        // click souris
+                  onTouchEnd={onTouchToggle(setPOpen)}            // tactile
                   aria-haspopup="true"
                   aria-expanded={productsOpen}
                 >
@@ -271,25 +261,42 @@ export const Navbar = () => {
                           <span className="flyout-link" aria-disabled>Chargement…</span>
                         </li>
                       )}
+
                       {categories.map((cat) => {
                         const list    = subsByCat[String(cat.id)] || [];
                         const hasSubs = list.length > 0;
                         const active  = String(hoverCatId) === String(cat.id);
+
                         return (
                           <li
                             key={cat.id}
                             className={`flyout-item ${active ? "is-active" : ""}`}
-                            onMouseEnter={() => setHoverCatId(cat.id)}
+                            onPointerEnter={(e) => {
+                              if (e.pointerType === "mouse" && isMousePointerEnv() && window.innerWidth > 900) {
+                                setHoverCatId(cat.id);
+                              }
+                            }}
                           >
                             <Link
                               to={`/category/${cat.id}`}
                               className="flyout-link"
-                              onClick={onNavLink}
+                              onClick={(e) => {
+                                // Tactile : 1er tap sur une catégorie avec sous-menus => ouvrir le niveau 2
+                                if (isTouchEnv() && hasSubs && hoverCatId !== cat.id) {
+                                  e.preventDefault();
+                                  setHoverCatId(cat.id);
+                                  if (!productsOpen) setPOpen(true);
+                                  return;
+                                }
+                                // Sinon navigation (ou 2e tap)
+                                onNavLink();
+                              }}
                             >
                               <span>{cat.name}</span>
                               {hasSubs && <span className="flyout-arrow">›</span>}
                             </Link>
 
+                            {/* Niveau 2 */}
                             {hasSubs && active && (
                               <div className="flyout-level2">
                                 {list.map((sc) => (
@@ -315,17 +322,17 @@ export const Navbar = () => {
               <Link to="/news" onClick={closeAllDropdowns}>Nouveautés</Link>
               <Link to="/promotion" onClick={closeAllDropdowns}>Soldes & promos</Link>
 
-              {/* COMPTE */}
+              {/* ===== COMPTE ===== */}
               <div
                 className="navbar-dropdown"
-                onMouseEnter={() => window.innerWidth > 900 && setAOpen(true)}
-                onMouseLeave={() => window.innerWidth > 900 && setAOpen(false)}
-                onTouchStart={() => setAOpen((v) => !v)}
+                onPointerEnter={onPointerEnterMouse(setAOpen)}
+                onPointerLeave={onPointerLeaveMouse(setAOpen)}
               >
                 <button
                   className="navbar-dropdown-toggle"
                   type="button"
-                  onClick={onClickAccount}
+                  onClick={clickToggleMouseOnly(setAOpen)}     // souris
+                  onTouchEnd={onTouchToggle(setAOpen)}         // tactile
                   aria-haspopup="true"
                   aria-expanded={accountOpen}
                 >
@@ -337,20 +344,21 @@ export const Navbar = () => {
                 {accountOpen && (
                   <div className="navbar-dropdown-menu" style={{ display: "flex" }}>
                     {!isAuth ? (
-                      <Link to="/login" onClick={() => { setAOpen(false); }}>
+                      <Link to="/login" onClick={() => setAOpen(false)}>
                         <i className="bi bi-box-arrow-in-right" style={{ marginRight: 6 }} />
                         Se connecter
                       </Link>
                     ) : (
                       <>
-                        <Link to="/account" onClick={() => { setAOpen(false); }}>
+                        <Link to="/account" onClick={() => setAOpen(false)}>
                           <i className="bi bi-person-circle" style={{ marginRight: 6 }} />
                           Mon compte
                         </Link>
                         <button
                           className="logout-btn"
                           onClick={() => {
-                            dispatch(logout());
+                            // ⚠️ Remplace par ton action réelle
+                            if (typeof logout === "function") dispatch(logout());
                             setAOpen(false);
                             navigate("/login");
                           }}
@@ -364,7 +372,7 @@ export const Navbar = () => {
                 )}
               </div>
 
-              {/* PANIER */}
+              {/* ===== PANIER ===== */}
               <Link to="/cart" onClick={closeAllDropdowns} className="nav-cart-link">
                 <span className="nav-cart-ico">
                   <i className="bi bi-cart-fill nav-icon" aria-hidden="true" />
@@ -373,18 +381,18 @@ export const Navbar = () => {
                 <span>Panier</span>
               </Link>
 
-              {/* ADMIN */}
+              {/* ===== ADMIN ===== */}
               {isAdmin && (
                 <div
                   className="navbar-dropdown"
-                  onMouseEnter={() => window.innerWidth > 900 && setAdOpen(true)}
-                  onMouseLeave={() => window.innerWidth > 900 && setAdOpen(false)}
-                  onTouchStart={() => setAdOpen((v) => !v)}
+                  onPointerEnter={onPointerEnterMouse(setAdOpen)}
+                  onPointerLeave={onPointerLeaveMouse(setAdOpen)}
                 >
                   <button
                     className="navbar-dropdown-toggle"
                     type="button"
-                    onClick={onClickAdmin}
+                    onClick={clickToggleMouseOnly(setAdOpen)}   // souris
+                    onTouchEnd={onTouchToggle(setAdOpen)}       // tactile
                     aria-haspopup="true"
                     aria-expanded={adminOpen}
                   >
@@ -447,8 +455,8 @@ export const Navbar = () => {
           <div className="mm-title">Menu</div>
           <button
             className="btn-light"
-            onClick={() => setIsOpen(false)}
-            onTouchEnd={() => setIsOpen(false)}
+            onClick={() => setIsOpen(false)}                           // souris
+            onTouchEnd={(e) => { e.preventDefault(); setIsOpen(false); }} // tactile
             aria-label="Fermer"
           >
             ✕
@@ -456,12 +464,12 @@ export const Navbar = () => {
         </div>
 
         <div className="mm-scroller">
-          {/* PRODUITS */}
+          {/* PRODUITS (mobile drawer) */}
           <div className="mm-section">
             <button
               className="mm-sec-btn"
-              onClick={onClickProducts}
-              onTouchEnd={mobileToggleProducts}
+              onClick={clickToggleMouseOnly(setPOpen)}
+              onTouchEnd={onTouchToggle(setPOpen)}
               aria-expanded={productsOpen}
               aria-controls="mm-products"
             >
@@ -527,12 +535,13 @@ export const Navbar = () => {
                 <button
                   className="mm-item"
                   onClick={() => {
-                    dispatch(logout());
+                    if (typeof logout === "function") dispatch(logout());
                     setIsOpen(false);
                     navigate("/login");
                   }}
-                  onTouchEnd={() => {
-                    dispatch(logout());
+                  onTouchEnd={(e) => {
+                    e.preventDefault();
+                    if (typeof logout === "function") dispatch(logout());
                     setIsOpen(false);
                     navigate("/login");
                   }}
@@ -557,8 +566,8 @@ export const Navbar = () => {
             <div className="mm-section">
               <button
                 className="mm-sec-btn"
-                onClick={onClickAdmin}
-                onTouchEnd={mobileToggleAdmin}
+                onClick={clickToggleMouseOnly(setAdOpen)}
+                onTouchEnd={onTouchToggle(setAdOpen)}
                 aria-expanded={adminOpen}
                 aria-controls="mm-admin"
               >
@@ -597,8 +606,6 @@ export const Navbar = () => {
     </>
   );
 };
-
-
 
 /* ===== Helpers ===== */
 const getPkgIdFromProduct = (p) =>

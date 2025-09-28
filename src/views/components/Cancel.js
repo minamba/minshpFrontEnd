@@ -1,5 +1,6 @@
 // src/pages/checkout/Cancel.jsx
 import { Link } from "react-router-dom";
+import "../../styles/pages/cancel.css";
 
 export const Cancel = () => {
   return (

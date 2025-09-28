@@ -1,0 +1,90 @@
+/* src/styles/pages/cancel.css */
+
+:root {
+    --danger: #ef4444;
+    --danger-700: #dc2626;
+    --blue: #2563eb;
+    --blue-light: #3b82f6;
+    --text: #111;
+    --text-muted: #374151;
+    --note: #6b7280;
+  }
+  
+  /* ---- Layout page ---- */
+  .cancel-page {
+    display: grid;
+    place-items: center;
+    padding: clamp(32px, 6vw, 64px) 16px;
+    min-height: calc(100vh - 100px);
+    background:
+      radial-gradient(1200px 600px at 80% -100px, rgba(239, 68, 68, 0.06), transparent),
+      radial-gradient(900px 500px at -10% 120%, rgba(59, 130, 246, 0.06), transparent),
+      linear-gradient(180deg, #f0b4b4 0%, #ffffff 60%, #f7f9ff 100%);
+  }
+  
+  /* ---- Card ---- */
+  .cancel-card {
+    width: min(700px, 92vw);
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.08);
+    padding: clamp(24px, 3vw, 48px);
+    text-align: center;
+  }
+  
+  /* ---- Badge ---- */
+  .cancel-badge {
+    width: 72px;
+    height: 72px;
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
+    font-size: 28px;
+    background: linear-gradient(135deg, var(--danger), var(--danger-700));
+    box-shadow: 0 12px 24px rgba(239, 68, 68, 0.25);
+    margin: 0 auto 12px;
+  }
+  
+  /* ---- Typo ---- */
+  .cancel-title {
+    margin: 8px 0;
+    font-size: clamp(26px, 3.5vw, 40px);
+    font-weight: 900;
+    letter-spacing: 0.01em;
+    color: var(--text);
+  }
+  
+  .cancel-text {
+    max-width: 600px;
+    margin: 0 auto 18px;
+    color: var(--text-muted);
+    font-size: clamp(16px, 1.25vw, 18px);
+    line-height: 1.6;
+  }
+  
+  /* ---- Actions ---- */
+  .cancel-actions {
+    margin-top: 20px;
+  }
+  
+  .cancel-actions .btn {
+    display: inline-block;
+    padding: 12px 20px;
+    border-radius: 12px;
+    font-weight: 700;
+    text-decoration: none;
+    cursor: pointer;
+    border: 0;
+    transition: background 0.2s ease;
+  }
+  
+  .cancel-actions .btn-primary {
+    background: linear-gradient(135deg, var(--blue-light), var(--blue));
+    color: #fff;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
+  }
+  
+  .cancel-actions .btn-primary:hover {
+    background: var(--blue);
+  }
+  

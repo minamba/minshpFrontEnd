@@ -376,7 +376,7 @@ export const SubCategory = () => {
                         {priceRef.toLocaleString("fr-FR", { style: "currency", currency: "EUR" })}
                       </span>
                     )}
-                    <div className={`product-price ${hasAnyPromo ? "product-price--promo" : ""}`}>
+                    <div className={`price ${hasAnyPromo ? "product-price--promo" : ""}`}>
                       <span className="euros">{euros}€</span>
                       <sup className="cents">{cents}</sup>
                     </div>

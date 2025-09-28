@@ -299,6 +299,10 @@
     z-index: 2;               /* au-dessus du contenu du panneau */
     background: #0f1115;
   }
+
+/* 
+  .navbar-dropdown-toggle { touch-action: manipulation; }  */
+
   
   
   

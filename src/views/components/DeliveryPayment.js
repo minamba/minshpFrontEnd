@@ -411,9 +411,7 @@ function AddressAutocomplete({
 
 const PHONE_DEFAULT_COUNTRY_LABEL = "France (métropolitaine)";
 const makeStreetLine = (addr) =>
-  `${addr?.housenumber ? `${addr.housenumber} ` : ""}${
-    addr?.street || addr?.name || ""
-  }`.trim();
+  `${addr?.housenumber ? `${addr.housenumber} ` : ""}${addr?.street || addr?.name || ""}`.trim();
 
 const toForm = (a, currentCustomer) => {
   const phoneRaw =
@@ -456,9 +454,7 @@ const toForm = (a, currentCustomer) => {
 };
 
 const toPayload = (form, currentCustomer, type) => {
-  const fullPhone = `${form.phoneDial || DEFAULT_DIAL}${cleanPhoneLocal(
-    form.phoneLocal
-  )}`;
+  const fullPhone = `${form.phoneDial || DEFAULT_DIAL}${cleanPhoneLocal(form.phoneLocal)}`;
   const base = {
     Id: form.id ?? undefined,
     IdCustomer: currentCustomer?.id,
@@ -732,9 +728,7 @@ function AddressBookModal({ open, addresses, onChoose, onEdit, onClose }) {
                 style={primaryBtn}
                 onClick={() => onChoose(idx)}
                 disabled={a.favorite === true}
-                title={
-                  a.favorite ? "Déjà l’adresse préférée" : "Définir comme préférée"
-                }
+                title={a.favorite ? "Déjà l’adresse préférée" : "Définir comme préférée"}
               >
                 Choisir
               </button>
@@ -799,6 +793,15 @@ export const DeliveryPayment = () => {
   const billingAddress = billingAddresses.find(
     (a) => a?.idCustomer === currentCustomer?.id
   );
+
+  // ---- États pour modale "adresses manquantes"
+  const [showMissingModal, setShowMissingModal] = useState(false);
+  /** "delivery" | "billing" | "both" | null */
+  const [missingKind, setMissingKind] = useState(null);
+
+  // A-t-on ce qu'il faut côté adresses ?
+  const hasDelivery = (deliveryLst && deliveryLst.length > 0) || !!deliveryFavoriteAddress;
+  const hasBilling = !!billingAddress;
 
   // Charger adresses
   useEffect(() => {
@@ -1019,590 +1022,681 @@ export const DeliveryPayment = () => {
                 : upper === "UPSE"
                 ? "ups"
                 : "poste"
-            ))
-      ) || relayRates[0]
-    );
-  }, [relayRates, relayOperator]);
-
-  const shippingPrice = useMemo(() => {
-    if (deliveryMode === "relay") return Number(selectedRelayRate?.priceTtc ?? 0);
-    const o = homeRates.find((r) => r.code === selectedRateCode) || homeRates[0];
-    return Number(o?.priceTtc ?? 0);
-  }, [deliveryMode, selectedRelayRate, homeRates, selectedRateCode]);
-
-  const grandTotal = +(baseTotal + shippingPrice).toFixed(2);
-
-  /* ------------ Choisir une adresse dans le carnet (favorite) ------------ */
-  const chooseFromBook = async (idx) => {
-    const a = deliveryLst[idx];
-    if (!a) return;
-    const id = a?.id ?? a?.deliveryAddressId ?? a?.Id ?? null;
-    if (!id) return;
-
-    await dispatch(
-      updateDeliveryAddressRequest({
-        Id: id,
-        IdCustomer: currentCustomer?.id,
-        Favorite: true,
-      })
-    );
-    await dispatch(getDeliveryAddressRequest());
-
-    try {
-      const parts = [];
-      if (a?.address) parts.push(a.address);
-      const cityPart = [a?.postalCode, a?.city].filter(Boolean).join(" ");
-      if (cityPart) parts.push(cityPart);
-      const country = a?.country || "FR";
-      if (country) parts.push(country);
-      const line = parts.join(", ");
-      if (line) setRelayFullAddress(line);
-    } catch {}
-    setShowBook(false);
-  };
-
-  /* ------------------------ Edition & sauvegarde ------------------------ */
-  const startEditShipping = (idx) => setEditShipIdx(idx);
-
-  const deliveryEditInitial =
-    editShipIdx !== null ? toForm(deliveryLst[editShipIdx], currentCustomer) : null;
-  const billingEditInitial = toForm(billingAddress, currentCustomer);
-
-  const save = async (form, meta) => {
-    const { type, mode } = meta;
-    const payload = toPayload(form, currentCustomer, type);
-
-    if (type === "billing") {
-      if (mode === "add") await dispatch(addBillingAddressRequest(payload));
-      else await dispatch(updateBillingAddressRequest(payload));
-      await dispatch(getBillingAddressRequest());
-      setShowEditBilling(false);
-    } else {
-      if (mode === "add") await dispatch(addDeliveryAddressRequest(payload));
-      else await dispatch(updateDeliveryAddressRequest(payload));
+              ))
+        ) || relayRates[0]
+      );
+    }, [relayRates, relayOperator]);
+  
+    const shippingPrice = useMemo(() => {
+      if (deliveryMode === "relay") return Number(selectedRelayRate?.priceTtc ?? 0);
+      const o = homeRates.find((r) => r.code === selectedRateCode) || homeRates[0];
+      return Number(o?.priceTtc ?? 0);
+    }, [deliveryMode, selectedRelayRate, homeRates, selectedRateCode]);
+  
+    const grandTotal = +(baseTotal + shippingPrice).toFixed(2);
+  
+    /* ------------ Choisir une adresse dans le carnet (favorite) ------------ */
+    const chooseFromBook = async (idx) => {
+      const a = deliveryLst[idx];
+      if (!a) return;
+      const id = a?.id ?? a?.deliveryAddressId ?? a?.Id ?? null;
+      if (!id) return;
+  
+      await dispatch(
+        updateDeliveryAddressRequest({
+          Id: id,
+          IdCustomer: currentCustomer?.id,
+          Favorite: true,
+        })
+      );
       await dispatch(getDeliveryAddressRequest());
-      setEditShipIdx(null);
-    }
-  };
-
-  const chosenRate =
-    deliveryMode === "relay"
-      ? selectedRelayRate || relayRates[0] || null
-      : homeRates.find((r) => r.code === selectedRateCode) || homeRates[0] || null;
-
-  const operatorCode = carrierToOperator(chosenRate?.carrier, selectedRelay?.network);
-  const serviceCode = chosenRate?.code || "";
-  const shippingCodesMissing = !operatorCode || !serviceCode;
-
-  const today = new Date().toISOString().slice(0, 10);
-  const toIsRelay = deliveryMode === "relay";
-  const toAddressLine = deliveryFavoriteAddress?.address || "";
-  const toZip = String(deliveryFavoriteAddress?.postalCode || "");
-  const toCity = deliveryFavoriteAddress?.city || "";
-  const toCountry = "FR";
-
-  const pickupPointCode = toIsRelay ? String(selectedRelay?.id || "") : null;
-  const declaredValue = Number(baseTotal) || 0;
-
-  /* --------------------------------- STRIPE -------------------------------- */
-
-  const buildCheckoutPayload = () => {
-    const currentCustomerId = currentCustomer?.id;
-    if (!currentCustomerId) {
-      alert("Veuillez vous connecter pour finaliser votre commande.");
-      return null;
-    }
-
-    const chosenRateLocal =
+  
+      try {
+        const parts = [];
+        if (a?.address) parts.push(a.address);
+        const cityPart = [a?.postalCode, a?.city].filter(Boolean).join(" ");
+        if (cityPart) parts.push(cityPart);
+        const country = a?.country || "FR";
+        if (country) parts.push(country);
+        const line = parts.join(", ");
+        if (line) setRelayFullAddress(line);
+      } catch {}
+      setShowBook(false);
+    };
+  
+    /* ------------------------ Edition & sauvegarde ------------------------ */
+    const startEditShipping = (idx) => setEditShipIdx(idx);
+  
+    // Modes add/edit
+    const deliveryEditInitial =
+      editShipIdx !== null
+        ? toForm(editShipIdx >= 0 ? deliveryLst[editShipIdx] : null, currentCustomer)
+        : null;
+    const deliveryEditMode = editShipIdx === null ? null : editShipIdx === -1 ? "add" : "edit";
+  
+    const billingEditInitial = toForm(billingAddress, currentCustomer);
+    const billingEditMode = billingAddress ? "edit" : "add";
+  
+    const save = async (form, meta) => {
+      const { type, mode } = meta;
+      const payload = toPayload(form, currentCustomer, type);
+  
+      if (type === "billing") {
+        if (mode === "add") await dispatch(addBillingAddressRequest(payload));
+        else await dispatch(updateBillingAddressRequest(payload));
+        await dispatch(getBillingAddressRequest());
+        setShowEditBilling(false);
+      } else {
+        if (mode === "add") await dispatch(addDeliveryAddressRequest(payload));
+        else await dispatch(updateDeliveryAddressRequest(payload));
+        await dispatch(getDeliveryAddressRequest());
+        setEditShipIdx(null);
+      }
+    };
+  
+    const chosenRate =
       deliveryMode === "relay"
         ? selectedRelayRate || relayRates[0] || null
         : homeRates.find((r) => r.code === selectedRateCode) || homeRates[0] || null;
-
-    if (!chosenRateLocal) {
-      alert("Veuillez choisir un mode de livraison.");
-      return null;
-    }
-    if (deliveryMode === "relay" && !selectedRelay) {
-      alert("Choisissez un point relais.");
-      return null;
-    }
-
-    return {
-      Shipment: {
-        Packages: packages,
-        toAddress: {
-          type: "particulier",
-          contact: {
-            email: currentCustomer?.email,
-            phone: String(deliveryFavoriteAddress?.phone),
-            lastName: deliveryFavoriteAddress?.lastName,
-            firstName: deliveryFavoriteAddress?.firstName,
-            civility: currentCustomer?.civilite,
-          },
-          location: {
-            city: deliveryFavoriteAddress?.city,
-            street: deliveryFavoriteAddress?.address,
-            postalCode: String(deliveryFavoriteAddress?.postalCode),
-            countryIsoCode: "FR",
+  
+    const operatorCode = carrierToOperator(chosenRate?.carrier, selectedRelay?.network);
+    const serviceCode = chosenRate?.code || "";
+    const shippingCodesMissing = !operatorCode || !serviceCode;
+  
+    const today = new Date().toISOString().slice(0, 10);
+    const toIsRelay = deliveryMode === "relay";
+    const toAddressLine = deliveryFavoriteAddress?.address || "";
+    const toZip = String(deliveryFavoriteAddress?.postalCode || "");
+    const toCity = deliveryFavoriteAddress?.city || "";
+    const toCountry = "FR";
+  
+    const pickupPointCode = toIsRelay ? String(selectedRelay?.id || "") : null;
+    const declaredValue = Number(baseTotal) || 0;
+  
+    /* --------------------------------- STRIPE -------------------------------- */
+  
+    const buildCheckoutPayload = () => {
+      const currentCustomerId = currentCustomer?.id;
+      if (!currentCustomerId) {
+        alert("Veuillez vous connecter pour finaliser votre commande.");
+        return null;
+      }
+  
+      const chosenRateLocal =
+        deliveryMode === "relay"
+          ? selectedRelayRate || relayRates[0] || null
+          : homeRates.find((r) => r.code === selectedRateCode) || homeRates[0] || null;
+  
+      if (!chosenRateLocal) {
+        alert("Veuillez choisir un mode de livraison.");
+        return null;
+      }
+      if (deliveryMode === "relay" && !selectedRelay) {
+        alert("Choisissez un point relais.");
+        return null;
+      }
+  
+      return {
+        Shipment: {
+          Packages: packages,
+          toAddress: {
+            type: "particulier",
+            contact: {
+              email: currentCustomer?.email,
+              phone: String(deliveryFavoriteAddress?.phone),
+              lastName: deliveryFavoriteAddress?.lastName,
+              firstName: deliveryFavoriteAddress?.firstName,
+              civility: currentCustomer?.civilite,
+            },
+            location: {
+              city: deliveryFavoriteAddress?.city,
+              street: deliveryFavoriteAddress?.address,
+              postalCode: String(deliveryFavoriteAddress?.postalCode),
+              countryIsoCode: "FR",
+            },
           },
         },
-      },
-
-      Insured: false,
-      LabelType: "PDF_A4",
-      ShippingOfferCode: serviceCode,
-      ExpectedTakingOverDate: today,
-
-      CustomerId: currentCustomerId,
-      CustomerNumber: currentCustomer?.clientNumber,
-      Amount: Number(grandTotal),
-      DeliveryAmount: shippingPrice,
-      PaymentMethod: "carte",
-      DeliveryMode: deliveryMode,
-      UseCodes: promoUseCodes,
-      ContentDescription: "Object high tech",
-      ServiceCode: serviceCode,
-      OperatorCode: operatorCode,
-      PickupPointCode: pickupPointCode,
-      DropOffPointCode: chosenRateLocal?.dropOffPointCodes?.[0] || null,
-
-      OrderCustomerProducts: readLsItems().map((it) => ({
-        ProductId: getPid(it),
-        CustomerId: Number(currentCustomerId),
-        Quantity: getQty(it),
-        ProductUnitPrice: it.price,
-      })),
+  
+        Insured: false,
+        LabelType: "PDF_A4",
+        ShippingOfferCode: serviceCode,
+        ExpectedTakingOverDate: today,
+  
+        CustomerId: currentCustomerId,
+        CustomerNumber: currentCustomer?.clientNumber,
+        Amount: Number(grandTotal),
+        DeliveryAmount: shippingPrice,
+        PaymentMethod: "carte",
+        DeliveryMode: deliveryMode,
+        UseCodes: promoUseCodes,
+        ContentDescription: "Object high tech",
+        ServiceCode: serviceCode,
+        OperatorCode: operatorCode,
+        PickupPointCode: pickupPointCode,
+        DropOffPointCode: chosenRateLocal?.dropOffPointCodes?.[0] || null,
+  
+        OrderCustomerProducts: readLsItems().map((it) => ({
+          ProductId: getPid(it),
+          CustomerId: Number(currentCustomerId),
+          Quantity: getQty(it),
+          ProductUnitPrice: it.price,
+        })),
+      };
     };
-  };
-
-  const handleStripePay = () => {
-    if (shippingCodesMissing) {
-      console.warn("operator/service manquants", { operatorCode, serviceCode, chosenRate, selectedRelay });
-      alert("Impossible de déterminer l’opérateur ou le service pour l’expédition.");
-      return;
-    }
-    const payload = buildCheckoutPayload();
-    if (!payload) return;
-    dispatch(createCheckoutSessionRequest(payload));
-  };
-
-  // vider le panier côté front si payment.confirmed (webhook a déjà tout fait côté back)
-  useEffect(() => {
-    if (paymentConfirmed) {
-      dispatch(saveCartRequest([]));
-      localStorage.setItem("items", "[]");
-    }
-  }, [paymentConfirmed, dispatch]);
-
-  const RELAY_LIST_MIN_HEIGHT = 340;
-  const RELAY_LIST_MAX_HEIGHT = 540;
-
-  const uniqueHomeRates = useMemo(() => {
-    const seen = new Set();
-    return (homeRates || []).filter((r) => {
-      const k = `${r.carrier}|${r.code}|${r.label}|${r.priceTtc}`;
-      if (seen.has(k)) return false;
-      seen.add(k);
-      return true;
-    });
-  }, [homeRates]);
-
-  return (
-    <div className="product-page dp-page" style={{ maxWidth: 1200 }}>
-      {/* ==================== SECTION LIVRAISON ==================== */}
-      <h2 className="section-title" style={{ textAlign: "left" }}>
-        Livraison
-      </h2>
-
-      <div
-        className="new-grid"
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: 16,
-          marginBottom: 18,
-        }}
-      >
-        {/* ----- À domicile ----- */}
-        <section className="category-card" style={{ padding: 16 }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              marginBottom: 8,
-            }}
-          >
-            <input
-              type="radio"
-              name="deliv"
-              checked={deliveryMode === "home"}
-              onChange={() => {
-                setDeliveryMode("home");
-                setSelectedRelay(null);
-              }}
-            />
-            <h3 style={{ margin: 0 }}>À domicile</h3>
-            <span style={chipMuted}>Tarifs en direct</span>
-          </div>
-
-          <div style={smallTitle}>Votre adresse de livraison préférée</div>
-          <div style={addressWrap}>
-            <div style={{ flex: 1 }}>
-              {deliveryFavoriteAddress ? (
-                <>
-                  <div style={{ fontWeight: 800 }}>
-                    {deliveryFavoriteAddress.firstName} {deliveryFavoriteAddress.lastName}
-                  </div>
-                  <div>{deliveryFavoriteAddress.address}</div>
-                  {deliveryFavoriteAddress.complementaryAddress && (
-                    <div>{deliveryFavoriteAddress.complementaryAddress}</div>
-                  )}
-                  <div>
-                    {deliveryFavoriteAddress.postalCode} {deliveryFavoriteAddress.city}
-                  </div>
-                  <div>{deliveryFavoriteAddress.country}</div>
-                  {deliveryFavoriteAddress.phone && (
-                    <div style={{ color: "#6b7280" }}>
-                      {deliveryFavoriteAddress.phone}
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div style={{ color: "#6b7280" }}>
-                  Aucune adresse de livraison préférée.
-                </div>
-              )}
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <button style={lightBtn} onClick={() => setShowBook(true)}>
-                Changer
-              </button>
-              <button style={lightBtn} onClick={() => setEditShipIdx(0)} hidden />
-            </div>
-          </div>
-
-          {/* Offres domicile */}
-          <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
-            {ratesLoading && (
-              <div style={{ color: "#6b7280" }}>Chargement des offres…</div>
-            )}
-            {!ratesLoading && uniqueHomeRates.length === 0 && (
-              <div style={{ color: "#6b7280" }}>
-                Aucune offre disponible pour cette adresse.
-              </div>
-            )}
-            {!ratesLoading &&
-              uniqueHomeRates.map((o, i) => (
-                <ShipOption
-                  key={`${o.carrier || "carrier"}-${o.code}-${o.label || ""}-${o.priceTtc}-${i}`}
-                  value={o.code}
-                  price={fmt(o.priceTtc)}
-                  label={`${o.carrier} — ${o.label}`}
-                  checked={selectedRateCode === o.code && deliveryMode === "home"}
-                  onChange={() => {
-                    setSelectedRateCode(o.code);
-                    setDeliveryMode("home");
-                    setSelectedRelay(null);
-                  }}
-                />
-              ))}
-          </div>
-        </section>
-
-        {/* ----- En point relais ----- */}
-        <section className="category-card" style={{ padding: 16 }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              marginBottom: 8,
-            }}
-          >
-            <input
-              type="radio"
-              name="deliv"
-              checked={deliveryMode === "relay"}
-              onChange={() => setDeliveryMode("relay")}
-            />
-            <h3 style={{ margin: 0 }}>En point relais</h3>
-            <span style={chipMuted}>Adresse en une ligne</span>
-          </div>
-
-          <div
-            style={{
-              color: "#2563eb",
-              fontWeight: 800,
-              fontSize: 12,
-              marginBottom: 6,
-            }}
-          >
-            Recherche par adresse
-          </div>
-
-          {/* <<< LIGNE DE RECHERCHE RELAIS >>> */}
-          <div
-            className="relay-search"
-            style={{
-              display: "grid",
-              gridTemplateColumns: "minmax(350px, 1fr) 60px",
-              gap: 12,
-              alignItems: "end",
-            }}
-          >
-            <div className="relay-address-input">
-              <Field label="Adresse complète">
-                <AddressAutocomplete
-                  value=""
-                  onChangeText={setRelayFullAddress}
-                  onSelect={(addr) => {
-                    const line = [
-                      makeStreetLine(addr),
-                      [addr.postcode, addr.city].filter(Boolean).join(" "),
-                    ]
-                      .filter(Boolean)
-                      .join(", ");
-                    setRelayFullAddress(line);
-                    const parsed = parseRelayAddress(line, { countryIso: "FR" });
-                    setDeliveryMode("relay");
-                    dispatch(
-                      getRelaysByAddressRequest({
-                        number: parsed.number || undefined,
-                        street: parsed.street || undefined,
-                        city: parsed.city || undefined,
-                        postalCode: parsed.postalCode || undefined,
-                        state: parsed.state || undefined,
-                        countryIsoCode: parsed.countryIsoCode || "FR",
-                        limit: 30,
-                      })
-                    );
-                  }}
-                  placeholder="ex: 4 bd des Capucines, 75009 Paris"
-                />
-              </Field>
-            </div>
-            <div style={{ display: "flex", alignItems: "end" }}>
-              <button className="dp-btn-light relay-ok" onClick={fetchRelaysByAddress}>
-                OK
-              </button>
-            </div>
-          </div>
-
-          {displayedRelaysLoading && (
-            <div style={{ color: "#6b7280", marginTop: 10 }}>
-              Recherche des relais…
-            </div>
-          )}
-
-          {!displayedRelaysLoading && displayedRelays.length > 0 && (
+  
+    const handleStripePay = () => {
+      // 🔒 0) Vérifier les adresses avant tout
+      const missing = [];
+      if (!hasDelivery) missing.push("delivery");
+      if (!hasBilling) missing.push("billing");
+      if (missing.length > 0) {
+        setMissingKind(missing.length === 2 ? "both" : missing[0]);
+        setShowMissingModal(true);
+        return;
+      }
+  
+      // 1) Vérifs expédition
+      if (shippingCodesMissing) {
+        console.warn("operator/service manquants", {
+          operatorCode,
+          serviceCode,
+          chosenRate,
+          selectedRelay,
+        });
+        alert("Impossible de déterminer l’opérateur ou le service pour l’expédition.");
+        return;
+      }
+  
+      // 2) Payload Stripe
+      const payload = buildCheckoutPayload();
+      if (!payload) return;
+      dispatch(createCheckoutSessionRequest(payload));
+    };
+  
+    // vider le panier côté front si payment.confirmed (webhook a déjà tout fait côté back)
+    useEffect(() => {
+      if (paymentConfirmed) {
+        dispatch(saveCartRequest([]));
+        localStorage.setItem("items", "[]");
+      }
+    }, [paymentConfirmed, dispatch]);
+  
+    const RELAY_LIST_MIN_HEIGHT = 340;
+    const RELAY_LIST_MAX_HEIGHT = 540;
+  
+    const uniqueHomeRates = useMemo(() => {
+      const seen = new Set();
+      return (homeRates || []).filter((r) => {
+        const k = `${r.carrier}|${r.code}|${r.label}|${r.priceTtc}`;
+        if (seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      });
+    }, [homeRates]);
+  
+    return (
+      <div className="product-page dp-page" style={{ maxWidth: 1200 }}>
+        {/* ==================== SECTION LIVRAISON ==================== */}
+        <h2 className="section-title" style={{ textAlign: "left" }}>
+          Livraison
+        </h2>
+  
+        <div
+          className="new-grid"
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: 16,
+            marginBottom: 18,
+          }}
+        >
+          {/* ----- À domicile ----- */}
+          <section className="category-card" style={{ padding: 16 }}>
             <div
               style={{
-                marginTop: 12,
-                display: "grid",
-                gap: 12,
-                minHeight: RELAY_LIST_MIN_HEIGHT,
-                maxHeight: RELAY_LIST_MAX_HEIGHT,
-                overflow: "auto",
-                paddingRight: 4,
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                marginBottom: 8,
               }}
             >
-              {displayedRelays.map((r) => (
-                <label
-                  key={r.id}
-                  style={{
-                    border: "1px solid #e5e7eb",
-                    borderRadius: 12,
-                    padding: 12,
-                    display: "grid",
-                    gap: 6,
-                    background: "#fff",
-                    cursor: "pointer",
-                  }}
-                  onClick={() => {
-                    setSelectedRelay(r);
-                    setDeliveryMode("relay");
-                  }}
-                >
-                  <input
-                    type="radio"
-                    name="relay"
-                    value={r.id}
-                    checked={String(selectedRelay?.id || "") === r.id}
+              <input
+                type="radio"
+                name="deliv"
+                checked={deliveryMode === "home"}
+                onChange={() => {
+                  setDeliveryMode("home");
+                  setSelectedRelay(null);
+                }}
+              />
+              <h3 style={{ margin: 0 }}>À domicile</h3>
+              <span style={chipMuted}>Tarifs en direct</span>
+            </div>
+  
+            <div style={smallTitle}>Votre adresse de livraison préférée</div>
+            <div style={addressWrap}>
+              <div style={{ flex: 1 }}>
+                {deliveryFavoriteAddress ? (
+                  <>
+                    <div style={{ fontWeight: 800 }}>
+                      {deliveryFavoriteAddress.firstName} {deliveryFavoriteAddress.lastName}
+                    </div>
+                    <div>{deliveryFavoriteAddress.address}</div>
+                    {deliveryFavoriteAddress.complementaryAddress && (
+                      <div>{deliveryFavoriteAddress.complementaryAddress}</div>
+                    )}
+                    <div>
+                      {deliveryFavoriteAddress.postalCode} {deliveryFavoriteAddress.city}
+                    </div>
+                    <div>{deliveryFavoriteAddress.country}</div>
+                    {deliveryFavoriteAddress.phone && (
+                      <div style={{ color: "#6b7280" }}>{deliveryFavoriteAddress.phone}</div>
+                    )}
+                  </>
+                ) : (
+                  <div style={{ color: "#6b7280" }}>
+                    Aucune adresse de livraison préférée.
+                  </div>
+                )}
+              </div>
+  
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <button style={lightBtn} onClick={() => setShowBook(true)}>
+                  Changer
+                </button>
+                <button style={lightBtn} onClick={() => setEditShipIdx(-1)}>
+                  Ajouter
+                </button>
+              </div>
+            </div>
+  
+            {/* Offres domicile */}
+            <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
+              {ratesLoading && (
+                <div style={{ color: "#6b7280" }}>Chargement des offres…</div>
+              )}
+              {!ratesLoading && uniqueHomeRates.length === 0 && (
+                <div style={{ color: "#6b7280" }}>
+                  Aucune offre disponible pour cette adresse.
+                </div>
+              )}
+              {!ratesLoading &&
+                uniqueHomeRates.map((o, i) => (
+                  <ShipOption
+                    key={`${o.carrier || "carrier"}-${o.code}-${o.label || ""}-${o.priceTtc}-${i}`}
+                    value={o.code}
+                    price={fmt(o.priceTtc)}
+                    label={`${o.carrier} — ${o.label}`}
+                    checked={selectedRateCode === o.code && deliveryMode === "home"}
                     onChange={() => {
+                      setSelectedRateCode(o.code);
+                      setDeliveryMode("home");
+                      setSelectedRelay(null);
+                    }}
+                  />
+                ))}
+            </div>
+          </section>
+  
+          {/* ----- En point relais ----- */}
+          <section className="category-card" style={{ padding: 16 }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                marginBottom: 8,
+              }}
+            >
+              <input
+                type="radio"
+                name="deliv"
+                checked={deliveryMode === "relay"}
+                onChange={() => setDeliveryMode("relay")}
+              />
+              <h3 style={{ margin: 0 }}>En point relais</h3>
+              <span style={chipMuted}>Adresse en une ligne</span>
+            </div>
+  
+            <div
+              style={{
+                color: "#2563eb",
+                fontWeight: 800,
+                fontSize: 12,
+                marginBottom: 6,
+              }}
+            >
+              Recherche par adresse
+            </div>
+  
+            {/* <<< LIGNE DE RECHERCHE RELAIS >>> */}
+            <div
+              className="relay-search"
+              style={{
+                display: "grid",
+                gridTemplateColumns: "minmax(350px, 1fr) 60px",
+                gap: 12,
+                alignItems: "end",
+              }}
+            >
+              <div className="relay-address-input">
+                <Field label="Adresse complète">
+                  <AddressAutocomplete
+                    value=""
+                    onChangeText={setRelayFullAddress}
+                    onSelect={(addr) => {
+                      const line = [
+                        makeStreetLine(addr),
+                        [addr.postcode, addr.city].filter(Boolean).join(" "),
+                      ]
+                        .filter(Boolean)
+                        .join(", ");
+                      setRelayFullAddress(line);
+                      const parsed = parseRelayAddress(line, { countryIso: "FR" });
+                      setDeliveryMode("relay");
+                      dispatch(
+                        getRelaysByAddressRequest({
+                          number: parsed.number || undefined,
+                          street: parsed.street || undefined,
+                          city: parsed.city || undefined,
+                          postalCode: parsed.postalCode || undefined,
+                          state: parsed.state || undefined,
+                          countryIsoCode: parsed.countryIsoCode || "FR",
+                          limit: 30,
+                        })
+                      );
+                    }}
+                    placeholder="ex: 4 bd des Capucines, 75009 Paris"
+                  />
+                </Field>
+              </div>
+              <div style={{ display: "flex", alignItems: "end" }}>
+                <button className="dp-btn-light relay-ok" onClick={fetchRelaysByAddress}>
+                  OK
+                </button>
+              </div>
+            </div>
+  
+            {displayedRelaysLoading && (
+              <div style={{ color: "#6b7280", marginTop: 10 }}>
+                Recherche des relais…
+              </div>
+            )}
+  
+            {!displayedRelaysLoading && displayedRelays.length > 0 && (
+              <div
+                style={{
+                  marginTop: 12,
+                  display: "grid",
+                  gap: 12,
+                  minHeight: RELAY_LIST_MIN_HEIGHT,
+                  maxHeight: RELAY_LIST_MAX_HEIGHT,
+                  overflow: "auto",
+                  paddingRight: 4,
+                }}
+              >
+                {displayedRelays.map((r) => (
+                  <label
+                    key={r.id}
+                    style={{
+                      border: "1px solid #e5e7eb",
+                      borderRadius: 12,
+                      padding: 12,
+                      display: "grid",
+                      gap: 6,
+                      background: "#fff",
+                      cursor: "pointer",
+                    }}
+                    onClick={() => {
                       setSelectedRelay(r);
                       setDeliveryMode("relay");
                     }}
-                  />
-                  <span>
-                    <img
-                      src={getRelayLogo(r)}
-                      style={{ width: 45 }}
-                      alt={r.carrier || r.network || "relay"}
+                  >
+                    <input
+                      type="radio"
+                      name="relay"
+                      value={r.id}
+                      checked={String(selectedRelay?.id || "") === r.id}
+                      onChange={() => {
+                        setSelectedRelay(r);
+                        setDeliveryMode("relay");
+                      }}
                     />
-                  </span>
-                  <strong>
-                    {r.name} <span style={{ color: "#6b7280" }}>({r.distance})</span>
-                  </strong>
-                  <span>{r.address}</span>
-                  <span>
-                    {r.zip} {r.city}
-                  </span>
-                  {r.schedules && (
                     <span>
-                      <strong>{r.schedules}</strong>
+                      <img
+                        src={getRelayLogo(r)}
+                        style={{ width: 45 }}
+                        alt={r.carrier || r.network || "relay"}
+                      />
                     </span>
-                  )}
-                </label>
-              ))}
-            </div>
-          )}
-
-          {selectedRelay && deliveryMode === "relay" && (
-            <div style={{ marginTop: 8, fontSize: 12, color: "#2563eb" }}>
-              Point relais sélectionné : <b>{selectedRelay.name}</b>
-              {selectedRelayRate && (
+                    <strong>
+                      {r.name} <span style={{ color: "#6b7280" }}>({r.distance})</span>
+                    </strong>
+                    <span>{r.address}</span>
+                    <span>
+                      {r.zip} {r.city}
+                    </span>
+                    {r.schedules && (
+                      <span>
+                        <strong>{r.schedules}</strong>
+                      </span>
+                    )}
+                  </label>
+                ))}
+              </div>
+            )}
+  
+            {selectedRelay && deliveryMode === "relay" && (
+              <div style={{ marginTop: 8, fontSize: 12, color: "#2563eb" }}>
+                Point relais sélectionné : <b>{selectedRelay.name}</b>
+                {selectedRelayRate && (
+                  <>
+                    {" "}
+                    — tarif <b>{fmt(selectedRelayRate.priceTtc)}</b>
+                  </>
+                )}
+              </div>
+            )}
+          </section>
+        </div>
+  
+        {/* ==================== ADRESSE DE FACTURATION ==================== */}
+        <div
+          className="category-card"
+          style={{ padding: 16, marginBottom: 18, display: "grid", gap: 8 }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <i className="bi bi-file-earmark-text" aria-hidden="true" />
+            <div style={{ fontWeight: 800 }}>Votre adresse de facturation</div>
+          </div>
+  
+          <div style={addressWrap}>
+            <div style={{ flex: 1 }}>
+              {billingAddress ? (
                 <>
-                  {" "}
-                  — tarif <b>{fmt(selectedRelayRate.priceTtc)}</b>
+                  <div style={{ fontWeight: 800 }}>
+                    {currentCustomer.firstName} {currentCustomer.lastName} —{" "}
+                    {billingAddress.address}
+                    {billingAddress.complementaryAddress
+                      ? `, ${billingAddress.complementaryAddress}`
+                      : ""}
+                  </div>
+                  <div>
+                    {billingAddress.postalCode} {billingAddress.city} — {billingAddress.country}
+                  </div>
+                  <div>{currentCustomer.phoneNumber}</div>
                 </>
+              ) : (
+                <div style={{ color: "#6b7280" }}>Aucune adresse de facturation.</div>
               )}
             </div>
-          )}
-        </section>
-      </div>
-
-      {/* ==================== ADRESSE DE FACTURATION ==================== */}
-      <div
-        className="category-card"
-        style={{ padding: 16, marginBottom: 18, display: "grid", gap: 8 }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <i className="bi bi-file-earmark-text" aria-hidden="true" />
-          <div style={{ fontWeight: 800 }}>Votre adresse de facturation</div>
+  
+            <div style={{ display: "flex", gap: 8 }}>
+              <button style={lightBtn} onClick={() => setShowEditBilling(true)}>
+                {billingAddress ? "Modifier" : "Ajouter"}
+              </button>
+            </div>
+          </div>
         </div>
-
-        <div style={addressWrap}>
-          <div style={{ flex: 1 }}>
-            {billingAddress ? (
-              <>
-                <div style={{ fontWeight: 800 }}>
-                  {currentCustomer.firstName} {currentCustomer.lastName} —{" "}
-                  {billingAddress.address}
-                  {billingAddress.complementaryAddress
-                    ? `, ${billingAddress.complementaryAddress}`
-                    : ""}
-                </div>
-                <div>
-                  {billingAddress.postalCode} {billingAddress.city} — {billingAddress.country}
-                </div>
-                <div>{currentCustomer.phoneNumber}</div>
-              </>
-            ) : (
-              <div style={{ color: "#6b7280" }}>Aucune adresse de facturation.</div>
+  
+        {/* ==================== PAIEMENT + RÉCAP ==================== */}
+        <h2 className="section-title" style={{ textAlign: "left" }}>
+          Paiement
+        </h2>
+  
+        <div
+          className="pay-grid"
+          style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: 18 }}
+        >
+          {/* Carte bancaire */}
+          <section className="category-card" style={{ padding: 16 }}>
+            <label className="pay-method" style={payMethodRow}>
+              <input type="radio" name="pay" checked readOnly />
+              <span style={{ fontWeight: 800 }}>Carte bancaire</span>
+              <span aria-hidden="true">💳</span>
+            </label>
+  
+            <>
+              <div style={stripeInfo}>
+                Paiement sécurisé via Stripe. Vous serez redirigé pour renseigner votre carte.
+              </div>
+              <button className="dp-pay-btn" onClick={handleStripePay}>
+                Payer ma commande
+              </button>
+            </>
+  
+            {paymentConfirmed && (
+              <div style={{ marginTop: 10, color: "#16a34a", fontWeight: 700 }}>
+                ✅ Paiement confirmé. Votre commande est en cours de préparation !
+              </div>
+            )}
+          </section>
+  
+          {/* Récapitulatif */}
+          <aside className="cart-summary" style={summaryCard}>
+            <h3 style={{ margin: 0, fontWeight: 800 }}>Récapitulatif</h3>
+  
+            <div style={sumRow}>
+              <span>Montant de vos produits</span>
+              <strong>{fmt(baseTotal)}</strong>
+            </div>
+  
+            <div style={sumRow}>
+              <span>Livraison</span>
+              <strong>{fmt(shippingPrice)}</strong>
+            </div>
+  
+            <hr style={{ border: 0, borderTop: "1px solid #eee" }} />
+  
+            <div style={{ ...sumRow, fontSize: "1.25rem" }}>
+              <span>Total TTC</span>
+              <strong>{fmt(grandTotal)}</strong>
+            </div>
+  
+            <div style={{ marginTop: 10, color: "#6b7280", fontSize: ".9rem" }}>
+              Livraison {deliveryMode === "relay" ? "en point relais" : "à domicile"}.
+            </div>
+          </aside>
+        </div>
+  
+        {/* ==================== POPUPS ==================== */}
+        <AddressBookModal
+          open={showBook}
+          addresses={deliveryLst}
+          onChoose={chooseFromBook}
+          onEdit={startEditShipping}
+          onClose={() => setShowBook(false)}
+        />
+  
+        {/* Modale adresses manquantes */}
+        <SimpleModal
+          open={showMissingModal}
+          onClose={() => setShowMissingModal(false)}
+          title="Adresse(s) requise(s)"
+          footer={[
+            (missingKind === "delivery" || missingKind === "both") && (
+              <button
+                key="go-delivery"
+                style={primaryBtn}
+                onClick={() => {
+                  setShowMissingModal(false);
+                  setEditShipIdx(-1); // ajout livraison
+                }}
+              >
+                Configurer livraison
+              </button>
+            ),
+            (missingKind === "billing" || missingKind === "both") && (
+              <button
+                key="go-billing"
+                style={primaryBtn}
+                onClick={() => {
+                  setShowMissingModal(false);
+                  setShowEditBilling(true);
+                }}
+              >
+                Configurer facturation
+              </button>
+            ),
+            <button key="close" style={lightBtn} onClick={() => setShowMissingModal(false)}>
+              Fermer
+            </button>,
+          ].filter(Boolean)}
+        >
+          <div style={{ display: "grid", gap: 8 }}>
+            {missingKind === "both" && (
+              <p>
+                Pour poursuivre le paiement, merci de renseigner <b>une adresse de livraison</b> et{" "}
+                <b>une adresse de facturation</b>.
+              </p>
+            )}
+            {missingKind === "delivery" && (
+              <p>
+                Pour poursuivre le paiement, merci de renseigner <b>une adresse de livraison</b>.
+              </p>
+            )}
+            {missingKind === "billing" && (
+              <p>
+                Pour poursuivre le paiement, merci de renseigner <b>une adresse de facturation</b>.
+              </p>
             )}
           </div>
-
-          <button style={lightBtn} onClick={() => setShowEditBilling(true)}>
-            Modifier
-          </button>
-        </div>
+        </SimpleModal>
+  
+        {/* Édition Livraison (add/edit selon editShipIdx) */}
+        <AddressFormModal
+          open={editShipIdx !== null}
+          initial={deliveryEditInitial || toForm(null, currentCustomer)}
+          title={
+            deliveryEditMode === "add"
+              ? "Ajouter une adresse de livraison"
+              : "Modifier l’adresse de livraison"
+          }
+          type="delivery"
+          onSave={(f) => save(f, { type: "delivery", mode: deliveryEditMode || "edit" })}
+          onCancel={() => setEditShipIdx(null)}
+        />
+  
+        {/* Édition Facturation (add si aucune adresse) */}
+        <AddressFormModal
+          open={showEditBilling}
+          initial={billingEditInitial}
+          title={
+            billingEditMode === "add"
+              ? "Ajouter une adresse de facturation"
+              : "Modifier l’adresse de facturation"
+          }
+          type="billing"
+          onSave={(f) => save(f, { type: "billing", mode: billingEditMode })}
+          onCancel={() => setShowEditBilling(false)}
+        />
       </div>
+    );
+  };
 
-      {/* ==================== PAIEMENT + RÉCAP ==================== */}
-      <h2 className="section-title" style={{ textAlign: "left" }}>
-        Paiement
-      </h2>
 
-      <div
-        className="pay-grid"
-        style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: 18 }}
-      >
-        {/* Carte bancaire */}
-        <section className="category-card" style={{ padding: 16 }}>
-          <label className="pay-method" style={payMethodRow}>
-            <input type="radio" name="pay" checked readOnly />
-            <span style={{ fontWeight: 800 }}>Carte bancaire</span>
-            <span aria-hidden="true">💳</span>
-          </label>
 
-          <>
-            <div style={stripeInfo}>
-              Paiement sécurisé via Stripe. Vous serez redirigé pour renseigner votre carte.
-            </div>
-            <button className="dp-pay-btn" onClick={handleStripePay}>
-              Payer ma commande
-            </button>
-          </>
-
-          {paymentConfirmed && (
-            <div style={{ marginTop: 10, color: "#16a34a", fontWeight: 700 }}>
-              ✅ Paiement confirmé. Votre commande est en cours de préparation !
-            </div>
-          )}
-        </section>
-
-        {/* Récapitulatif */}
-        <aside className="cart-summary" style={summaryCard}>
-          <h3 style={{ margin: 0, fontWeight: 800 }}>Récapitulatif</h3>
-
-          <div style={sumRow}>
-            <span>Montant de vos produits</span>
-            <strong>{fmt(baseTotal)}</strong>
-          </div>
-
-          <div style={sumRow}>
-            <span>Livraison</span>
-            <strong>{fmt(shippingPrice)}</strong>
-          </div>
-
-          <hr style={{ border: 0, borderTop: "1px solid #eee" }} />
-
-          <div style={{ ...sumRow, fontSize: "1.25rem" }}>
-            <span>Total TTC</span>
-            <strong>{fmt(grandTotal)}</strong>
-          </div>
-
-          <div style={{ marginTop: 10, color: "#6b7280", fontSize: ".9rem" }}>
-            Livraison {deliveryMode === "relay" ? "en point relais" : "à domicile"}.
-          </div>
-        </aside>
-      </div>
-
-      {/* ==================== POPUPS ==================== */}
-      <AddressBookModal
-        open={showBook}
-        addresses={deliveryLst}
-        onChoose={chooseFromBook}
-        onEdit={startEditShipping}
-        onClose={() => setShowBook(false)}
-      />
-
-      {/* Édition Livraison */}
-      <AddressFormModal
-        open={editShipIdx !== null}
-        initial={deliveryEditInitial || toForm(null, currentCustomer)}
-        title="Modifier l’adresse de livraison"
-        type="delivery"
-        onSave={(f) => save(f, { type: "delivery", mode: "edit" })}
-        onCancel={() => setEditShipIdx(null)}
-      />
-
-      {/* Édition Facturation */}
-      <AddressFormModal
-        open={showEditBilling}
-        initial={billingEditInitial}
-        title="Modifier l’adresse de facturation"
-        type="billing"
-        onSave={(f) => save(f, { type: "billing", mode: "edit" })}
-        onCancel={() => setShowEditBilling(false)}
-      />
-    </div>
-  );
-};
-
-/* ------------------------------------------------------------------ */
+  /* ------------------------------------------------------------------ */
 /* ------------------------------ UI -------------------------------- */
 /* ------------------------------------------------------------------ */
 
@@ -1632,6 +1726,7 @@ function ShipOption({ value, label, sub, price, checked, onChange }) {
   );
 }
 
+/* Styles inline réutilisés (pour éviter les no-undef) */
 const addressWrap = {
   display: "flex",
   gap: 14,
@@ -1703,3 +1798,7 @@ const sumRow = {
   alignItems: "center",
   margin: "8px 0",
 };
+
+  
+
+

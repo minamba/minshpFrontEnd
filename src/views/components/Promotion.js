@@ -342,7 +342,7 @@ export const Promotion = () => {
                     <span className="price-old">
                       {priceRef.toLocaleString("fr-FR", { style: "currency", currency: "EUR" })}
                     </span>
-                    <div className="product-price product-price--promo">
+                    <div className="price product-price--promo">
                       <span className="euros">{euros}€</span>
                       <sup className="cents">{cents}</sup>
                     </div>
