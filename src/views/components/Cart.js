@@ -111,6 +111,21 @@ export const Cart = () => {
   const subCategories = useSelector((s) => s?.subCategories?.subCategories) || [];
   const stocks = useSelector((s) => s?.stocks?.stocks) || [];
 
+//je recupere le current user 
+  const { user } = useSelector((s) => s.account);
+  const customers = useSelector((s) => s?.customers?.customers) || [];
+  const uid = user?.id || null;
+  const currentCustomer = customers.find((c) => c.idAspNetUser === uid);
+
+
+  const customerPromotionCodes = useSelector((s) => s?.customerPromotionCodes?.customerPromotionCodes) || [];
+// garde TOUS les codes du client dans un tableau
+const currentCustomerPromotionCodes = (customerPromotionCodes || []).filter(
+  (cp) =>
+    String(cp?.idCutomer ?? cp?.idCustomer ?? cp?.IdCustomer) ===
+    String(currentCustomer?.id)
+);
+
   const payment = useSelector((s) => s?.payment) || {};
   const paymentConfirmed = !!payment.confirmed;
 
@@ -296,7 +311,24 @@ export const Cart = () => {
   const applyPromo = () => {
     const code = norm(promoInput);
     if (!code) return;
+  
+    // ⛔ Déjà utilisé par ce client ?
+    const getPromotionCode = promotionCodes.find((p) => norm(p?.name) === code)
 
+    const isCustomerUsedTheCode = currentCustomerPromotionCodes.find((cp) => cp.idPromotion === getPromotionCode.id)
+
+    console.log("isCustomerUsedTheCode",isCustomerUsedTheCode.isUsed)
+
+    if (isCustomerUsedTheCode.isUsed) {
+      setAppliedCode(null);
+      setPromoModal({
+        open: true,
+        variant: "warning",
+        message: "Ce code promo a déjà été utilisé !",
+      });
+      return; // on n'applique pas
+    }
+  
     if ((promotionCodes?.length ?? 0) === 0) {
       setPromoModal({
         open: true,
@@ -305,25 +337,13 @@ export const Cart = () => {
       });
       return;
     }
-
-    // Bloqué si déjà appliqué ailleurs
-    const alreadyAppliedSomewhere = items.some(
-      (it) => promoAppliedMap[String(it.id)] === code
-    );
-    if (alreadyAppliedSomewhere) {
-      setPromoModal({
-        open: true,
-        variant: "info",
-        message: "Ce code a déjà été appliqué à un produit de votre panier.",
-      });
-      return;
-    }
-
+  
+    // (le reste de ta fonction inchangé)
     const promo =
       promotionCodes.find(
         (p) => norm(p?.name) === code || norm(p?.code) === code || norm(p?.Code) === code
       ) || null;
-
+  
     if (!promo || !isPromoActive(promo)) {
       setAppliedCode(null);
       setPromoModal({
@@ -333,7 +353,7 @@ export const Cart = () => {
       });
       return;
     }
-
+  
     const pct = Number(promo.purcentage) || 0;
     if (pct <= 0) {
       setAppliedCode(null);
@@ -344,7 +364,7 @@ export const Cart = () => {
       });
       return;
     }
-
+  
     const promoId = promo.id ?? promo.idPromotionCode ?? promo.promoId;
     const promoCategoryId =
       promo?.idCategory ?? promo?.IdCategory ?? promo?.categoryId ?? null;
@@ -352,36 +372,31 @@ export const Cart = () => {
       promo?.idSubCategory ?? promo?.IdSubCategory ?? promo?.subCategoryId ?? null;
     const promoProductId =
       promo?.idProduct ?? promo?.IdProduct ?? promo?.productId ?? null;
-
+  
     const byCode = products
       .filter((p) => String(p?.idPromotionCode ?? p?.IdPromotionCode) === String(promoId))
       .map((p) => p.id);
-
+  
     const byCategory =
       promoCategoryId != null
         ? products
-            .filter(
-              (p) => String(getCategoryIdFromProduct(p)) === String(promoCategoryId)
-            )
+            .filter((p) => String(getCategoryIdFromProduct(p)) === String(promoCategoryId))
             .map((p) => p.id)
         : [];
-
+  
     const bySubCategory =
       promoSubCategoryId != null
         ? products
-            .filter(
-              (p) =>
-                String(getSubCategoryIdFromProduct(p)) === String(promoSubCategoryId)
-            )
+            .filter((p) => String(getSubCategoryIdFromProduct(p)) === String(promoSubCategoryId))
             .map((p) => p.id)
         : [];
-
+  
     const byDirectProduct = promoProductId != null ? [String(promoProductId)] : [];
-
+  
     const affectedProductIds = Array.from(
       new Set([...byCode, ...byCategory, ...bySubCategory, ...byDirectProduct].map(String))
     );
-
+  
     if (affectedProductIds.length === 0) {
       setAppliedCode(null);
       setPromoModal({
@@ -391,22 +406,18 @@ export const Cart = () => {
       });
       return;
     }
-
+  
     const updatedItems = [...items];
     const changedNames = [];
     const changedIds = [];
-
+  
     for (const it of items) {
       if (!affectedProductIds.includes(String(it.id))) continue;
-
+  
       const product = products.find((p) => String(p.id) === String(it.id));
-      const category = categories.find(
-        (p) => String(p.name) === String(product?.category)
-      );
-      const subCategory = subCategories.find(
-        (p) => String(p.id) === String(product?.idSubCategory)
-      );
-
+      const category = categories.find((p) => String(p.name) === String(product?.category));
+      const subCategory = subCategories.find((p) => String(p.id) === String(product?.idSubCategory));
+  
       let totalPurcentage = calculPriceForApplyPromoCode(
         product,
         promotions,
@@ -415,23 +426,20 @@ export const Cart = () => {
         subCategory
       );
       totalPurcentage += pct;
-
+  
       const base = Number(product?.price) || 0;
       let newPrice = base - (base * totalPurcentage) / 100;
       newPrice = newPrice + (newPrice * (product?.tva || 0)) / 100;
       newPrice = newPrice + (product?.taxWithoutTvaAmount || 0);
-
+  
       if (Math.abs((Number(product?.price) || 0) - newPrice) < 0.001) continue;
-
+  
       const idx = updatedItems.findIndex((u) => u.id === it.id);
       if (idx >= 0) updatedItems[idx] = { ...updatedItems[idx], price: newPrice };
-
+  
       if (usingRedux) {
         const orig =
-          reduxItems.find((i) => String(i.id) === String(it.id)) || {
-            id: it.id,
-            qty: it.qty,
-          };
+          reduxItems.find((i) => String(i.id) === String(it.id)) || { id: it.id, qty: it.qty };
         const updated = { ...orig, price: newPrice };
         dispatch(updateCartRequest(updated, it.qty));
         updateLsPrice(it.id, newPrice);
@@ -440,13 +448,13 @@ export const Cart = () => {
         setItems(next);
         persistLsItems(next);
       }
-
+  
       changedNames.push(it.name);
       changedIds.push(it.id);
     }
-
+  
     setItems(updatedItems);
-
+  
     if (changedNames.length > 0) {
       setAppliedCode(code);
       setPromoModal({
@@ -454,12 +462,10 @@ export const Cart = () => {
         message:
           changedNames.length === 1
             ? `Code promo appliqué sur le produit « ${changedNames[0]} ».`
-            : `Code promo appliqué sur ${changedNames.length} produits : ${changedNames.join(
-                ", "
-              )}.`,
+            : `Code promo appliqué sur ${changedNames.length} produits : ${changedNames.join(", ")}.`,
         variant: "success",
       });
-
+  
       const nextMap = { ...promoAppliedMap };
       for (const id of changedIds) nextMap[String(id)] = code;
       setPromoAppliedMap(nextMap);
@@ -473,6 +479,7 @@ export const Cart = () => {
       });
     }
   };
+  
 
   const subTotal = items.reduce((s, it) => s + it.price * it.qty, 0);
   const grandTotal = Math.max(0, subTotal);
