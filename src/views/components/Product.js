@@ -8,6 +8,7 @@ import { GenericModal } from '../../components/index';
 import { toMediaUrl } from '../../lib/utils/mediaUrl';
 import { getProductsPagedUserRequest } from "../../lib/actions/ProductActions"; // ✅ pagination
 import "../../styles/pages/product.css";
+import { calculPrice } from '../../lib/utils/Helpers';
 
 export const Product = () => {
   const { id } = useParams();
@@ -184,17 +185,19 @@ export const Product = () => {
     return +(priceRef * (1 - productPromoPct / 100)).toFixed(2);
   }, [activePromo, product, priceRef, productPromoPct]);
 
-  const displayPrice = useMemo(() => {
-    if (priceFromSubCategoryCode != null) {
-      return priceFromSubCategoryCode * (product?.tva / 100 + 1) + product?.taxWithoutTvaAmount;
-    } else if (priceFromCategoryCode != null && priceFromSubCategoryCode == null) {
-      return priceFromCategoryCode * (product?.tva / 100 + 1) + product?.taxWithoutTvaAmount;
-    } else if (priceHtPromoted != null && priceFromSubCategoryCode == null && priceFromCategoryCode == null) {
-      return priceHtPromoted * (product?.tva / 100 + 1) + product?.taxWithoutTvaAmount;
-    } else {
-      return price * (product?.tva / 100 + 1) + product?.taxWithoutTvaAmount;
-    }
-  }, [priceFromCategoryCode, discountedPriceProduct]); // (garde tes deps)
+  // const displayPrice = useMemo(() => {
+  //   if (priceFromSubCategoryCode != null) {
+  //     return priceFromSubCategoryCode * (product?.tva / 100 + 1) + product?.taxWithoutTvaAmount;
+  //   } else if (priceFromCategoryCode != null && priceFromSubCategoryCode == null) {
+  //     return priceFromCategoryCode * (product?.tva / 100 + 1) + product?.taxWithoutTvaAmount;
+  //   } else if (priceHtPromoted != null && priceFromSubCategoryCode == null && priceFromCategoryCode == null) {
+  //     return priceHtPromoted * (product?.tva / 100 + 1) + product?.taxWithoutTvaAmount;
+  //   } else {
+  //     return price * (product?.tva / 100 + 1) + product?.taxWithoutTvaAmount;
+  //   }
+  // }, [priceFromCategoryCode, discountedPriceProduct]); // (garde tes deps)
+
+  const displayPrice = calculPrice(product, promotionCodes);
 
   const badgePct = pctFromCategoryCode ?? productPromoPct;
   const showBadge = Number.isFinite(badgePct) && badgePct > 0;

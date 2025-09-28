@@ -34,8 +34,12 @@ export const SubCategory = () => {
   const prodState    = useSelector((s) => s.products) || {};
   const fullProducts = Array.isArray(prodState.products) ? prodState.products : [];
   const pagedItems   = Array.isArray(prodState.items)    ? prodState.items    : [];
+
   let productsAll  = fullProducts.length ? fullProducts : pagedItems;
   const loading      = !!prodState.loading;
+
+
+
 
   productsAll = productsAll.filter((p) => p.display === true);
 
@@ -141,6 +145,8 @@ export const SubCategory = () => {
     return productImages.length > 0 ? productImages[0].url : "/Images/placeholder.jpg";
   };
 
+  const promotionCodes  = useSelector((s) => s.promotionCodes?.promotionCodes) || [];
+
   // ---------- Sélection produits (si on a déjà une liste full en mémoire, on filtre côté client) ----------
   const subCategoryProducts = useMemo(() => {
     if (!routeSubCategoryId) return [];
@@ -202,7 +208,9 @@ export const SubCategory = () => {
         return toNumOrNull(dPrice);
       })();
 
-      const displayPrice = calculPrice(product);
+
+      const displayPrice = calculPrice(product, promotionCodes);
+      
       const hasAnyPromo  = priceCat != null || hasProductPromo;
 
       const creationTs = (() => {
@@ -215,7 +223,7 @@ export const SubCategory = () => {
 
       return { product, name, brand, priceRef, displayPrice, hasAnyPromo, discountRate, discountPct, creationTs };
     });
-  }, [subCategoryProducts]);
+  }, [subCategoryProducts, promotionCodes]);
 
   const filteredSorted = useMemo(() => {
     const q = search.trim().toLowerCase();

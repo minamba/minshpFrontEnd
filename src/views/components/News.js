@@ -30,6 +30,7 @@ export const News = () => {
   const prodState    = useSelector((s) => s.products) || {};
   const fullProducts = Array.isArray(prodState.products) ? prodState.products : [];
   const pagedItems   = Array.isArray(prodState.items)    ? prodState.items    : [];
+  const promotionCodes = useSelector((s) => s.promotionCodes?.promotionCodes) || [];
   let productsAll  = fullProducts.length ? fullProducts : pagedItems;
   productsAll = productsAll.filter((p) => p.display === true);
 
@@ -115,7 +116,7 @@ export const News = () => {
       );
 
       const codePrice = (subCatCodeVal ?? catCodeVal);
-      const displayPrice = calculPrice(product);
+      const displayPrice = calculPrice(product, promotionCodes);
       const hasAnyPromo  = (codePrice != null) || (productPromoPrice != null);
 
       const discountRate = priceRef > 0 ? (priceRef - displayPrice) / priceRef : 0;

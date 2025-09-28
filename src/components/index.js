@@ -1687,6 +1687,56 @@ export const GenericModal = ({
   );
 };
 
+
+//////////////////////// Indicateur de scroll sur tablette ////////////////////////
+
+export const ScrollHint = () => {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const mqTablet = window.matchMedia(
+      "(hover: none) and (pointer: coarse) and (min-width: 768px) and (max-width: 1366px)"
+    );
+
+    const compute = () => {
+      const root = document.documentElement;
+      const hasOverflow = root.scrollHeight - root.clientHeight > 80;
+      setVisible(mqTablet.matches && hasOverflow && window.scrollY <= 8);
+    };
+
+    const onScroll = () => {
+      if (window.scrollY > 8) setVisible(false);
+    };
+
+    compute();
+    window.addEventListener("resize", compute);
+    window.addEventListener("orientationchange", compute);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    const t = setTimeout(compute, 400);
+
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener("resize", compute);
+      window.removeEventListener("orientationchange", compute);
+      window.removeEventListener("scroll", onScroll);
+    };
+  }, []);
+
+  if (!visible) return null;
+
+  return (
+    <div className="scroll-hint" aria-hidden="true">
+      <div className="scroll-hint__fade" />
+      <div className="scroll-hint__pill">
+        Faites défiler pour voir plus
+        <span className="scroll-hint__chevrons" aria-hidden>⌄⌄⌄</span>
+      </div>
+    </div>
+  );
+};
+
+
+
 //////////////////////// Footer ////////////////////////
 
 export const Footer = () => {

@@ -323,7 +323,7 @@ export const Account = () => {
             )}
           </div>
           <button className="account-logout" onClick={deconnect}>
-            <i className="bi bi-power" aria-hidden="true" />
+            <i className="bi bi-power text-danger fw-bold" aria-hidden="true" />
             <span>Se déconnecter</span>
           </button>
         </div>
@@ -445,6 +445,7 @@ export const Account = () => {
                                         }}
                                       />
                                     </Link>
+                                    <span className="fw-bold">{it.name}</span>
                                   </span>
                                   <span className="text-dark fw-bold">{fmtPrice(it.price * it.qty)}</span>
                                   <span>x{it.qty}</span>

@@ -36,6 +36,7 @@ export const Promotion = () => {
   const prodState    = useSelector((s) => s.products) || {};
   const fullProducts = Array.isArray(prodState.products) ? prodState.products : [];
   const pagedItems   = Array.isArray(prodState.items)    ? prodState.items    : [];
+  const promotionCodes = useSelector((s) => s.promotions?.promotionCodes) || [];
   let productsAll  = fullProducts.length ? fullProducts : pagedItems;
   productsAll = productsAll.filter((p) => p.display === true);
 

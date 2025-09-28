@@ -317,9 +317,9 @@ const currentCustomerPromotionCodes = (customerPromotionCodes || []).filter(
 
     const isCustomerUsedTheCode = currentCustomerPromotionCodes.find((cp) => cp.idPromotion === getPromotionCode.id)
 
-    console.log("isCustomerUsedTheCode",isCustomerUsedTheCode.isUsed)
+    console.log("isCustomerUsedTheCode",isCustomerUsedTheCode?.isUsed)
 
-    if (isCustomerUsedTheCode.isUsed) {
+    if (isCustomerUsedTheCode?.isUsed) {
       setAppliedCode(null);
       setPromoModal({
         open: true,

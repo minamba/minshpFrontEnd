@@ -8,6 +8,7 @@ import { GenericModal } from "../../components";
 import { toMediaUrl } from "../../lib/utils/mediaUrl";
 import { calculPrice } from "../../lib/utils/Helpers";
 import { getProductsPagedUserRequest } from "../../lib/actions/ProductActions";
+import { ScrollHint } from "../../components";
 
 
 /* -------------------- Helpers (définis ici) -------------------- */
@@ -82,6 +83,7 @@ export const Category = () => {
   const fullProducts = Array.isArray(prodState.products) ? prodState.products : [];
   const pagedItems   = Array.isArray(prodState.items)    ? prodState.items    : [];
   let productsAll  = fullProducts.length ? fullProducts : pagedItems;
+  const promotionCodes = useSelector((s) => s.promotionCodes?.promotionCodes) || [];
   const loading      = !!prodState.loading;
 
   productsAll = productsAll.filter((p) => p.display === true);
@@ -190,7 +192,7 @@ export const Category = () => {
 
       const codePrice = (subCatCodeVal ?? catCodeVal);
 
-      const displayPrice = calculPrice(product);
+      const displayPrice = calculPrice(product, promotionCodes);
       const hasAnyPromo  = (codePrice != null) || (productPromoPrice != null);
 
       const discountRate = priceRef > 0 ? (priceRef - displayPrice) / priceRef : 0;
@@ -574,6 +576,8 @@ export const Category = () => {
         </div>
       </div>
       {/* ===== Fin barre mobile ===== */}
+
+      <ScrollHint />
     </div>
   );
 };

@@ -103,7 +103,7 @@
   }
   .account-counter{ display:flex;align-items:center;gap:10px; }
   .account-counter__num{
-    width:46px;height:46px;border-radius:12px;background:#111;color:#fff;
+    width:46px;height:46px;border-radius:12px;background:#2a60f5;color:#fff;
     display:grid;place-items:center;font-weight:900;font-size:1.1rem;
   }
   .account-counter__label{ font-weight:800;color:#374151; }

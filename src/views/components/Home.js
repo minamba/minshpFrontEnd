@@ -21,6 +21,7 @@ export const Home = () => {
   const videos    = useSelector((state) => state.videos.videos) || [];
   const categoriesFromStore = useSelector((state) => state.categories.categories) || [];
   const items     = useSelector((state) => state.items.items) || [];
+  const promotionCodes = useSelector((state) => state.promotionCodes.promotionCodes) || [];
 
   const dispatch  = useDispatch();
   const navigate  = useNavigate();
@@ -294,7 +295,7 @@ export const Home = () => {
                 : (Number.isFinite(catCodeVal) ? catCodeVal : null);
 
             // ==== Prix affiché & indicateurs UI ====
-            const displayPrice = calculPrice(product);
+            const displayPrice = calculPrice(product, promotionCodes);
             const hasAnyPromo = (codePrice != null) || (productPromoPrice != null);
 
             const [euros, cents] = displayPrice.toFixed(2).split('.');
