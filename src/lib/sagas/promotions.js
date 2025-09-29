@@ -1,8 +1,13 @@
 import {takeEvery, takeLatest, call, put, fork} from "redux-saga/effects";
 import * as actions from "../actions/PromotionActions";
 import * as actionsProduct from "../actions/ProductActions";
+import * as actionsApplication from "../actions/ApplicationActions";
 import * as api from "../api/promotions";
 import * as apiProduct from "../api/products";
+import * as apiApplication from "../api/applications";
+
+
+
 
 
 function* getPromotions() {
@@ -25,6 +30,9 @@ function* addPromotion(action) {
 
         const products = yield call (apiProduct.getProducts);
         yield put (actionsProduct.getProductUserSuccess({products : products.data}));
+
+        const apps = yield call (apiApplication.getApplication);
+        yield put (actionsApplication.getApplicationSuccess({applications : apps.data}));
     }
     catch (error) {
         yield put (actions.addPromotionFailure({error : error.response?.data || error.message}));
@@ -40,6 +48,9 @@ function* updatePromotion(action) {
         
         const products = yield call (apiProduct.getProducts);
         yield put (actionsProduct.getProductUserSuccess({products : products.data}));
+
+        const apps = yield call (apiApplication.getApplication);
+        yield put (actionsApplication.getApplicationSuccess({applications : apps.data}));
     }
     catch (error) {
         yield put (actions.updatePromotionFailure({error : error.response?.data || error.message}));
@@ -56,6 +67,9 @@ function* deletePromotion(action) {
 
             const products = yield call (apiProduct.getProducts);
             yield put (actionsProduct.getProductUserSuccess({products : products.data}));
+
+            const apps = yield call (apiApplication.getApplication);
+            yield put (actionsApplication.getApplicationSuccess({applications : apps.data}));
     }
     catch (error) {
         yield put (actions.deletePromotionFailure({error : error.response?.data || error.message}));

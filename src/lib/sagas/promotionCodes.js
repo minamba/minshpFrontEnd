@@ -1,6 +1,8 @@
 import {takeEvery, takeLatest, call, put, fork} from "redux-saga/effects";
 import * as actions from "../actions/PromotionCodeActions";
+import * as actionsApplication from "../actions/ApplicationActions";
 import * as api from "../api/promotionCodes";
+import * as apiApplication from "../api/applications";
 
 
 
@@ -21,6 +23,8 @@ function* addPromotionCode(action) {
         console.log("Promotion code added :",response.data);
         const promotionCodes = yield call (api.getPromotionCodes);
         yield put (actions.getPromotionCodesSuccess({promotionCodes : promotionCodes.data}));
+        const apps = yield call (apiApplication.getApplication);
+        yield put (actionsApplication.getApplicationSuccess({applications : apps.data}));
     }
     catch (error) {
         yield put (actions.addPromotionCodeFailure({error : error.response?.data || error.message}));
@@ -34,6 +38,8 @@ function* updatePromotionCode(action) {
         console.log("Promotion code updated :",response.data);
         const promotionCodes = yield call (api.getPromotionCodes);
         yield put (actions.getPromotionCodesSuccess({promotionCodes : promotionCodes.data}));
+        const apps = yield call (apiApplication.getApplication);
+        yield put (actionsApplication.getApplicationSuccess({applications : apps.data}));
     }
     catch (error) {
         yield put (actions.updatePromotionCodeFailure({error : error.response?.data || error.message}));
@@ -46,6 +52,8 @@ function* deletePromotionCode(action) {
             const response = yield call(api.getPromotionCodes);
 
             yield put (actions.getPromotionCodesSuccess({promotionCodes : response.data}));
+            const apps = yield call (apiApplication.getApplication);
+            yield put (actionsApplication.getApplicationSuccess({applications : apps.data}));
     }
     catch (error) {
         yield put (actions.deletePromotionCodeFailure({error : error.response?.data || error.message}));
