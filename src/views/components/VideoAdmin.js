@@ -23,7 +23,8 @@ export const VideoAdmin = () => {
     description: '',
     idProduct: '',
     title: '',
-    position: ''
+    position: '',
+    display: false,
   });
   const [previewUrl, setPreviewUrl] = useState('');
 
@@ -51,10 +52,10 @@ export const VideoAdmin = () => {
   }, [showModal]);
 
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: type === 'checkbox' ? checked : value,
     }));
   };
 
@@ -69,7 +70,7 @@ export const VideoAdmin = () => {
   const handleAddClick = () => {
     setIsEditing(false);
     setCurrentId(null);
-    setFormData({ file: null, description: '', idProduct: '', title: '', position: '' });
+    setFormData({ file: null, description: '', idProduct: '', title: '', position: '', display: false });
     setPreviewUrl('');
     setShowModal(true);
   };
@@ -83,6 +84,7 @@ export const VideoAdmin = () => {
       idProduct: video.idProduct ?? '',
       title: video.title ?? '',
       position: video.position != null ? String(video.position) : '',
+      display: Boolean(video.display),
     });
     setPreviewUrl(video.url);
     setShowModal(true);
@@ -98,26 +100,26 @@ export const VideoAdmin = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    const payloadBase = {
+      File: formData.file,
+      Type: 'VIDEO',
+      Description: formData.description,
+      IdProduct: formData.idProduct,
+      Position: parseInt(formData.position, 10),
+      Title: formData.title,
+      Display: formData.display,
+    };
+
     if (isEditing) {
       await dispatch(postUploadRequest({
+        ...payloadBase,
         Id: currentId,
-        File: formData.file,
-        Type: 'VIDEO',
-        Description: formData.description,
-        IdProduct: formData.idProduct,
-        Position: parseInt(formData.position, 10),
         TypeUpload: 'UPLOAD',
-        Title: formData.title
       }));
     } else {
       await dispatch(postUploadRequest({
-        File: formData.file,
-        Type: 'VIDEO',
-        IdProduct: formData.idProduct,
-        Description: formData.description,
-        Position: parseInt(formData.position, 10),
+        ...payloadBase,
         TypeUpload: 'ADD',
-        Title: formData.title
       }));
     }
 
@@ -127,7 +129,7 @@ export const VideoAdmin = () => {
 
   const getProductName = (id) => {
     const product = productsFromStore.find(p => p.id === id);
-    return product ? product.name : 'Produit inconnu';
+    return product ? product.name + ' - ' + product.model : 'Produit inconnu';
   };
 
   const sortedVideos = [...videosFromStore].sort((a, b) => {
@@ -172,6 +174,7 @@ export const VideoAdmin = () => {
               <th>Produit</th>
               <th>Titre</th>
               <th>Position</th>
+              <th>Afficher</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -188,6 +191,13 @@ export const VideoAdmin = () => {
                 <td>{getProductName(vid.idProduct)}</td>
                 <td>{vid.title}</td>
                 <td>{vid.position}</td>
+                <td>
+                  {vid.display ? (
+                    <span className="badge bg-success">Oui</span>
+                  ) : (
+                    <span className="badge bg-secondary">Non</span>
+                  )}
+                </td>
                 <td>
                   <button
                     className='btn btn-sm btn-warning me-2'
@@ -212,7 +222,7 @@ export const VideoAdmin = () => {
             ))}
             {filteredVideos.length === 0 && (
               <tr>
-                <td colSpan="6" className="text-center">Aucune vidéo trouvée.</td>
+                <td colSpan="7" className="text-center">Aucune vidéo trouvée.</td>
               </tr>
             )}
           </tbody>
@@ -309,6 +319,20 @@ export const VideoAdmin = () => {
                     </option>
                   ))}
                 </select>
+              </div>
+
+              <div className="form-check form-switch mb-3">
+                <input
+                  className="form-check-input"
+                  type="checkbox"
+                  id="displaySwitch"
+                  name="display"
+                  checked={!!formData.display}
+                  onChange={handleInputChange}
+                />
+                <label className="form-check-label" htmlFor="displaySwitch">
+                  Afficher (publiée)
+                </label>
               </div>
 
               <div className="d-flex justify-content-end">

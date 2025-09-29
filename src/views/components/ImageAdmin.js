@@ -26,6 +26,7 @@ export const ImageAdmin = () => {
     idProduct: '',
     title: '',
     position: '',
+    display: false,
   });
   const [previewUrl, setPreviewUrl] = useState('');
 
@@ -57,10 +58,10 @@ export const ImageAdmin = () => {
   }, [previewUrl]);
 
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: type === 'checkbox' ? checked : value,
     }));
   };
 
@@ -78,7 +79,7 @@ export const ImageAdmin = () => {
   const handleAddClick = () => {
     setIsEditing(false);
     setCurrentId(null);
-    setFormData({ file: null, description: '', idProduct: '', title: '', position: '' });
+    setFormData({ file: null, description: '', idProduct: '', title: '', position: '', display: false });
     if (previewUrl?.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
     setPreviewUrl('');
     setShowModal(true);
@@ -93,6 +94,7 @@ export const ImageAdmin = () => {
       idProduct: image.idProduct ?? '',
       title: image.title ?? '',
       position: image.position ?? '',
+      display: Boolean(image.display),
     });
     if (previewUrl?.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(image.url || '');
@@ -119,6 +121,7 @@ export const ImageAdmin = () => {
           IdProduct: formData.idProduct,
           Title: formData.title,
           Position: formData.position,
+          Display: formData.display,
           TypeUpload: 'UPLOAD',
         })
       );
@@ -131,6 +134,7 @@ export const ImageAdmin = () => {
           Description: formData.description,
           Title: formData.title,
           Position: formData.position,
+          Display: formData.display,
           TypeUpload: 'ADD',
         })
       );
@@ -142,7 +146,7 @@ export const ImageAdmin = () => {
 
   const getProductName = (id) => {
     const product = productsFromStore.find((p) => p.id === id);
-    return product ? product.name : 'Produit inconnu';
+    return product ? product.name + ' - ' + product.model : 'Produit inconnu';
   };
 
   const sortedImages = [...imagesFromStore].sort((a, b) => {
@@ -185,6 +189,7 @@ export const ImageAdmin = () => {
               <th>Produit</th>
               <th>Titre</th>
               <th>Position</th>
+              <th>Afficher</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -198,6 +203,13 @@ export const ImageAdmin = () => {
                 <td>{getProductName(img.idProduct)}</td>
                 <td>{img.title}</td>
                 <td>{img.position}</td>
+                <td>
+                  {img.display ? (
+                    <span className="badge bg-success">Oui</span>
+                  ) : (
+                    <span className="badge bg-secondary">Non</span>
+                  )}
+                </td>
                 <td>
                   <button
                     className='btn btn-sm btn-warning me-2'
@@ -222,7 +234,7 @@ export const ImageAdmin = () => {
             ))}
             {filteredImages.length === 0 && (
               <tr>
-                <td colSpan="6" className="text-center">Aucune image trouvée.</td>
+                <td colSpan="7" className="text-center">Aucune image trouvée.</td>
               </tr>
             )}
           </tbody>
@@ -317,6 +329,20 @@ export const ImageAdmin = () => {
                     </option>
                   ))}
                 </select>
+              </div>
+
+              <div className="form-check form-switch mb-3">
+                <input
+                  className="form-check-input"
+                  type="checkbox"
+                  id="displaySwitch"
+                  name="display"
+                  checked={!!formData.display}
+                  onChange={handleInputChange}
+                />
+                <label className="form-check-label" htmlFor="displaySwitch">
+                  Afficher (publiée)
+                </label>
               </div>
 
               <div className="d-flex justify-content-end">

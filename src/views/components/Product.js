@@ -25,11 +25,14 @@ export const Product = () => {
   const fullProducts    = Array.isArray(prodState.products) ? prodState.products : [];
   const pagedItems      = Array.isArray(prodState.items)    ? prodState.items    : [];
   const productsAll     = fullProducts.length ? fullProducts : pagedItems; // ✅
-  const images          = useSelector((s) => s.images?.images) || [];
-  const videos          = useSelector((s) => s.videos?.videos) || [];
+  let images          = useSelector((s) => s.images?.images) || [];
+  let videos          = useSelector((s) => s.videos?.videos) || [];
   const items           = useSelector((s) => s.items?.items) || [];
   const promotionCodes  = useSelector((s) => s.promotionCodes?.promotionCodes) || [];
   const stocks          = useSelector((s) => s.stocks?.stocks) || [];
+
+  images = images.filter((i) => i.display === true);
+  videos = videos.filter((v) => v.display === true);
 
   // Sauvegarde panier
   useEffect(() => { dispatch(saveCartRequest(items)); }, [items, dispatch]);
