@@ -303,6 +303,80 @@
 /* 
   .navbar-dropdown-toggle { touch-action: manipulation; }  */
 
+/* === Bandeau promo défilant === */
+
+  :root{
+    --ticker-h: 36px;
+    --ticker-bg: linear-gradient(90deg, #1e5add 0%, #1e5add 50%, #1e5add 100%);
+    --ticker-fg: #f3faff;
+    --ticker-gap: 48px;
+  }
+  
+  /* Bandeau défilant fixé sous la navbar */
+  .promo-ticker{
+    position: fixed;
+    top: var(--nav-h);        /* collé à la navbar */
+    left: 0; right: 0;
+    height: var(--ticker-h);
+    z-index: 1190;            /* en dessous des menus (10000) et au-dessus du contenu */
+    background: var(--ticker-bg);
+    color: var(--ticker-fg);
+    overflow: hidden;
+    display: flex; align-items: center;
+    border-bottom: 1px solid rgba(0,0,0,.05);
+  }
+  
+  /* Espace pour ne pas recouvrir le contenu (uniquement quand ticker monté) */
+  .promo-ticker-spacer{
+    height: var(--ticker-h);
+  }
+  
+  /* Rail + animation */
+  .promo-track{
+    display: flex;
+    align-items: center;
+    width: max-content;
+    animation: promo-marquee 22s linear infinite;
+    will-change: transform;
+  }
+  .promo-ticker:hover .promo-track{
+    animation-play-state: paused;    /* pause au survol */
+  }
+  
+  /* Deux lots d’items pour une boucle sans rupture */
+  .promo-items{
+    display: inline-flex;
+    align-items: center;
+    gap: var(--ticker-gap);
+    padding: 0 24px;
+    white-space: nowrap;
+  }
+  .promo-item{
+    font-weight: 800;
+    font-size: 0.95rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .promo-item::before{
+    content: "🏷️";
+    font-size: 0.95rem;
+    opacity: .9;
+  }
+  
+  /* Animation: défilement continu vers la gauche */
+  @keyframes promo-marquee{
+    0%   { transform: translateX(0); }
+    100% { transform: translateX(-50%); } /* -50% car on a dupliqué les items */
+  }
+  
+  /* Responsive: bandeau un peu plus compact en mobile */
+  @media (max-width: 900px){
+    :root{ --ticker-h: 32px; --ticker-gap: 28px; }
+    .promo-item{ font-size: .9rem; }
+  }
+  
+
   
   
   

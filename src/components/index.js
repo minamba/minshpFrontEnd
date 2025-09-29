@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback  } from 'react';
+import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import "../styles/components/navbar.css";
 import { FaFacebookF, FaInstagram, FaTwitter, FaLinkedin, FaCheckCircle, FaTimesCircle } from 'react-icons/fa';
 import {Link, NavLink, useParams} from 'react-router-dom';
@@ -46,6 +46,17 @@ export const Navbar = () => {
   // --- Panier
   const cartItems = useSelector((s) => s.items?.items) || [];
   const cartCount = cartItems.reduce((acc, it) => acc + Number(it.qty ?? it.quantity ?? 1), 0);
+
+  // --- Application pour recuperer les messages promo
+  const applications = useSelector((s) => s.applications?.applications) || []; // tableau de string
+
+  console.log("applications FOOOOCK DA SHHHHHHIIIT",applications);
+
+  // const promoMessages =
+  // useSelector((s) => s.app?.tickerMessages) || []; // tableau de string
+
+  const promoMessages = applications[0]?.promoMessages;
+<PromoTicker messages={promoMessages} />
 
   // --- Effet badge
   const [bump, setBump] = useState(false);
@@ -435,6 +446,8 @@ export const Navbar = () => {
           </div>
         </div>
       </nav>
+            {/* ===== BANDEAU PROMO défilant (affiché seulement si messages.length>0) ===== */}
+            <PromoTicker messages={promoMessages} />
 
       {/* ===== Overlay + Drawer mobile (GAUCHE) ===== */}
       <div
@@ -1734,6 +1747,36 @@ export const ScrollHint = () => {
     </div>
   );
 };
+
+
+/////////////////////////// Bandeau de promotion ///////////////////////////////////
+
+export const PromoTicker = memo(function PromoTicker({ messages = [] }) {
+  if (!messages || messages.length === 0) return null;
+
+  return (
+    <>
+      <div className="promo-ticker" role="region" aria-label="Bandeau d'annonces">
+        <div className="promo-track">
+          {/* lot visible */}
+          <div className="promo-items">
+            {messages.map((m, i) => (
+              <span className="promo-item" key={`t1-${i}`}>{m}</span>
+            ))}
+          </div>
+          {/* lot dupliqué pour boucle continue */}
+          <div className="promo-items" aria-hidden="true">
+            {messages.map((m, i) => (
+              <span className="promo-item" key={`t2-${i}`}>{m}</span>
+            ))}
+          </div>
+        </div>
+      </div>
+      {/* Espace pour ne pas recouvrir le contenu (barre fixed) */}
+      <div className="promo-ticker-spacer" />
+    </>
+  );
+});
 
 
 
