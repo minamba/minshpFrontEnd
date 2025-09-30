@@ -60,7 +60,8 @@ function* addCustomer(action) {
 function* updateCustomer(action) {
   try {
     yield call(api.updateCustomer, action.payload);
-    yield* refreshAfterMutation();
+    const response = yield call (api.getCustomers);
+    yield put (actions.getCustomerSuccess({customers : response.data}));
   } catch (error) {
     yield put(actions.updateCustomerFailure({ error: error?.response?.data || error?.message }));
   }

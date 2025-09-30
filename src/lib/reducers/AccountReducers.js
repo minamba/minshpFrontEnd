@@ -70,6 +70,16 @@ const initialState = {
   loadingDeleteRole: false,
   errorDeleteRole: null,
   successDeleteRole: false,
+
+  // --- lock ---
+  loadingLock: false,
+  errorLock: null,
+  successLock: false,
+
+  // --- unlock ---
+  loadingUnlock: false,
+  errorUnlock: null,
+  successUnlock: false,
 };
 
 export default function AccountReducer(state = initialState, action) {
@@ -149,6 +159,23 @@ export default function AccountReducer(state = initialState, action) {
             return { ...state, loadingRemoveRole: false, successRemoveRole: true };
         case actionsAccount.REMOVE_USER_ROLE_FAILURE:
             return { ...state, loadingRemoveRole: false, errorRemoveRole: action.payload.error || "Échec de la suppression du role" };
+
+        
+        //LOCK
+        case actionsAccount.LOCK_USER_REQUEST:
+            return { ...state, loadingLock: true, errorLock: null, successLock: false };
+        case actionsAccount.LOCK_USER_SUCCESS:
+            return { ...state, loadingLock: false, successLock: true };
+        case actionsAccount.LOCK_USER_FAILURE:
+            return { ...state, loadingLock: false, errorLock: action.payload.error || "Échec de la verrouillage" };
+
+        //UNLOCK
+        case actionsAccount.UNLOCK_USER_REQUEST:
+            return { ...state, loadingUnlock: true, errorUnlock: null, successUnlock: false };
+        case actionsAccount.UNLOCK_USER_SUCCESS:
+            return { ...state, loadingUnlock: false, successUnlock: true };
+        case actionsAccount.UNLOCK_USER_FAILURE:
+            return { ...state, loadingUnlock: false, errorUnlock: action.payload.error || "Échec de la déverrouillage" };
 
     default:
       return state;

@@ -2,8 +2,6 @@ import {takeEvery, takeLatest, call, put, fork} from "redux-saga/effects";
 import * as actions from "../actions/ApplicationActions";
 import * as api from "../api/applications";
 
-
-
 function* getApplications() {
     try {
         const response = yield call (api.getApplication);

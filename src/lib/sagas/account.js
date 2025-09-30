@@ -60,9 +60,33 @@ function* login(action) {
 
     }
     catch (error) {
-        //console.log(error.response?.data || error.message);
-
-        yield put(actions.loginFailure({ error: problemToText(error) })); // 👈 string
+      // On essaie d'identifier proprement le cas "compte bloqué"
+      const res   = error?.response;         // axios
+      const data  = res?.data;
+      const code  = res?.status ?? error?.status; // fetch fallback
+    
+      let msg = "Impossible de se connecter pour le moment.";
+    
+      // Cas OpenIddict (password grant): 400 invalid_grant
+      if (code === 400 && data?.error === "invalid_grant") {
+        const desc = String(data?.error_description || "").toLowerCase();
+        if (desc.includes("account_locked") || desc.includes("bloqué") || desc.includes("locked")) {
+          msg = "Votre compte est bloqué. Réessayez plus tard ou contactez le support";
+        } else {
+          msg = "Email ou mot de passe incorrect.";
+        }
+      }
+      // Cas éventuel de ton endpoint /account/login : 423 Locked
+      else if (code === 423) {
+        const desc = String(data?.message || data?.error_description || "").trim();
+        msg = desc || "Votre compte est bloqué. Réessayez plus tard.";
+      }
+      // Fallback générique existant
+      else {
+        msg = problemToText?.(error) || msg;
+      }
+    
+      yield put(actions.loginFailure({ error: msg }));
     }
 
 }
@@ -172,6 +196,31 @@ function* Register(action) {
     }
 
 
+    //Lock User
+    function* LockUser(action) {
+      try {
+        const res = yield call(api.lockUser, action.payload);
+        yield put(actions.lockUserSuccess(res.data));
+        // yield put(getCustomerRequest());
+        const response = yield call (apiCustomers.getCustomers);
+        yield put (actionsCustomers.getCustomerSuccess({customers : response.data}));
+      } catch (err) {
+        yield put(actions.lockUserFailure({ error: problemToText(err) }));
+      }
+    }
+
+    //Unlock User
+    function* UnlockUser(action) {
+      try {
+        const res = yield call(api.unlockUser, action.payload);
+        yield put(actions.unlockUserSuccess(res.data));
+        yield put(getCustomerRequest());
+      } catch (err) {
+        yield put(actions.unlockUserFailure({ error: problemToText(err) }));
+      }
+    }
+
+
     function* watchAccount() {
         yield takeLatest(actions.actionsAccount.LOGIN_REQUEST, login);
         yield takeLatest(actions.actionsAccount.REGISTER_REQUEST, Register);
@@ -180,6 +229,8 @@ function* Register(action) {
         yield takeLatest(actions.actionsAccount.UPDATE_USER_PASSWORD_REQUEST, UpdatePassword);
         yield takeLatest(actions.actionsAccount.ADD_USER_ROLE_REQUEST, AddRole);
         yield takeLatest(actions.actionsAccount.REMOVE_USER_ROLE_REQUEST, RemoveRole);
+        yield takeLatest(actions.actionsAccount.LOCK_USER_REQUEST, LockUser);
+        yield takeLatest(actions.actionsAccount.UNLOCK_USER_REQUEST, UnlockUser);
     }
 
     function* accountSaga() {

@@ -743,7 +743,7 @@ function AddressBookModal({ open, addresses, onChoose, onEdit, onClose }) {
 function Field({ label, children }) {
   return (
     <label style={{ display: "grid", gap: 6 }}>
-      <span style={{ fontWeight: 700 }}>{label}</span>
+      <span style={{ fontWeight: 700, textAlign: "center" }}>{label}</span>
       {children}
     </label>
   );

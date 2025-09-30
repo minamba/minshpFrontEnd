@@ -36,6 +36,14 @@ export const actionsAccount = {
     REMOVE_USER_ROLE_REQUEST : "REMOVE_USER_ROLE_REQUEST",
     REMOVE_USER_ROLE_SUCCESS : "REMOVE_USER_ROLE_SUCCESS",
     REMOVE_USER_ROLE_FAILURE : "REMOVE_USER_ROLE_FAILURE",
+
+    LOCK_USER_REQUEST : "LOCK_USER_REQUEST",
+    LOCK_USER_SUCCESS : "LOCK_USER_SUCCESS",
+    LOCK_USER_FAILURE : "LOCK_USER_FAILURE",
+
+    UNLOCK_USER_REQUEST : "UNLOCK_USER_REQUEST",
+    UNLOCK_USER_SUCCESS : "UNLOCK_USER_SUCCESS",
+    UNLOCK_USER_FAILURE : "UNLOCK_USER_FAILURE",
 }
 
 
@@ -219,6 +227,54 @@ export function removeRoleFailure(error) {
         payload: error,
     }
 }
+
+
+//lock
+export function lockUserRequest(id) {
+    return {
+        type: actionsAccount.LOCK_USER_REQUEST,
+        payload: id,
+    }
+}
+
+export function lockUserSuccess(id) {
+    return {
+        type: actionsAccount.LOCK_USER_SUCCESS,
+        payload: id,
+    }
+}
+
+export function lockUserFailure(error) {
+    return {
+        type: actionsAccount.LOCK_USER_FAILURE,
+        payload: error,
+    }
+}
+
+
+//unlock
+export function unlockUserRequest(id) {
+    return {
+        type: actionsAccount.UNLOCK_USER_REQUEST,
+        payload: id,
+    }
+}
+
+export function unlockUserSuccess(id) {
+    return {
+        type: actionsAccount.UNLOCK_USER_SUCCESS,
+        payload: id,
+    }
+}
+
+export function unlockUserFailure(error) {
+    return {
+        type: actionsAccount.UNLOCK_USER_FAILURE,
+        payload: error,
+    }
+}
+
+
 
 
 

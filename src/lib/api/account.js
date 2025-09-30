@@ -115,3 +115,28 @@ export function addUserRole(data) {
   }
 
 
+
+  //Lock Use
+
+  export function lockUser(id) {
+    return idp.post(`/account/${encodeURIComponent(id)}/lock`,null, {
+      headers: {
+        ...authHeader(),
+        withCredentials: false,        // Bearer <token>
+      },
+      withCredentials: false,   // SPA: pas de cookies nécessaires
+    });
+  }
+
+
+  // Unlock User
+
+  export function unlockUser(id) {
+    return idp.post(`/account/${encodeURIComponent(id)}/unlock`,null, {
+      headers: {
+        ...authHeader(),        // Bearer <token>
+      },
+      withCredentials: false,   // SPA: pas de cookies nécessaires
+    });
+  }
+

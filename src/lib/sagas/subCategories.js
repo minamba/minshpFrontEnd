@@ -34,10 +34,8 @@ function* updateSubCategory(action) {
         const subCategories = yield call (api.getSubCategories);
         yield put (actions.getSubCategorySuccess({subCategories : subCategories.data}));
 
-                const products = yield call (apiProducts.getProducts);
-                yield put (actionsProducts.getProductUserSuccess({products : products.data}));
-
-
+        const products = yield call (apiProducts.getProducts);
+        yield put (actionsProducts.getProductUserSuccess({products : products.data}));
     }
     catch (error) {
         yield put (actions.updateSubCategoryFailure({error : error.response?.data || error.message}));

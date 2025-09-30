@@ -1782,16 +1782,16 @@ export const PromoTicker = memo(function PromoTicker({ messages = [] }) {
 
 
 //////////////////////// Footer ////////////////////////
-
 export const Footer = () => {
   const year = new Date().getFullYear();
   const dispatch = useDispatch();
 
-  // Sélecteurs : adapte le chemin selon ton store
-  const error           = useSelector(s => s.newsletters.error);          // null | ...
-  const successMessage  = useSelector(s => s.newsletters.successMessage); // null | string
-  const errorMessage    = useSelector(s => s.newsletters.errorMessage);   // null | string
+  // Sélecteurs Redux
+  const error = useSelector((s) => s.newsletters?.error);
+  const successMessage = useSelector((s) => s.newsletters?.successMessage);
+  const errorMessage = useSelector((s) => s.newsletters?.errorMessage);
 
+  // Local state
   const [email, setEmail] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -1805,34 +1805,73 @@ export const Footer = () => {
     dispatch(addNewsletterRequest({ Mail: email, Suscribe: true }));
   };
 
-
-// Ouvre la popup quand un message arrive
-useEffect(() => {
-  if (!submitted) return;
-
-  if (successMessage) {
-    setModalMsg(successMessage);
-    setModalType("success");
-    setEmail("");
-    setShowModal(true);
-    setSubmitted(false);
-  } else if (errorMessage || error) {
-    setModalMsg(errorMessage || "Ajout échoué");
-    setModalType("error");
-    setShowModal(true);
-    setSubmitted(false);
-  }
-}, [submitted, successMessage, errorMessage, error]);
+  // Gère la popup selon le résultat Redux
+  useEffect(() => {
+    if (!submitted) return;
+    if (successMessage) {
+      setModalMsg(successMessage);
+      setModalType("success");
+      setEmail("");
+      setShowModal(true);
+      setSubmitted(false);
+    } else if (errorMessage || error) {
+      setModalMsg(errorMessage || "Ajout échoué");
+      setModalType("error");
+      setShowModal(true);
+      setSubmitted(false);
+    }
+  }, [submitted, successMessage, errorMessage, error]);
 
   return (
     <footer className="footer-container">
       <div className="footer-content">
+        {/* ====== 2 colonnes (paiements / transporteurs) ====== */}
+        <div className="footer-badges">
+          {/* Colonne Paiements */}
+          <div className="badge-col">
+            <h4 className="badge-title">Moyens de paiement acceptés</h4>
+            <div className="badge-row">
+              <span className="badge-item">
+                <img src="/Images/visa.png" alt="Visa" />
+              </span>
+              {/* <span className="badge-item">
+                <img src="/Images/paypal.png" alt="PayPal" />
+              </span> */}
+            </div>
+          </div>
+
+          {/* Colonne Transporteurs */}
+          <div className="badge-col mb-3">
+            <h4 className="badge-title">Nos transporteurs</h4>
+            <div className="badge-row">
+              <span className="badge-item">
+                <img src="/Images/colissimo.png" alt="Colissimo" />
+              </span>
+              <span className="badge-item">
+                <img src="/Images/chronopost.png" alt="Chronopost" />
+              </span>
+              <span className="badge-item">
+                <img src="/Images/mondialrelay.png" alt="Mondial Relay" />
+              </span>
+              <span className="badge-item">
+                <img src="/Images/ups.png" alt="UPS" />
+              </span>
+            </div>
+          </div>
+        </div>
+        {/* ====== fin 2 colonnes ====== */}
+
+        {/* Liens */}
         <div className="footer-links">
           <a href="#conditions">Conditions</a>
           <a href="#privacy">Confidentialité</a>
-          <a href="#contact">Contact</a>
+          {/* Ouvre le logiciel de mail par défaut avec le destinataire pré-rempli */}
+          <a href="mailto:contact@minshp.com" aria-label="Envoyer un email à contact@minshp.com">
+            Contact
+          </a>
         </div>
 
+        {/* Newsletter */}
         <div className="footer-newsletter mt-5">
           <form onSubmit={handleSubmit}>
             <input
@@ -1845,6 +1884,7 @@ useEffect(() => {
           </form>
         </div>
 
+        {/* Réseaux sociaux */}
         <div className="footer-socials mt-5">
           <a href="https://facebook.com" target="_blank" rel="noopener noreferrer"><FaFacebookF /></a>
           <a href="https://instagram.com" target="_blank" rel="noopener noreferrer"><FaInstagram /></a>
@@ -1852,12 +1892,13 @@ useEffect(() => {
           <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer"><FaLinkedin /></a>
         </div>
 
+        {/* Copyright */}
         <div className="footer-copy mt-5">
-          &copy; {year} Min's. Tous droits réservés.
+          &copy; {year} Min&apos;s. Tous droits réservés.
         </div>
       </div>
 
-      {/* Popup */}
+      {/* Popup résultat newsletter */}
       {showModal && (
         <div className="modal-backdrop" role="dialog" aria-modal="true">
           <div className={`modal-card ${modalType}`}>
@@ -1876,8 +1917,89 @@ useEffect(() => {
         </div>
       )}
 
-      {/* Styles minimaux pour la popup */}
+      {/* Styles */}
       <style jsx>{`
+        .footer-container {
+          background: #333;
+          color: #fff;
+        }
+        .footer-content {
+          max-width: 1200px;
+          margin: 0 auto;
+          padding: 32px 20px;
+          text-align: center;
+        }
+
+        .footer-badges {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 24px;
+          align-items: start;
+          justify-content: center;
+          margin-bottom: 28px;
+        }
+        @media (min-width: 900px) {
+          .footer-badges { grid-template-columns: 1fr 1fr; }
+        }
+        .badge-col { display: flex; flex-direction: column; gap: 12px; }
+        .badge-title {
+          font-weight: 600;
+          margin: 0;
+          font-size: 18px;
+        }
+        .badge-row {
+          display: flex;
+          gap: 12px;
+          flex-wrap: wrap;
+          justify-content: center;
+        }
+        .badge-item {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          background: #fff;
+          padding: 8px 14px;
+          border-radius: 10px;
+          box-shadow: 0 2px 6px rgba(0,0,0,.15);
+        }
+        .badge-item img {
+          display: block;
+          height: 30px;
+          width: auto;
+        }
+
+        .footer-links {
+          display: flex;
+          gap: 18px;
+          justify-content: center;
+          flex-wrap: wrap;
+        }
+        .footer-links a {
+          color: #ddd;
+          text-decoration: none;
+        }
+        .footer-links a:hover { text-decoration: underline; }
+
+        .footer-newsletter form {
+          display: flex; gap: 10px; justify-content: center; margin-top: 14px;
+        }
+        .footer-newsletter input {
+          padding: 10px 12px;
+          border-radius: 8px;
+          border: none;
+          width: min(380px, 90%);
+        }
+        .footer-newsletter button {
+          padding: 10px 16px;
+          border-radius: 8px; border: none; cursor: pointer;
+          background: #0d6efd; color: #fff;
+        }
+
+        .footer-socials { display: flex; gap: 12px; justify-content: center; }
+        .footer-socials a { color: #fff; font-size: 18px; }
+
+        .footer-copy { opacity: 0.85; margin-top: 20px; }
+
         .modal-backdrop {
           position: fixed; inset: 0;
           display: flex; align-items: center; justify-content: center;
@@ -1892,6 +2014,7 @@ useEffect(() => {
           width: 90%;
           text-align: center;
           box-shadow: 0 12px 40px rgba(0,0,0,0.2);
+          color: #111;
         }
         .modal-icon { font-size: 64px; }
         .icon.success { color: #16a34a; }
@@ -1900,8 +2023,11 @@ useEffect(() => {
           padding: 10px 20px; border: none; border-radius: 8px;
           background: #0d6efd; color: #fff; cursor: pointer;
         }
+
+        .mt-4 { margin-top: 1rem; }
+        .mt-5 { margin-top: 1.5rem; }
+        .mb-3 { margin-bottom: 1rem; }
       `}</style>
     </footer>
-    );
-  };
-
+  );
+};

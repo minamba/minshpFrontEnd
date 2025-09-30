@@ -284,7 +284,6 @@
   /* ===== Point relais : champ + bouton en mobile ===== */
 @media (max-width: 768px){
     /* cible le bloc "Adresse complète" */
-    .dp-page [style*="Adresse complète"],
     .dp-page .relay-search,
     .dp-page .relay-address-input{
       display: flex !important;
@@ -379,6 +378,37 @@
       padding-top: 8px;
     }
   }
+
+
+  /* Centrer le texte "Adresse complète" dans la section En point relais (mobile) */
+@media (max-width: 768px){
+  /* aligne le bloc label au centre */
+  .relay-search .relay-address-input label{
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+  }
+
+  /* centre le texte du libellé */
+  .relay-search .relay-address-input label > span:first-child{
+    display: block !important;
+    width: 100% !important;
+    text-align: center !important;
+    margin-bottom: 6px; /* optionnel */
+  }
+}
+
+
+/* Centrer le libellé "Adresse complète" dans la section En point relais
+   (desktop + mobile) */
+   .relay-search .relay-address-input label > span:first-child{
+    display: block;           /* occupe toute la ligne du grid */
+    width: 100%;
+    text-align: center;       /* ← centrage du texte */
+    margin-bottom: 6px;    
+  }
+
+
   
 
   
