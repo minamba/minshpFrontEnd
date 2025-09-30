@@ -248,3 +248,46 @@
 @media (hover: hover) and (pointer: fine) { .scroll-hint{ display:none; } } /* desktop */
 @media (max-width: 767.98px) { .scroll-hint{ display:none; } }             /* smartphone */
 @media (min-width: 1366.98px) { .scroll-hint{ display:none; } }            /* grand écran */
+
+
+
+
+/* ===== Bloquer l'usage en mode paysage sur mobile/tablette ===== */
+@media screen and (max-width: 1024px) and (orientation: landscape) {
+  /* Empêche le scroll sous l'overlay */
+  html, body {
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* Masque visuellement le contenu dessous (optionnel) */
+  #root {
+    filter: blur(2px);
+  }
+
+  /* Overlay bloquant */
+  body::before {
+    content: "Veuillez pivoter votre appareil en mode portrait pour continuer.";
+    position: fixed;
+    inset: 0;
+    z-index: 999999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+
+    padding: 32px;
+    background: #111;                    /* fond opaque */
+    color: #fff;
+    font-weight: 800;
+    font-size: clamp(16px, 3.5vw, 22px);
+    line-height: 1.4;
+
+    /* support iOS zones sûres */
+    padding-left: calc(32px + env(safe-area-inset-left));
+    padding-right: calc(32px + env(safe-area-inset-right));
+    padding-bottom: calc(32px + env(safe-area-inset-bottom));
+    padding-top: calc(32px + env(safe-area-inset-top));
+  }
+}
+
