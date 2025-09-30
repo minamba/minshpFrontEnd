@@ -40,6 +40,19 @@ export const Promotion = () => {
   let productsAll  = fullProducts.length ? fullProducts : pagedItems;
   productsAll = productsAll.filter((p) => p.display === true);
 
+  productsAll.forEach((p) => {
+
+    if (p.categoryVm?.display === false) {
+      p.display = false;
+    }
+
+    if (p.subCategoryVm?.display === false) {
+      p.display = false;
+    }
+  });
+
+
+
   const images = useSelector((s) => s.images?.images) || [];
   const items  = useSelector((s) => s.items?.items) || [];
 

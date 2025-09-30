@@ -1,6 +1,8 @@
 import {takeEvery, takeLatest, call, put, fork} from "redux-saga/effects";
 import * as actions from "../actions/SubCategoryActions";
+import * as actionsProducts from "../actions/ProductActions";
 import * as api from "../api/subCategories";
+import * as apiProducts from "../api/products";
 
 function* getSubCategories() {
     try {
@@ -31,6 +33,11 @@ function* updateSubCategory(action) {
         console.log("SubCategory updated :",response.data);
         const subCategories = yield call (api.getSubCategories);
         yield put (actions.getSubCategorySuccess({subCategories : subCategories.data}));
+
+                const products = yield call (apiProducts.getProducts);
+                yield put (actionsProducts.getProductUserSuccess({products : products.data}));
+
+
     }
     catch (error) {
         yield put (actions.updateSubCategoryFailure({error : error.response?.data || error.message}));

@@ -24,7 +24,7 @@ export const CategoryAdmin = () => {
   const [showModal, setShowModal]                   = useState(false);
   const [isEditing, setIsEditing]                   = useState(false);
   const [currentId, setCurrentId]                   = useState(null);
-  const [formData, setFormData]                     = useState({ name: '' });
+  const [formData, setFormData]                     = useState({ name: '', display: false });
   const [idImage, setIdImage]                       = useState('');
   const [selectedProductId, setSelectedProductId]   = useState('');
   const [selectedTaxIds, setSelectedTaxIds]         = useState([]);       // string[]
@@ -62,6 +62,20 @@ export const CategoryAdmin = () => {
       .split(',')
       .map((t) => t.trim())
       .filter(Boolean);
+
+  const toBool = (v) => {
+    if (typeof v === 'string') {
+      const t = v.trim().toLowerCase();
+      if (t === 'true' || t === '1' || t === 'yes' || t === 'oui') return true;
+      if (t === 'false' || t === '0' || t === 'no' || t === 'non') return false;
+    }
+    return Boolean(v);
+  };
+
+  const getDisplayFromCategory = (cat) => {
+    const v = cat?.display ?? cat?.Display ?? cat?.isDisplayed ?? cat?.IsDisplayed ?? cat?.published ?? cat?.Published;
+    return toBool(v);
+  };
 
   // id package profil dans catégorie
   const getPkgIdFromCategory = (cat) =>
@@ -124,14 +138,19 @@ export const CategoryAdmin = () => {
   };
 
   const getContentCodeLabel = (cat) => {
-    const contentCategory = contentCategories.allCodeCategories.find((cc) => cc.id === String(cat.contentCode));
+    const list = Array.isArray(contentCategories?.allCodeCategories)
+      ? contentCategories.allCodeCategories
+      : Array.isArray(contentCategories)
+      ? contentCategories
+      : [];
+    const contentCategory = list.find((cc) => String(cc.id) === String(cat?.contentCode ?? cat?.ContentCode));
     const label = contentCategory?.label;
     return label || '—';
   };
 
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
 
   const extractTaxIdsFromCategory = (cat, taxesList) => {
@@ -153,7 +172,7 @@ export const CategoryAdmin = () => {
   const handleAddClick = () => {
     setIsEditing(false);
     setCurrentId(null);
-    setFormData({ name: '' });
+    setFormData({ name: '', display: false });
     setIdImage('');
     setSelectedProductId('');
     setSelectedTaxIds([]);
@@ -166,7 +185,7 @@ export const CategoryAdmin = () => {
   const handleEditClick = (category) => {
     setIsEditing(true);
     setCurrentId(category.id);
-    setFormData({ id: category.id, name: category.name });
+    setFormData({ id: category.id, name: category.name, display: getDisplayFromCategory(category) });
 
     // Pré-sélections
     const pkgId = getPkgIdFromCategory(category);
@@ -232,7 +251,8 @@ export const CategoryAdmin = () => {
         name: formData.name,
         idTaxe: idsTaxesCsv,
         IdPackageProfil: pkgIdNum,
-        ContentCode: contentCodeId, 
+        ContentCode: contentCodeId,
+        Display: !!formData.display,
       }));
       if (idImage) {
         await dispatch(updateImageRequest({ id: Number(idImage), idCategory: Number(currentId) }));
@@ -243,6 +263,7 @@ export const CategoryAdmin = () => {
         idsTaxes: idsTaxesCsv,
         IdPackageProfil: pkgIdNum,
         ContentCode: contentCodeId,
+        Display: !!formData.display,
       };
       await dispatch(addCategoryRequest(addPayload));
       await dispatch(getCategoryRequest());
@@ -324,6 +345,7 @@ export const CategoryAdmin = () => {
               <th>Taxes</th>
               <th>Code produit</th>
               <th>Package profil</th>
+              <th>Afficher</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -335,6 +357,13 @@ export const CategoryAdmin = () => {
                 <td>{getCategoryTaxNames(cat)}</td>
                 <td>{getContentCodeLabel(cat)}</td>
                 <td>{getPackageProfilName(cat)}</td>
+                <td>
+                  {getDisplayFromCategory(cat) ? (
+                    <span className="badge bg-success">Oui</span>
+                  ) : (
+                    <span className="badge bg-secondary">Non</span>
+                  )}
+                </td>
                 <td>
                   <button
                     className='btn btn-sm btn-warning me-2'
@@ -383,6 +412,21 @@ export const CategoryAdmin = () => {
                   onChange={handleInputChange}
                   required
                 />
+              </div>
+
+              {/* Afficher */}
+              <div className="form-check form-switch mb-3">
+                <input
+                  className="form-check-input"
+                  type="checkbox"
+                  id="displaySwitch"
+                  name="display"
+                  checked={!!formData.display}
+                  onChange={handleInputChange}
+                />
+                <label className="form-check-label" htmlFor="displaySwitch">
+                  Afficher (publiée)
+                </label>
               </div>
 
               {/* Package profil (avant images) */}

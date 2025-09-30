@@ -38,7 +38,7 @@ export const SubCategoryAdmin = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [currentId, setCurrentId] = useState(null);
 
-  const [formData, setFormData] = useState({ name: "" });
+  const [formData, setFormData] = useState({ name: "", display: false }); // ✅ display dans le state
   const [idImage, setIdImage] = useState("");
   const [selectedProductId, setSelectedProductId] = useState("");
 
@@ -46,7 +46,7 @@ export const SubCategoryAdmin = () => {
   const [selectedPackageProfilId, setSelectedPackageProfilId] = useState(""); // string
   const [selectedContentCode, setSelectedContentCode] = useState(""); // string
   const [contentCodeQuery, setContentCodeQuery] = useState(""); // recherche code produit
-  const [selectedCategoryId, setSelectedCategoryId] = useState(""); // ✅ Catégorie (id, string)
+  const [selectedCategoryId, setSelectedCategoryId] = useState(""); // Catégorie (id, string)
 
   // ───────── Fetch data ─────────
   useEffect(() => {
@@ -93,7 +93,7 @@ export const SubCategoryAdmin = () => {
     x?.contentCode ?? x?.ContentCode ?? x?.idContentCode ?? x?.IdContentCode ?? null;
 
   const getCategoryIdFromEntity = (x) =>
-    x?.idCategory ?? x?.IdCategory ?? x?.categoryId ?? x?.CategoryId ?? null; // ✅ liens sous-cat -> cat
+    x?.idCategory ?? x?.IdCategory ?? x?.categoryId ?? x?.CategoryId ?? null;
 
   const getProductSubCatId = (p) =>
     p?.idSubCategory ?? p?.IdSubCategory ?? p?.subCategoryId ?? p?.SubCategoryId ?? null;
@@ -135,7 +135,7 @@ export const SubCategoryAdmin = () => {
 
   const getPackageProfilName = (entity) => {
     const category = categoriesFromStore.find((c) => c.id === entity.idCategory);
-    const packageProfil = packageProfils.find((p) => p.id === category.idPackageProfil);
+    const packageProfil = packageProfils.find((p) => p.id === category?.idPackageProfil);
     if (packageProfil == null) return "—";
     return packageProfil.name ?? packageProfil.Name ?? `#${packageProfil.id}`;
   };
@@ -177,13 +177,13 @@ export const SubCategoryAdmin = () => {
   const handleAddClick = () => {
     setIsEditing(false);
     setCurrentId(null);
-    setFormData({ name: "" });
+    setFormData({ name: "", display: false }); // ✅ reset display
     setIdImage("");
     setSelectedProductId("");
     setSelectedTaxIds([]);
     setSelectedPackageProfilId("");
     setSelectedContentCode("");
-    setSelectedCategoryId(""); // ✅ reset cat
+    setSelectedCategoryId("");
     setContentCodeQuery("");
     setShowModal(true);
   };
@@ -191,7 +191,11 @@ export const SubCategoryAdmin = () => {
   const handleEditClick = (subcat) => {
     setIsEditing(true);
     setCurrentId(subcat.id);
-    setFormData({ id: subcat.id, name: subcat.name });
+    setFormData({
+      id: subcat.id,
+      name: subcat.name,
+      display: Boolean(subcat.display), // ✅ pré-rempli
+    });
 
     // Pré-sélections
     const pkgId = getPkgIdFromEntity(subcat);
@@ -202,7 +206,7 @@ export const SubCategoryAdmin = () => {
     setContentCodeQuery("");
 
     const catId = getCategoryIdFromEntity(subcat);
-    setSelectedCategoryId(catId != null ? String(catId) : ""); // ✅ préselection catégorie
+    setSelectedCategoryId(catId != null ? String(catId) : "");
 
     // Image liée
     const img = imagesFromStore.find((i) => imageMatchesSubCat(i, subcat.id));
@@ -241,7 +245,7 @@ export const SubCategoryAdmin = () => {
     const idsTaxesCsv = selectedTaxIds.join(",");
     const pkgIdNum = selectedPackageProfilId !== "" ? Number(selectedPackageProfilId) : null;
     const contentCodeId = selectedContentCode !== "" ? Number(selectedContentCode) : null;
-    const catIdNum = selectedCategoryId !== "" ? Number(selectedCategoryId) : null; // ✅ id catégorie
+    const catIdNum = selectedCategoryId !== "" ? Number(selectedCategoryId) : null;
 
     if (isEditing) {
       await dispatch(
@@ -252,6 +256,7 @@ export const SubCategoryAdmin = () => {
           IdPackageProfil: pkgIdNum,
           ContentCode: contentCodeId,
           IdCategory: catIdNum,
+          Display: !!formData.display, // ✅ ENVOI Display en UPDATE
         })
       );
       if (idImage) {
@@ -269,7 +274,8 @@ export const SubCategoryAdmin = () => {
           IdTaxe: idsTaxesCsv,
           IdPackageProfil: pkgIdNum,
           ContentCode: contentCodeId,
-          IdCategory: catIdNum,     // ✅ envoi id catégorie aussi à la création
+          IdCategory: catIdNum,
+          Display: !!formData.display, // ✅ ENVOI Display en ADD
         })
       );
       await dispatch(getSubCategoryRequest());
@@ -330,10 +336,11 @@ export const SubCategoryAdmin = () => {
             <tr>
               <th>Image</th>
               <th>Nom</th>
-              <th>Catégorie</th>{/* ✅ nouvelle colonne */}
+              <th>Catégorie</th>
               <th>Taxes</th>
               <th>Code produit</th>
               <th>Package profil</th>
+              <th>Afficher</th> {/* ✅ nouvelle colonne */}
               <th style={{ width: 180 }}>Actions</th>
             </tr>
           </thead>
@@ -361,10 +368,17 @@ export const SubCategoryAdmin = () => {
                     <img src={toMediaUrl(getSubCategoryImageUrl(sc.id))} width={100} alt={sc.name} />
                   </td>
                   <td>{sc.name}</td>
-                  <td>{getCategoryNameForSubCat(sc)}</td>{/* ✅ affichage nom catégorie */}
+                  <td>{getCategoryNameForSubCat(sc)}</td>
                   <td>{taxNames}</td>
                   <td>{getContentCodeLabelById(getContentCodeIdFromEntity(sc))}</td>
                   <td>{getPackageProfilName(sc)}</td>
+                  <td>
+                    {sc.display ? (
+                      <span className="badge bg-success">Oui</span>
+                    ) : (
+                      <span className="badge bg-secondary">Non</span>
+                    )}
+                  </td>
                   <td className="d-flex gap-2">
                     <button
                       className="btn btn-sm btn-warning"
@@ -392,7 +406,7 @@ export const SubCategoryAdmin = () => {
             })}
             {sortedSubCategories.length === 0 && (
               <tr>
-                <td colSpan={7} className="text-center">
+                <td colSpan={8} className="text-center">
                   Aucune sous-catégorie.
                 </td>
               </tr>
@@ -432,7 +446,7 @@ export const SubCategoryAdmin = () => {
                 />
               </div>
 
-              {/* ✅ Catégorie (au-dessus du package profil) */}
+              {/* Catégorie */}
               <div className="mb-3">
                 <label>Catégorie</label>
                 <select
@@ -449,23 +463,6 @@ export const SubCategoryAdmin = () => {
                   ))}
                 </select>
               </div>
-
-              {/* Package profil */}
-              {/* <div className="mb-3">
-                <label>Package profil</label>
-                <select
-                  className="form-select mt-2"
-                  value={selectedPackageProfilId}
-                  onChange={(e) => setSelectedPackageProfilId(e.target.value)}
-                >
-                  <option value="">— Sélectionner —</option>
-                  {packageProfils.map((pp) => (
-                    <option key={pp.id ?? pp.Id} value={String(pp.id ?? pp.Id)}>
-                      {pp.name ?? pp.Name ?? `Profil #${pp.id ?? pp.Id}`}
-                    </option>
-                  ))}
-                </select>
-              </div> */}
 
               {/* Code produit : recherche + liste filtrée */}
               <div className="mb-3">
@@ -523,6 +520,22 @@ export const SubCategoryAdmin = () => {
                     <span className="text-muted">Aucune taxe disponible.</span>
                   )}
                 </div>
+              </div>
+
+              {/* Afficher (switch) */}
+              <div className="form-check form-switch mb-3">
+                <input
+                  className="form-check-input"
+                  type="checkbox"
+                  id="displaySwitch"
+                  checked={!!formData.display}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, display: e.target.checked }))
+                  }
+                />
+                <label className="form-check-label" htmlFor="displaySwitch">
+                  Afficher (publiée)
+                </label>
               </div>
 
               {/* Images liées à la sous-catégorie */}

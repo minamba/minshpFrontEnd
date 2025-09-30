@@ -40,8 +40,11 @@ export const Navbar = () => {
   const { isAuth } = useSelector((s) => s.account) || { isAuth: false };
 
   // --- Données catalogue
-  const categories    = useSelector((s) => s.categories?.categories) || [];
-  const subCategories = useSelector((s) => s.subCategories?.subCategories) || [];
+  let categories    = useSelector((s) => s.categories?.categories) || [];
+  let subCategories = useSelector((s) => s.subCategories?.subCategories) || [];
+
+  categories = categories.filter((c) => c.display === true);
+  subCategories = subCategories.filter((c) => c.display === true);
 
   // --- Panier
   const cartItems = useSelector((s) => s.items?.items) || [];
@@ -49,8 +52,6 @@ export const Navbar = () => {
 
   // --- Application pour recuperer les messages promo
   const applications = useSelector((s) => s.applications?.applications) || []; // tableau de string
-
-  console.log("applications FOOOOCK DA SHHHHHHIIIT",applications);
 
   // const promoMessages =
   // useSelector((s) => s.app?.tickerMessages) || []; // tableau de string
@@ -66,7 +67,7 @@ export const Navbar = () => {
       const t = setTimeout(() => setBump(false), 300);
       return () => clearTimeout(t);
     }
-  }, [cartCount]);
+  }, [cartCount, categories, subCategories]);
 
   // --- Map sous-cat par cat
   const subsByCat = useMemo(() => {

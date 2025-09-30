@@ -13,13 +13,32 @@ export const Home = () => {
   const prodState     = useSelector((s) => s.products) || {};
   const fullProducts  = Array.isArray(prodState.products) ? prodState.products : [];
   const pagedItems    = Array.isArray(prodState.items)    ? prodState.items    : [];
+  
   let allProducts   = fullProducts.length ? fullProducts : pagedItems;
+  allProducts = allProducts.filter((p) => p.display === true && p.categoryVm.display === true || p.subCategoryVm?.display === true);
 
-  allProducts = allProducts.filter((p) => p.display === true);
+
+  allProducts.forEach((p) => {
+    if (p.subCategoryVm?.display === false) {
+      p.display = false;
+    }
+  });
+
+
+  allProducts.forEach((p) => {
+    if (p.categoryVm?.display === false) {
+      p.display = false;
+    }
+  });
+
 
   const images    = useSelector((state) => state.images.images) || [];
   const videos    = useSelector((state) => state.videos.videos) || [];
-  const categoriesFromStore = useSelector((state) => state.categories.categories) || [];
+
+  let categoriesFromStore = useSelector((state) => state.categories.categories) || [];
+  categoriesFromStore = categoriesFromStore.filter((c) => c.display === true);
+
+
   const items     = useSelector((state) => state.items.items) || [];
   const promotionCodes = useSelector((state) => state.promotionCodes.promotionCodes) || [];
 
@@ -33,6 +52,9 @@ export const Home = () => {
       ? window.matchMedia('(max-width: 768px)').matches
       : false
   );
+
+
+  
 
 
   useEffect(() => {
