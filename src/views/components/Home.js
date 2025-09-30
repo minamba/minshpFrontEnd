@@ -81,7 +81,7 @@ export const Home = () => {
 
   useEffect(() => { dispatch(saveCartRequest(items)); }, [items, dispatch]);
 
-  const NEW_MAX = 4;
+  const NEW_MAX = 5;
 
   const mainProduct      = allProducts.find((p) => p.main === true) || null;
   const galleryProducts  = allProducts.filter((p) => p.id !== mainProduct?.id);
@@ -129,11 +129,13 @@ export const Home = () => {
     return Number.isNaN(d.getTime()) ? null : d;
   };
 
-  const newestProducts = useMemo(() => {
+  let newestProducts = useMemo(() => {
     return [...allProducts]
       .sort((a, b) => (Date.parse(b?.creationDate || 0) - Date.parse(a?.creationDate || 0)))
       .slice(0, NEW_MAX);
   }, [allProducts]);
+
+  newestProducts = newestProducts.filter((p) => p.id !== mainProduct?.id);
 
   const closeAdded = () => setShowAdded(false);
   const goToCart = () => { setShowAdded(false); navigate('/cart'); };

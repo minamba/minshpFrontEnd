@@ -131,13 +131,70 @@ export const Product = () => {
     };
   }, []);
 
+
+  const computeBadgeFromProduct = (product, promotionCodes = []) => {
+    if (!product) return { badgePct: null, refPriceTtc: null, until: null, source: null };
+  
+    const now = new Date();
+    const isActive = (end) => !!end && now <= new Date(end);
+  
+    // End dates (mêmes règles que calculPrice)
+    const endProd = product?.promotions?.[0]?.endDate;
+  
+    const subPromoId =
+      product?.subCategoryVm?.promotionCodes?.[0]?.id ??
+      product?.subCategoryVm?.idPromotionCode ??
+      null;
+  
+    const catPromoId =
+      product?.categoryVm?.promotionCodes?.[0]?.id ??
+      product?.categoryVm?.idPromotionCode ??
+      null;
+  
+    const endSub = promotionCodes.find(p => p.id === subPromoId)?.endDate;
+    const endCat = promotionCodes.find(p => p.id === catPromoId)?.endDate;
+  
+    // Base/ref prices en HT pour calcul du %
+    const baseHt  = typeof product?.price === 'number' ? product.price : parseFloat(product?.price ?? 0);
+    const subHt   = product?.priceHtSubCategoryCodePromoted;
+    const catHt   = product?.priceHtCategoryCodePromoted;
+    const prodHt  = product?.priceHtPromoted;
+  
+    // Pour l’affichage du prix barré, on repasse en TTC
+    const tvaMultiplier = ((product?.tva ?? 0) / 100) + 1;
+    const tax = product?.taxWithoutTvaAmount ?? 0;
+    const refPriceTtc = (baseHt ?? 0) * tvaMultiplier + tax;
+  
+    const pctFrom = (ht) => {
+      if (!ht || !baseHt || baseHt <= 0) return null;
+      const pct = Math.round((1 - (ht / baseHt)) * 100);
+      return Number.isFinite(pct) && pct > 0 ? pct : null;
+    };
+  
+    // Même priorité que calculPrice
+    if (subHt != null && isActive(endSub)) {
+      return { badgePct: pctFrom(subHt), refPriceTtc, until: endSub, source: 'subcategory' };
+    }
+    if (catHt != null && isActive(endCat)) {
+      return { badgePct: pctFrom(catHt), refPriceTtc, until: endCat, source: 'category' };
+    }
+    if (prodHt != null && isActive(endProd)) {
+      return { badgePct: pctFrom(prodHt), refPriceTtc, until: endProd, source: 'product' };
+    }
+    return { badgePct: null, refPriceTtc: null, until: null, source: 'base' };
+  };
+  
+
+
+
   // ===== Helpers prix/promo =====
   const toNum = (x) => {
     const n = typeof x === 'number' ? x : parseFloat(x);
     return Number.isFinite(n) ? n : null;
   };
 
-  const priceRef = useMemo(() => toNum(product?.priceTtc) ?? 0, [product]);
+  //const priceRef = useMemo(() => toNum(product?.priceTtc) ?? 0, [product]);
+
 
   const parseDate = (val) => {
     if (!val) return null;
@@ -181,29 +238,29 @@ export const Product = () => {
 
   const productPromoPct = activePromo ? Number(activePromo.purcentage) || 0 : 0;
 
-  const discountedPriceProduct = useMemo(() => {
-    if (!activePromo) return priceRef;
-    const p = toNum(product?.priceHtPromoted);
-    if (p != null) return p;
-    return +(priceRef * (1 - productPromoPct / 100)).toFixed(2);
-  }, [activePromo, product, priceRef, productPromoPct]);
-
-  // const displayPrice = useMemo(() => {
-  //   if (priceFromSubCategoryCode != null) {
-  //     return priceFromSubCategoryCode * (product?.tva / 100 + 1) + product?.taxWithoutTvaAmount;
-  //   } else if (priceFromCategoryCode != null && priceFromSubCategoryCode == null) {
-  //     return priceFromCategoryCode * (product?.tva / 100 + 1) + product?.taxWithoutTvaAmount;
-  //   } else if (priceHtPromoted != null && priceFromSubCategoryCode == null && priceFromCategoryCode == null) {
-  //     return priceHtPromoted * (product?.tva / 100 + 1) + product?.taxWithoutTvaAmount;
-  //   } else {
-  //     return price * (product?.tva / 100 + 1) + product?.taxWithoutTvaAmount;
-  //   }
-  // }, [priceFromCategoryCode, discountedPriceProduct]); // (garde tes deps)
 
   const displayPrice = calculPrice(product, promotionCodes);
 
-  const badgePct = pctFromCategoryCode ?? productPromoPct;
-  const showBadge = Number.isFinite(badgePct) && badgePct > 0;
+// ⬇️ nouveau calcul du badge + prix de référence (aligné avec calculPrice)
+const { badgePct, refPriceTtc, until: promoUntilDate } = useMemo(
+  () => computeBadgeFromProduct(product, promotionCodes),
+  [product, promotionCodes]
+);
+
+
+// ancien priceRef -> devient refPriceTtc si dispo, sinon ton fallback
+const priceRef = useMemo(
+  () => (Number.isFinite(refPriceTtc) ? refPriceTtc : toNum(product?.priceTtc) ?? 0),
+  [refPriceTtc, product]
+);
+
+
+const discountedPriceProduct = useMemo(() => {
+  if (!activePromo) return priceRef;
+  const p = toNum(product?.priceHtPromoted);
+  if (p != null) return p;
+  return +(priceRef * (1 - productPromoPct / 100)).toFixed(2);
+}, [activePromo, product, priceRef, productPromoPct]);
 
   const hasPrice = Number.isFinite(displayPrice);
   const [eurosStr, centsStr] = hasPrice ? displayPrice.toFixed(2).split('.') : ['0', '00'];
