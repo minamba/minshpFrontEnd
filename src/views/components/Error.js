@@ -16,7 +16,7 @@ export const Error = ({ errorId }) => {
     [errorId]
   );
 
-  const SUPPORT_EMAIL = "contact@minshp.com";
+  const SUPPORT_EMAIL = "support@minshp.com";
   const mailHref = useMemo(() => {
     const subject = `Probleme de passage de commande`;
     const body = `Bonjour,\n\nJ'ai rencontré un problème technique lors de ma commande.\n\nMon numéro de client est : \nMon mail est :\n\nMerci de votre aide.`;
