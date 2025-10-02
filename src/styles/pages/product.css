@@ -258,3 +258,18 @@
     .thumbs-col .thumb{ flex:0 0 64px; width:64px; height:64px; }
   }
   
+
+  /* Séparateur de section (plein largeur du conteneur) */
+  .section-divider{
+    border: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #1b4caf, transparent);
+    width: 100%;
+    margin: 2rem 0 1.75rem;
+  }
+
+  .bg-description {
+    background-color: rgba(177, 200, 224, 0.08); /* bleu clair très léger */
+    border-radius: 6px; /* optionnel : arrondir un peu les coins */
+    padding: 1rem;      /* optionnel : aérer le contenu */
+  }

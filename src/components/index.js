@@ -23,8 +23,9 @@ import { RequireRole } from '../views/components/Authentication/RequireRole';
 import { toMediaUrl } from '../lib/utils/mediaUrl';
 import { addNewsletterRequest } from '../lib/actions/NewLetterActions';
 import { getProductsPagedUserRequest } from '../lib/actions/ProductActions';
-
-
+import { useEditor, EditorContent } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
+import LinkExt from "@tiptap/extension-link";
 
 
 
@@ -705,6 +706,109 @@ const buildStockFilter = (val) => {
 
 
 
+// ====== Mini composant d’éditeur HTML (TipTap) ======
+function HtmlEditor({ value, onChange }) {
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      LinkExt.configure({
+        openOnClick: true,
+        autolink: true,
+        HTMLAttributes: { target: "_blank", rel: "noopener noreferrer" },
+      }),
+    ],
+    content: value || "",
+    autofocus: false,
+    onUpdate: ({ editor }) => onChange(editor.getHTML()),
+  });
+
+  if (!editor) return null;
+
+  return (
+    <div className="tiptap-wrap">
+      {/* Toolbar minimaliste */}
+      <div className="tt-toolbar d-flex gap-2 mb-2">
+        <button
+          type="button"
+          className={`btn btn-sm ${editor.isActive("bold") ? "btn-dark" : "btn-outline-dark"}`}
+          onClick={() => editor.chain().focus().toggleBold().run()}
+        >
+          B
+        </button>
+        <button
+          type="button"
+          className={`btn btn-sm ${editor.isActive("italic") ? "btn-dark" : "btn-outline-dark"}`}
+          onClick={() => editor.chain().focus().toggleItalic().run()}
+        >
+          I
+        </button>
+        <button
+          type="button"
+          className={`btn btn-sm ${editor.isActive("strike") ? "btn-dark" : "btn-outline-dark"}`}
+          onClick={() => editor.chain().focus().toggleStrike().run()}
+        >
+          S
+        </button>
+        <button
+          type="button"
+          className="btn btn-sm btn-outline-dark"
+          onClick={() => editor.chain().focus().toggleBulletList().run()}
+        >
+          • Liste
+        </button>
+        <button
+          type="button"
+          className="btn btn-sm btn-outline-dark"
+          onClick={() => editor.chain().focus().toggleOrderedList().run()}
+        >
+          1. Liste
+        </button>
+        <button
+          type="button"
+          className="btn btn-sm btn-outline-dark"
+          onClick={() => {
+            const url = window.prompt("URL du lien :");
+            if (url) {
+              editor
+                .chain()
+                .focus()
+                .extendMarkRange("link")
+                .setLink({ href: url, target: "_blank", rel: "noopener noreferrer" })
+                .run();
+            }
+          }}
+        >
+          Lien
+        </button>
+        <button
+          type="button"
+          className="btn btn-sm btn-outline-secondary"
+          onClick={() => editor.chain().focus().unsetLink().run()}
+        >
+          Retirer lien
+        </button>
+        <button
+          type="button"
+          className="btn btn-sm btn-outline-danger"
+          onClick={() => editor.chain().focus().clearNodes().unsetAllMarks().run()}
+        >
+          Nettoyer
+        </button>
+      </div>
+
+      {/* Zone d'édition */}
+      <div className="form-control p-2" style={{ minHeight: 160 }}>
+        <EditorContent editor={editor} />
+      </div>
+    </div>
+  );
+}
+
+// ====== Helper local: strip HTML pour l’aperçu dans le tableau ======
+const stripHtml = (s = "") => s.replace(/<[^>]+>/g, "");
+
+
+
 // //////////////////////// Product Table ////////////////////////
 export const ProductTable = () => {
   // -------------------- UI local state --------------------
@@ -724,14 +828,14 @@ export const ProductTable = () => {
     name: "",
     brand: "",
     model: "",
-    description: "",
+    description: "", // HTML
     price: "",
     category: "",
     image: "",
     stock: 0,
     promotion: "Non",
     main: false,
-    display: false, // ⬅️ nouveau champ
+    display: false,
     packageProfilId: "",
     subCategoryId: "",
   });
@@ -851,7 +955,6 @@ export const ProductTable = () => {
   }, [categoriesFromStore, categoryFilter, stockFilter, debouncedSearch, page, pageSize]);
 
   const refreshPage = useCallback(() => {
-    // force un nouveau fetch même si la signature est identique
     lastQueryRef.current = "";
     dispatch(getProductsPagedUserRequest(buildQueryPayload()));
   }, [dispatch, buildQueryPayload]);
@@ -869,7 +972,6 @@ export const ProductTable = () => {
     if (totalPagesFromStore) return Math.max(1, Number(totalPagesFromStore));
     if (Number(totalCountFromStore) > 0)
       return Math.max(1, Math.ceil(Number(totalCountFromStore) / pageSize));
-    // Heuristique si l’API ne renvoie pas de total
     return Math.max(1, products.length === pageSize ? page + 1 : page);
   })();
 
@@ -938,11 +1040,11 @@ export const ProductTable = () => {
       name: product.name,
       brand: product.brand,
       model: product.model,
-      description: product.description,
+      description: product.description, // HTML
       price: product.price,
       category: product.category,
       main: !!product.main,
-      display: !!product.display, // ⬅️ on récupère
+      display: !!product.display,
       stock: getQty(product),
       idStock: product.stocks?.id,
       packageProfilId: (() => {
@@ -985,11 +1087,11 @@ export const ProductTable = () => {
           Name: formData.name,
           Brand: formData.brand,
           Model: formData.model,
-          Description: formData.description,
+          Description: formData.description, // HTML
           Price: formData.price,
           IdCategory: idCategory,
           Main: formData.main,
-          Display: formData.display, // ⬅️ nouveau
+          Display: formData.display,
           Stock: formData.stock,
           ...(pkgId != null ? { IdPackageProfil: pkgId, PackageProfilId: pkgId } : {}),
           ...(subCatId != null ? { IdSubCategory: subCatId, SubCategoryId: subCatId } : {}),
@@ -1001,12 +1103,12 @@ export const ProductTable = () => {
           Name: formData.name,
           Brand: formData.brand,
           Model: formData.model,
-          Description: formData.description,
+          Description: formData.description, // HTML
           Price: formData.price,
           Stock: formData.stock,
           IdCategory: idCategory,
           Main: formData.main,
-          Display: formData.display, // ⬅️ nouveau
+          Display: formData.display,
           ...(pkgId != null ? { IdPackageProfil: pkgId, PackageProfilId: pkgId } : {}),
           ...(subCatId != null ? { IdSubCategory: subCatId, SubCategoryId: subCatId } : {}),
         })
@@ -1125,7 +1227,7 @@ export const ProductTable = () => {
                   <td>{prod.brand}</td>
                   <td>{prod.model}</td>
                   <td className="text-truncate col-desc" style={{ maxWidth: 360 }}>
-                    {prod.description}
+                    {stripHtml(prod.description)}
                   </td>
                   <td>{prod.price}</td>
                   <td>{prod.priceTtc}</td>
@@ -1276,7 +1378,11 @@ export const ProductTable = () => {
 
       {/* Modal Ajout / Modif */}
       {showModal && (
-        <div className="admin-modal-backdrop" role="presentation" onClick={() => setShowModal(false)}>
+        <div
+          className="admin-modal-backdrop"
+          role="presentation"
+          onClick={() => setShowModal(false)}
+        >
           <div
             className="admin-modal-panel"
             role="dialog"
@@ -1287,6 +1393,7 @@ export const ProductTable = () => {
             <h2 id="prod-edit-title" className="mb-3">
               {isEditing ? "Modifier le produit" : "Ajouter un produit"}
             </h2>
+
             <form onSubmit={handleSubmit}>
               <div className="mb-3">
                 <label>Nom</label>
@@ -1299,6 +1406,7 @@ export const ProductTable = () => {
                   required
                 />
               </div>
+
               <div className="mb-3">
                 <label>Marque</label>
                 <input
@@ -1310,6 +1418,7 @@ export const ProductTable = () => {
                   required
                 />
               </div>
+
               <div className="mb-3">
                 <label>Modèle</label>
                 <input
@@ -1320,16 +1429,18 @@ export const ProductTable = () => {
                   onChange={handleInputChange}
                 />
               </div>
+
+              {/* ===== Description : éditeur HTML TipTap ===== */}
               <div className="mb-3">
-                <label>Description</label>
-                <textarea
-                  name="description"
-                  className="form-control"
+                <label>Description (HTML)</label>
+                <HtmlEditor
                   value={formData.description}
-                  onChange={handleInputChange}
-                  required
+                  onChange={(html) =>
+                    setFormData((prev) => ({ ...prev, description: html }))
+                  }
                 />
               </div>
+
               <div className="mb-3">
                 <label>Prix (€)</label>
                 <input
@@ -1453,7 +1564,6 @@ export const ProductTable = () => {
     </div>
   );
 };
-
 
 
 

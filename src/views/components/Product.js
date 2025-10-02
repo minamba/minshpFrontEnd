@@ -9,6 +9,7 @@ import { toMediaUrl } from '../../lib/utils/mediaUrl';
 import { getProductsPagedUserRequest } from "../../lib/actions/ProductActions"; // ✅ pagination
 import "../../styles/pages/product.css";
 import { calculPrice } from '../../lib/utils/Helpers';
+import DOMPurify from 'dompurify';
 
 export const Product = () => {
   const { id } = useParams();
@@ -59,6 +60,26 @@ export const Product = () => {
     () => (productsAll || []).find((p) => String(p.id) === String(id)) || null,
     [productsAll, id]
   );
+
+
+
+  const cleanDescriptionHtml = useMemo(() => {
+    const raw = product?.description ?? '';
+    // Fallback si vide
+    const fallback = 'Découvrez ce produit au design soigné et aux performances solides. Idéal pour un usage quotidien comme pour les usages intensifs.';
+    const html = raw && String(raw).trim() !== '' ? raw : `<p>${fallback}</p>`;
+  
+    // Autorise un sous-ensemble sûr de balises/attributs
+    return DOMPurify.sanitize(html, {
+      ALLOWED_TAGS: [
+        'p','br','ul','ol','li',
+        'b','strong','i','em','u','s',
+        'h1','h2','h3','h4','blockquote','span','a'
+      ],
+      ALLOWED_ATTR: ['href','title','target','rel','class'],
+    });
+  }, [product?.description]);
+
 
   // Promo liée à la catégorie (optionnel)
   const promotion = useMemo(
@@ -380,6 +401,7 @@ const discountedPriceProduct = useMemo(() => {
     );
   }
 
+
   return (
     <div className="product-page" onContextMenu={handleContextMenu}>
       {/* Zone haute: galerie + infos achat */}
@@ -517,14 +539,17 @@ const discountedPriceProduct = useMemo(() => {
       )}
 
       {/* Description */}
-      <section className="product-desc">
-        <h2 className="specs-title">Description</h2>
-        <p>
-          {product?.description ||
-            'Découvrez ce produit au design soigné et aux performances solides. Idéal pour un usage quotidien comme pour les usages intensifs.'}
-        </p>
-      </section>
+      <hr className="section-divider" aria-hidden="true" />
 
+      <section className="product-desc">
+          <h2 className="specs-title">Description</h2>
+
+          <div
+            className="product-description-html mb-3 bg-description"
+            // ⬇️ injection contrôlée (sanitized)
+            dangerouslySetInnerHTML={{ __html: cleanDescriptionHtml }}
+          />
+      </section>
       {/* Vidéo — NE PAS TOUCHER */}
       {hasVideo && (
         <section className="product-video-section">
@@ -544,6 +569,7 @@ const discountedPriceProduct = useMemo(() => {
         </section>
       )}
 
+<hr className="section-divider " aria-hidden="true" />
       {/* Caractéristiques */}
       <section className="specs-wrap">
         <h2 className="specs-title">Caractéristiques techniques</h2>
