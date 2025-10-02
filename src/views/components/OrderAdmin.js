@@ -157,12 +157,14 @@ export const OrderAdmin = () => {
   const openEdit = (o) => setModal({ open: true, mode: "edit", order: o });
   const close    = () => setModal((m) => ({ ...m, open: false }));
 
-  const [searchCust, setSearchCust] = useState("");
-  const [selectedCustomer, setSelectedCustomer] = useState("");
+  const [searchCust, setSearchCust] = useState(null);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [payMethod, setPayMethod] = useState("Carte");
   const [status, setStatus] = useState("En attente");
   const [cat, setCat] = useState("Toutes les catégories");
   const [searchProd, setSearchProd] = useState("");
+  const [trackingLink, setTrackingLink] = useState(null);
+  const [trackingNumber, setTrackingNumber] = useState(null);
 
   const [selectedProducts, setSelectedProducts] = useState(new Set());
   const [quantities, setQuantities] = useState(new Map());
@@ -172,6 +174,7 @@ export const OrderAdmin = () => {
     if (modal.mode === "add") {
       setSearchCust(""); setSelectedCustomer(""); setPayMethod("Carte"); setStatus("En attente");
       setCat("Toutes les catégories"); setSearchProd(""); setSelectedProducts(new Set()); setQuantities(new Map());
+      setTrackingLink(""); setTrackingNumber("");
     } else if (modal.mode === "edit" && modal.order) {
       const oid = String(getId(modal.order));
       const lines = opByOrder.get(oid) || [];
@@ -179,6 +182,8 @@ export const OrderAdmin = () => {
       setPayMethod(modal.order?.payment ?? modal.order?.paymentMethod ?? "Carte");
       setStatus(modal.order?.status ?? modal.order?.orderStatus ?? "En cours");
       setCat("Toutes les catégories"); setSearchProd("");
+      setTrackingLink(modal.order?.trackingLink ?? modal.order?.TrackingLink ?? "");
+      setTrackingNumber(modal.order?.trackingNumber ?? modal.order?.TrackingNumber ?? "");
       const ids = new Set(); const qmap = new Map();
       for (const l of lines) { const pid = String(getProductIdFromOP(l)); if (!pid) continue; ids.add(pid); qmap.set(pid, clamp(Number(l?.quantity ?? l?.qty ?? 1))); }
       setSelectedProducts(ids); setQuantities(qmap);
@@ -343,6 +348,8 @@ export const OrderAdmin = () => {
 
     await dispatch(updateOrderRequest({
       OrderId: orderId, CustomerId: customerId, Status: status, PaymentMethod: payMethod, Amount: amount,
+      TrackingLink: trackingLink, trackingLink: trackingLink,
+      TrackingNumber: trackingNumber, trackingNumber: trackingNumber,
       Id: orderId, Payment: payMethod, Total: amount,
     }));
 
@@ -386,7 +393,10 @@ export const OrderAdmin = () => {
       const amount = o?.amount;
       const trackingNumber = o?.trackingNumber ?? "—";
       const trackingLink = o?.trackingLink ?? "—";
-      return { _raw: o, oid, email, num, pay, st, total, prods, date, amount, trackingNumber, trackingLink };
+      const carrier = o?.carrier ?? "—";
+      const serviceCode = o?.serviceCode ?? "—";
+      const boxtalShipmentId = o?.boxtalShipmentId ?? "—";
+      return { _raw: o, oid, email, num, pay, st, total, prods, date, amount, trackingNumber, trackingLink, carrier, serviceCode, boxtalShipmentId };
     });
   }, [items, customersById, computeTotal, productsListForOrder]);
 
@@ -483,6 +493,8 @@ export const OrderAdmin = () => {
               <th>Montant</th>
               <th>Date</th>
               <th>Produits</th>
+              <th>Transporteur</th>
+              <th>Ref commande Boxtal</th>
               <th style={{ width: 180 }}>Actions</th>
             </tr>
           </thead>
@@ -511,6 +523,8 @@ export const OrderAdmin = () => {
                   <td className="text-success fw-bold">{fmtMoney(r.amount)}</td>
                   <td>{r.date}</td>
                   <td style={{ whiteSpace: "pre-wrap" }}>{r.prods.length ? r.prods.join(", ") : "—"}</td>
+                  <td>{r.carrier + " : " + r.serviceCode}</td>
+                  <td>{r.boxtalShipmentId}</td>
                   <td className="d-flex gap-2">
                     <button className="btn btn-sm btn-warning" onClick={() => openEdit(r._raw)} title="Modifier">
                       <i className="bi bi-pencil" />
@@ -534,7 +548,7 @@ export const OrderAdmin = () => {
         <Pagination />
       </div>
 
-      {/* ===== Modale (garde tes champs/handlers tels quels) ===== */}
+      {/* ===== Modale ===== */}
       {modal.open && (
         <div className="admin-modal-backdrop" role="presentation" onClick={close}>
           <div
@@ -546,13 +560,318 @@ export const OrderAdmin = () => {
           >
             <h3 className="mb-3">{modal.mode === "add" ? "Ajouter une commande" : "Modifier la commande"}</h3>
 
-            {/* ⚠️ Remets ici TON formulaire complet (client / produits / quantités) */}
-            {/* Les handlers utilisés ci-dessus: submitAdd, submitEdit, toggleProduct, changeQty */}
-            {/* Pour éviter un message interminable, je n’ai pas recopié tout le markup du formulaire. */}
-            {/* ... */}
+            {modal.mode === "add" ? (
+              /* ======== FORMULAIRE D'AJOUT ======== */
+              <form onSubmit={submitAdd} className="d-flex flex-column gap-3">
+                {/* Ligne 1 : Client + Paiement/Statut */}
+                <div className="row g-3">
+                  <div className="col-md-6">
+                    <label className="form-label">Rechercher un client</label>
+                    <input
+                      className="form-control"
+                      placeholder="email, nom, téléphone…"
+                      value={searchCust}
+                      onChange={(e) => setSearchCust(e.target.value)}
+                    />
+                    <div className="mt-2" style={{ maxHeight: 220, overflow: "auto", border: "1px solid #e5e5e5", borderRadius: 6 }}>
+                      <ul className="list-group list-group-flush">
+                        {filteredCustomers.map((c) => {
+                          const cid = getCustomerId(c);
+                          const label = [c?.firstName, c?.lastName].filter(Boolean).join(" ") || c?.fullName || c?.email || cid;
+                          return (
+                            <li
+                              key={cid}
+                              className={`list-group-item d-flex justify-content-between align-items-center ${String(selectedCustomer) === String(cid) ? "active" : ""}`}
+                              style={{ cursor: "pointer" }}
+                              onClick={() => setSelectedCustomer(String(cid))}
+                            >
+                              <span>
+                                <strong>{label}</strong>
+                                <div className="small text-muted">{c?.email} {c?.phone ? `• ${c.phone}` : ""}</div>
+                              </span>
+                              {String(selectedCustomer) === String(cid) && <i className="bi bi-check2-circle" />}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="col-md-6">
+                    <div className="row g-3">
+                      <div className="col-sm-6">
+                        <label className="form-label">Paiement</label>
+                        <select className="form-select" value={payMethod} onChange={(e) => setPayMethod(e.target.value)}>
+                          {["Carte", "PayPal", "Virement", "Espèces"].map((p) => <option key={p} value={p}>{p}</option>)}
+                        </select>
+                      </div>
+                      <div className="col-sm-6">
+                        <label className="form-label">Statut</label>
+                        <select className="form-select" value={status} onChange={(e) => setStatus(e.target.value)}>
+                          {["En attente", "En cours", "Envoyé préparé", "Expédié", "Annulé"].map((s) => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </div>
+                      <div className="col-12">
+                        <label className="form-label">Catégorie</label>
+                        <select className="form-select" value={cat} onChange={(e) => setCat(e.target.value)}>
+                          <option>Toutes les catégories</option>
+                          {[...new Set((products || []).map(p => p?.category?.name || p?.category || p?.categoryName).filter(Boolean))].map((c) => (
+                            <option key={c} value={c}>{c}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Ligne 2 : Produits */}
+                <div className="row g-3">
+                  <div className="col-md-7">
+                    <label className="form-label">Rechercher un produit</label>
+                    <input
+                      className="form-control"
+                      placeholder="marque, modèle, nom…"
+                      value={searchProd}
+                      onChange={(e) => setSearchProd(e.target.value)}
+                    />
+
+                    <div className="mt-2" style={{ maxHeight: 340, overflow: "auto", border: "1px solid #e5e5e5", borderRadius: 6 }}>
+                      <table className="table table-sm align-middle mb-0">
+                        <thead>
+                          <tr>
+                            <th style={{ width: 40 }}></th>
+                            <th>Produit</th>
+                            <th style={{ width: 120 }}>Prix</th>
+                            <th style={{ width: 110 }}>Qté</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredProducts.map((p) => {
+                            const pid = String(getId(p));
+                            const checked = selectedProducts.has(pid);
+                            const qty = quantities.get(pid) ?? 1;
+                            return (
+                              <tr key={pid} className={checked ? "table-success" : undefined}>
+                                <td>
+                                  <input
+                                    type="checkbox"
+                                    className="form-check-input"
+                                    checked={checked}
+                                    onChange={() => toggleProduct(pid)}
+                                  />
+                                </td>
+                                <td>{labelForProduct(p)}</td>
+                                <td>{fmtMoney(unitPrice(p))}</td>
+                                <td>
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    className="form-control form-control-sm"
+                                    value={qty}
+                                    onChange={(e) => changeQty(pid, e.target.value)}
+                                    onFocus={(e) => e.target.select()}
+                                  />
+                                </td>
+                              </tr>
+                            );
+                          })}
+                          {filteredProducts.length === 0 && (
+                            <tr><td colSpan={4} className="text-center text-muted py-4">Aucun produit</td></tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Résumé commande */}
+                  <div className="col-md-5">
+                    <div className="card h-100">
+                      <div className="card-body d-flex flex-column">
+                        <h5 className="card-title">Résumé</h5>
+                        <div className="flex-grow-1">
+                          {[...selectedProducts].map((pid) => {
+                            const p = productsById.get(String(pid));
+                            if (!p) return null;
+                            const q = quantities.get(String(pid)) ?? 1;
+                            return (
+                              <div key={pid} className="d-flex justify-content-between small border-bottom py-1">
+                                <div className="text-truncate" title={labelForProduct(p)}>{labelForProduct(p)} × {q}</div>
+                                <div>{fmtMoney(unitPrice(p) * q)}</div>
+                              </div>
+                            );
+                          })}
+                          {selectedProducts.size === 0 && (
+                            <div className="text-muted small">Aucun produit sélectionné.</div>
+                          )}
+                        </div>
+
+                        <div className="d-flex justify-content-between align-items-center mt-3">
+                          <strong>Total</strong>
+                          <strong className="text-success">{fmtMoney(calcModalAmount())}</strong>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="d-flex justify-content-end gap-2">
+                  <button type="button" className="btn btn-light" onClick={close}>Annuler</button>
+                  <button type="submit" className="btn btn-primary">Créer la commande</button>
+                </div>
+              </form>
+            ) : (
+              /* ======== VUE ÉDITION (Données de la ligne sélectionnée uniquement) ======== */
+              <form onSubmit={submitEdit} className="d-flex flex-column gap-3">
+                {(() => {
+                  const o = modal.order;
+                  const oid = String(getId(o));
+                  const cid = o?.idCustomer ?? o?.customerId ?? o?.CustomerId ?? o?.customer?.id;
+                  const cust = customersById.get(String(cid));
+                  const lines = (opByOrder.get(oid) || []).map(l => {
+                    const pid = String(getProductIdFromOP(l));
+                    const prod = productsById.get(pid);
+                    const qty  = Number(l?.quantity ?? l?.qty ?? 1);
+                    return { pid, prod, qty };
+                  });
+
+                  return (
+                    <>
+                      {/* En-tête commande */}
+                      <div className="row g-3">
+                        <div className="col-md-6">
+                          <div className="card">
+                            <div className="card-body">
+                              <div className="fw-bold mb-1">Client</div>
+                              <div>{cust ? `${cust?.firstName ?? ""} ${cust?.lastName ?? ""}`.trim() : "—"}</div>
+                              <div className="text-muted small">{cust?.email ?? o?.customer?.email ?? "—"}</div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="col-md-6">
+                          <div className="row g-3">
+                            <div className="col-sm-6">
+                              <label className="form-label">Paiement</label>
+                              <select className="form-select" value={payMethod} onChange={(e) => setPayMethod(e.target.value)}>
+                                {["Carte","PayPal","Virement","Espèces"].map(p => <option key={p} value={p}>{p}</option>)}
+                              </select>
+                            </div>
+                            <div className="col-sm-6">
+                              <label className="form-label">Statut</label>
+                              <select className="form-select" value={status} onChange={(e) => setStatus(e.target.value)}>
+                                {["En attente","En cours","Envoyé préparé","Expédié","Annulé"].map(s => <option key={s} value={s}>{s}</option>)}
+                              </select>
+                            </div>
+                            <div className="col-12">
+                              <label className="form-label">Tracking link</label>
+                              <input
+                                className="form-control"
+                                placeholder="https://..."
+                                value={trackingLink}
+                                onChange={(e) => setTrackingLink(e.target.value)}
+                              />
+                            </div>
+                            <div className="col-12">
+                              <label className="form-label">Tracking number</label>
+                              <input
+                                className="form-control"
+                                placeholder="Numéro de suivi"
+                                value={trackingNumber}
+                                onChange={(e) => setTrackingNumber(e.target.value)}
+                              />
+                            </div>
+                          </div>
+                          <div className="mt-3 small text-muted">
+                            <div><span className="fw-semibold">N° commande :</span> {o?.orderNo ?? o?.orderNumber ?? `#${oid}`}</div>
+                            <div><span className="fw-semibold">Date :</span> {o?.date ? new Date(o.date).toLocaleDateString() : "—"}</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Lignes produits */}
+                      <div className="card">
+                        <div className="card-body">
+                          <div className="d-flex justify-content-between align-items-center mb-2">
+                            <h5 className="card-title mb-0">Produits de la commande</h5>
+                            <span className="text-muted small">{lines.length} article(s)</span>
+                          </div>
+
+                          <div className="table-responsive">
+                            <table className="table table-sm align-middle">
+                              <thead>
+                                <tr>
+                                  <th>Produit</th>
+                                  <th style={{width:120}}>Prix unitaire</th>
+                                  <th style={{width:110}}>Qté</th>
+                                  <th style={{width:140}}>Total ligne</th>
+                                  <th style={{width:70}}></th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {lines.map(({ pid, prod }) => {
+                                  const label = labelForProduct(prod);
+                                  const qty   = quantities.get(pid) ?? 1; // hydraté à l’ouverture
+                                  const price = unitPrice(prod);
+                                  return (
+                                    <tr key={pid}>
+                                      <td className="text-truncate" title={label}>{label}</td>
+                                      <td>{fmtMoney(price)}</td>
+                                      <td>
+                                        <input
+                                          type="number"
+                                          min={1}
+                                          className="form-control form-control-sm"
+                                          value={qty}
+                                          onChange={(e) => changeQty(pid, e.target.value)}
+                                          onFocus={(e) => e.target.select()}
+                                        />
+                                      </td>
+                                      <td className="fw-semibold">{fmtMoney(price * (quantities.get(pid) ?? 1))}</td>
+                                      <td className="text-end">
+                                        <button
+                                          type="button"
+                                          className="btn btn-sm btn-outline-danger"
+                                          title="Retirer"
+                                          onClick={() => toggleProduct(pid)}
+                                        >
+                                          <i className="bi bi-x-lg" />
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                                {lines.length === 0 && (
+                                  <tr><td colSpan={5} className="text-center text-muted py-4">Aucun produit dans cette commande.</td></tr>
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+
+                          {/* Total */}
+                          <div className="d-flex justify-content-end">
+                            <div className="fs-6">
+                              <span className="me-2">Total :</span>
+                              <strong className="text-success">{fmtMoney(calcModalAmount())}</strong>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="d-flex justify-content-end gap-2">
+                        <button type="button" className="btn btn-light" onClick={close}>Fermer</button>
+                        <button type="submit" className="btn btn-primary">Enregistrer</button>
+                      </div>
+                    </>
+                  );
+                })()}
+              </form>
+            )}
           </div>
         </div>
       )}
     </div>
   );
 };
+
+export default OrderAdmin;
