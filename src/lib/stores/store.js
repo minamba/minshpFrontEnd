@@ -39,6 +39,7 @@ import axios from "axios";
 const API_HOST = window.location.hostname;     // ex: "localhost" ou "192.168.1.63"
 const API_PORT = 5054;                         // ton port API HTTP
 axios.defaults.baseURL = `http://${API_HOST}:${API_PORT}`;
+//axios.defaults.baseURL = "https://minshp.com";
 axios.defaults.withCredentials = false;
 axios.defaults.timeout = 15000;
 

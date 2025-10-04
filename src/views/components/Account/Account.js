@@ -253,7 +253,7 @@ export const Account = () => {
       prod?.Image ??
       null;
 
-    const url = imgRec?.url ?? prodUrl ?? "/Images/placeholder.jpg";
+    const url = imgRec?.url ?? prodUrl ?? "/Imgs/placeholder.jpg";
     return toMediaUrl(url);
   };
 
@@ -300,7 +300,7 @@ export const Account = () => {
           {currentCustomer ? (
             <img
               className="account-avatar"
-              src={currentCustomer.civilite === "M" ? "/Images/man_avatar.png" : "/Images/women_avatar.png"}
+              src={currentCustomer.civilite === "M" ? "/Imgs/man_avatar.png" : "/Imgs/women_avatar.png"}
               alt={user?.fullName || "Avatar"}
             />
           ) : (
@@ -360,7 +360,7 @@ export const Account = () => {
           {currentCustomer && (
             <img
               className="account-hero__img"
-              src={"/Images/account-empty.png"}
+              src={"/Imgs/account-empty.png"}
               alt=""
               onError={(e) => (e.currentTarget.style.display = "none")}
             />
@@ -441,7 +441,7 @@ export const Account = () => {
                                         alt={it.name}
                                         width={60}
                                         onError={(e) => {
-                                          e.currentTarget.src = "/Images/placeholder.jpg";
+                                          e.currentTarget.src = "/Imgs/placeholder.jpg";
                                         }}
                                       />
                                     </Link>

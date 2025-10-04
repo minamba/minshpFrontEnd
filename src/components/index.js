@@ -222,7 +222,7 @@ export const Navbar = () => {
 
             <div className="navbar-logo">
               <Link to="/" onClick={onNavLink} aria-label="Accueil">
-                <img className="logo-img" src="/Images/logo_16.png" alt="Min's" />
+                <img className="logo-img" src="/Imgs/logo_16.png" alt="Min's" />
               </Link>
             </div>
 
@@ -242,7 +242,7 @@ export const Navbar = () => {
             <div className="navbar-left">
               <div className="navbar-logo">
                 <Link to="/" onClick={closeAllDropdowns} aria-label="Accueil">
-                  <img className="logo-img" src="/Images/logo_16.png" alt="Min's" />
+                  <img className="logo-img" src="/Imgs/logo_16.png" alt="Min's" />
                 </Link>
               </div>
             </div>
@@ -1942,7 +1942,7 @@ export const Footer = () => {
             <h4 className="badge-title">Moyens de paiement acceptés</h4>
             <div className="badge-row">
               <span className="badge-item">
-                <img src="/Images/visa.png" alt="Visa" />
+                <img src="/Imgs/visa.png" alt="Visa" />
               </span>
               {/* <span className="badge-item">
                 <img src="/Images/paypal.png" alt="PayPal" />
@@ -1955,16 +1955,16 @@ export const Footer = () => {
             <h4 className="badge-title">Nos transporteurs</h4>
             <div className="badge-row">
               <span className="badge-item">
-                <img src="/Images/colissimo.png" alt="Colissimo" />
+                <img src="/Imgs/colissimo.png" alt="Colissimo" />
               </span>
               <span className="badge-item">
-                <img src="/Images/chronopost.png" alt="Chronopost" />
+                <img src="/Imgs/chronopost.png" alt="Chronopost" />
               </span>
               <span className="badge-item">
-                <img src="/Images/mondialrelay.png" alt="Mondial Relay" />
+                <img src="/Imgs/mondialrelay.png" alt="Mondial Relay" />
               </span>
               <span className="badge-item">
-                <img src="/Images/ups.png" alt="UPS" />
+                <img src="/Imgs/ups.png" alt="UPS" />
               </span>
             </div>
           </div>
