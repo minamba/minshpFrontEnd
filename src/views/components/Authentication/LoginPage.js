@@ -8,8 +8,8 @@ import { loginRequest } from "../../../lib/actions/AccountActions";
 
 const API_HOST = window.location.hostname;     // ex: "localhost" ou "192.168.1.63"
 const API_PORT = 5054;                         // ton port API HTTP
-const FORGOT_URL = `http://${API_HOST}:${API_PORT}/account/forgot-password`;
-//const FORGOT_URL = "https://minshp.com/account/forgot-password"; // <-- adapte l'URL si besoin
+//const FORGOT_URL = `http://${API_HOST}:${API_PORT}/account/forgot-password`;
+const FORGOT_URL = "https://minshp.com/account/forgot-password"; // <-- adapte l'URL si besoin
 
 export default function LoginPage() {
   const dispatch  = useDispatch();
