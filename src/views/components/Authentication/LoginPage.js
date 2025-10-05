@@ -6,7 +6,10 @@ import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { loginRequest } from "../../../lib/actions/AccountActions";
 
-const FORGOT_URL = "https://localhost:7183/account/forgot-password"; // <-- adapte l'URL si besoin
+const API_HOST = window.location.hostname;     // ex: "localhost" ou "192.168.1.63"
+const API_PORT = 5054;                         // ton port API HTTP
+const FORGOT_URL = `http://${API_HOST}:${API_PORT}/account/forgot-password`;
+//const FORGOT_URL = "https://minshp.com/account/forgot-password"; // <-- adapte l'URL si besoin
 
 export default function LoginPage() {
   const dispatch  = useDispatch();
@@ -115,7 +118,7 @@ export default function LoginPage() {
   return (
     <div
     className="auth-page auth-page--photo"
-    style={{ '--auth-bg': 'url(/Images/login_background.png)' }}
+    style={{ '--auth-bg': 'url(/Imgs/login_background.png)' }}
 >
       <div className="auth-card" role="dialog" aria-labelledby="login-title">
         <h1 id="login-title" className="auth-title">Connexion</h1>

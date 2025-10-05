@@ -1,17 +1,5 @@
 import axios from "axios";
 
-const API_HOST = window.location.hostname;     // ex: "localhost" ou "192.168.1.63"
-const API_PORT = 5098;                         // ton port API HTTP
-
-const idp = axios.create({
-
-   baseURL: `http://${API_HOST}:${API_PORT}`,
-  //baseURL: "https://minshp.com",
-  // header pas obligatoire ici, Axios le mettra pour URLSearchParams
-  headers: { "Accept": "application/json" },
-  timeout: 10000,
-});
-
 
 //login
 export const login = ({ email, password }) => {
@@ -23,7 +11,7 @@ export const login = ({ email, password }) => {
     scope: "openid profile roles api", // ✅ sans doublon
   });
 
-  return idp.post("/api/auth/token", body, {
+  return axios.post("/api/auth/token", body, {
     withCredentials: false, // ✅ SPA: pas de cookies
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
   });
@@ -31,7 +19,7 @@ export const login = ({ email, password }) => {
 
 //register
 export const register = (dto) => {
-  return idp.post("/account/register", dto, {
+  return axios.post("/account/register", dto, {
     headers: { "Content-Type": "application/json" },
     withCredentials: false,
   });
@@ -47,7 +35,7 @@ export const passwordToken = ({ email, password }) => {
     scope: "openid profile roles api",
   });
 
-  return idp.post("/api/auth/token", body, {
+  return axios.post("/api/auth/token", body, {
     withCredentials: false,
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
   });
@@ -62,7 +50,7 @@ function authHeader() {
 
 
 export function updateUser(data) {
-  return idp.put(`/account/${encodeURIComponent(data.Id)}`, data, {
+  return axios.put(`/account/${encodeURIComponent(data.Id)}`, data, {
     headers: {
       "Content-Type": "application/json",
       ...authHeader(),
@@ -73,7 +61,7 @@ export function updateUser(data) {
 
 
 export function deleteUser(id) {
-  return idp.delete(`/account/${encodeURIComponent(id)}`, {
+  return axios.delete(`/account/${encodeURIComponent(id)}`, {
     headers: {
       ...authHeader(),        // Bearer <token>
     },
@@ -82,7 +70,7 @@ export function deleteUser(id) {
 }
 
 export function updateUserPassword(data) {
-  return idp.put(`/account/${encodeURIComponent(data.Id)}/password`, data, {
+  return axios.put(`/account/${encodeURIComponent(data.Id)}/password`, data, {
     headers: {
       "Content-Type": "application/json",
       ...authHeader(),
@@ -97,7 +85,7 @@ export function updateUserPassword(data) {
 //role
 
 export function addUserRole(data) {
-    return idp.post(`/role/add`, data, {
+    return axios.post(`/role/add`, data, {
       headers: {
         "Content-Type": "application/json",
         ...authHeader(),
@@ -107,7 +95,7 @@ export function addUserRole(data) {
   }
 
   export function removeUserRole(data) {
-    return idp.post(`/role/remove`, data, {
+    return axios.post(`/role/remove`, data, {
       headers: {
         "Content-Type": "application/json",
         ...authHeader(),        // Bearer <token>
@@ -121,7 +109,7 @@ export function addUserRole(data) {
   //Lock Use
 
   export function lockUser(id) {
-    return idp.post(`/account/${encodeURIComponent(id)}/lock`,null, {
+    return axios.post(`/account/${encodeURIComponent(id)}/lock`,null, {
       headers: {
         ...authHeader(),
         withCredentials: false,        // Bearer <token>
@@ -134,7 +122,7 @@ export function addUserRole(data) {
   // Unlock User
 
   export function unlockUser(id) {
-    return idp.post(`/account/${encodeURIComponent(id)}/unlock`,null, {
+    return axios.post(`/account/${encodeURIComponent(id)}/unlock`,null, {
       headers: {
         ...authHeader(),        // Bearer <token>
       },
