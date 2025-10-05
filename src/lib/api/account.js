@@ -1,6 +1,22 @@
 import axios from "axios";
 
 
+const API_HOST = window.location.hostname;     // ex: "localhost" ou "192.168.1.63"
+const API_PORT = 5098;
+//const baseurl = `http://${API_HOST}:${API_PORT}`;
+const baseurl = "https://minshp.com";                              // ton port API HTTP
+
+
+const idp = axios.create({ 
+  baseURL: baseurl,
+   // header pas obligatoire ici, Axios le mettra pour URLSearchParams
+   headers: { "Accept": "application/json" }, 
+   timeout: 10000
+   });
+
+
+
+
 //login
 export const login = ({ email, password }) => {
   const body = new URLSearchParams({
@@ -11,7 +27,7 @@ export const login = ({ email, password }) => {
     scope: "openid profile roles api", // ✅ sans doublon
   });
 
-  return axios.post("/api/auth/token", body, {
+  return idp.post("/connect/token", body, {
     withCredentials: false, // ✅ SPA: pas de cookies
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
   });
@@ -35,7 +51,7 @@ export const passwordToken = ({ email, password }) => {
     scope: "openid profile roles api",
   });
 
-  return axios.post("/api/auth/token", body, {
+  return idp.post("/connect/token", body, {
     withCredentials: false,
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
   });
