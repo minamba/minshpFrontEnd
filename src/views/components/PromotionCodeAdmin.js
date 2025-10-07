@@ -37,6 +37,7 @@ export const PromotionCodeAdmin = () => {
     startDate: '',
     endDate: '',
     isUsed: false,
+    generalCartAmount: '' // NEW: montant pour panier global (number | '')
   });
 
   // Sélections pilotant les listes
@@ -308,6 +309,15 @@ export const PromotionCodeAdmin = () => {
   // ===== Handlers =====
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
+
+    // NEW: parsing pour generalCartAmount
+    if (name === 'generalCartAmount') {
+      // Autoriser vide => '' ; sinon number
+      const v = value === '' ? '' : Number(value);
+      setFormData((prev) => ({ ...prev, generalCartAmount: Number.isFinite(v) ? v : '' }));
+      return;
+    }
+
     if (type === 'checkbox') {
       setFormData((prev) => ({ ...prev, [name]: !!checked }));
       return;
@@ -341,7 +351,8 @@ export const PromotionCodeAdmin = () => {
       purcentage: 0,
       startDate: '',
       endDate: '',
-      isUsed: false
+      isUsed: false,
+      generalCartAmount: '' // NEW
     });
     setShowModal(true);
   };
@@ -384,7 +395,8 @@ export const PromotionCodeAdmin = () => {
       purcentage: promo?.purcentage ?? 0,
       startDate: promo?.startDate ? String(promo.startDate).slice(0, 10) : '',
       endDate:   promo?.endDate   ? String(promo.endDate).slice(0, 10)   : '',
-      isUsed: !!promo?.isUsed
+      isUsed: !!promo?.isUsed,
+      generalCartAmount: (promo?.generalCartAmount ?? '') // NEW
     });
 
     setShowModal(true);
@@ -398,8 +410,8 @@ export const PromotionCodeAdmin = () => {
       await dispatch(getPromotionCodesRequest());
       await dispatch(getProductUserRequest());
 
-      // 🔁 MAJ panier selon la promo supprimée (sauf promo produit)
-      if (!doomed?.idProduct) {
+      // 🔁 MAJ panier selon la promo supprimée (sauf promo produit / panier global)
+      if (!doomed?.idProduct && !toNumOrNull(doomed?.generalCartAmount)) {
         if (doomed?.idSubCategory) {
           bulkSyncCartByCategoryOrSubcategory({ subCategoryId: doomed.idSubCategory });
         } else if (doomed?.idCategory) {
@@ -412,30 +424,59 @@ export const PromotionCodeAdmin = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const hasSub = !!selectedSubCategoryId;
-    const idProductToSend  = formData.idProduct ? String(formData.idProduct) : null;
+    const hasProduct = !!formData.idProduct;
+    const hasSub     = !!selectedSubCategoryId;
+    const hasCat     = !!selectedCategoryId || !!formData.idCategory;
 
-    let idCategoryToSend    = null;
+    const codeProvided = (formData.name || '').trim().length > 0;
+    const amountNum = Number(formData.generalCartAmount);
+    const amountProvided = Number.isFinite(amountNum) && amountNum > 0; // CHANGED: "saisie" => > 0
+
+    // RÈGLE de validation:
+    // si aucune cible (cat, subcat, produit) => code + generalCartAmount OBLIGATOIRES
+    if (!hasCat && !hasSub && !hasProduct) {
+      if (!codeProvided) {
+        alert('Le code est obligatoire lorsque aucune catégorie / sous-catégorie / produit n’est sélectionné.');
+        return;
+      }
+      if (!amountProvided) {
+        alert('Le montant Panier (generalCartAmount) est obligatoire et doit être > 0 dans ce cas.');
+        return;
+      }
+    }
+
+    // Stratégie d’envoi:
+    // - Si code + generalCartAmount sont saisis => FORCER idCategory/idSubCategory/idProduct à null
+    // - Sinon, comportement normal (cat/subcat priorisées, puis produit éventuel)
+    let idProductToSend  = hasProduct ? String(formData.idProduct) : null;
+    let idCategoryToSend = null;
     let idSubCategoryToSend = null;
 
-    if (hasSub) {
-      idSubCategoryToSend = String(selectedSubCategoryId);
-      idCategoryToSend    = null;
-    } else {
+    if (codeProvided && amountProvided) {
+      idProductToSend = null;
+      idCategoryToSend = null;
       idSubCategoryToSend = null;
-      idCategoryToSend    = selectedCategoryId || formData.idCategory || null;
+    } else {
+      if (hasSub) {
+        idSubCategoryToSend = String(selectedSubCategoryId);
+        idCategoryToSend    = null;
+      } else {
+        idSubCategoryToSend = null;
+        idCategoryToSend    = selectedCategoryId || formData.idCategory || null;
+      }
     }
 
     const payload = {
       id: currentId,
       name: formData.name,
       idProduct: idProductToSend,
-      idCategory: idCategoryToSend,        // <-- FIX: on envoie bien la valeur calculée
+      idCategory: idCategoryToSend,
       idSubCategory: idSubCategoryToSend,
       purcentage: Number(formData.purcentage) || 0,
       startDate: formData.startDate,
       endDate: formData.endDate,
-      isUsed: !!formData.isUsed
+      isUsed: !!formData.isUsed,
+      generalCartAmount: amountProvided ? amountNum : null // NEW
     };
 
     if (isEditing) {
@@ -449,10 +490,11 @@ export const PromotionCodeAdmin = () => {
     await dispatch(getProductUserRequest());
 
     // 🔁 MAJ panier après création/màj:
-    // - Si PRODUIT ciblé => pas de MAJ (sera appliqué via Cart quand l’utilisateur saisit le code)
-    // - Si SOUS-CAT ciblée => MAJ tous les items du panier appartenant à la sous-cat
-    // - Sinon si CAT ciblée => MAJ tous les items du panier appartenant à la cat
-    if (!idProductToSend) {
+    // - Si PRODUIT ciblé => pas de MAJ (appliquée via Cart)
+    // - Si SOUS-CAT ciblée => MAJ items concernés
+    // - Si CAT ciblée => MAJ items concernés
+    // - Si PANIER GLOBAL (generalCartAmount) => on ne touche pas ici (logique distincte)
+    if (!amountProvided && !idProductToSend) {
       if (idSubCategoryToSend) {
         bulkSyncCartByCategoryOrSubcategory({ subCategoryId: idSubCategoryToSend });
       } else if (idCategoryToSend) {
@@ -498,6 +540,7 @@ export const PromotionCodeAdmin = () => {
   });
 
   // ===== Render =====
+  const noTargetSelected = !selectedCategoryId && !selectedSubCategoryId && !formData.idProduct; // NEW
   return (
     <div className='container py-5'>
       <h1 className="text-center mb-4">Gestion des promotions (codes)</h1>
@@ -522,6 +565,7 @@ export const PromotionCodeAdmin = () => {
               <th>Produit</th>
               <th>Catégorie</th>
               <th>Sous Catégorie</th>
+              <th>Panier</th>
               <th>Code</th>
               <th>Pourcentage</th>
               <th>Date début</th>
@@ -540,6 +584,9 @@ export const PromotionCodeAdmin = () => {
                 <td className={getRowProductName(promo) !== 'NONE' ? 'fw-bold text-primary' : 'fw-bold text-danger'}>{getRowProductName(promo)}</td>
                 <td className={getRowCategoryName(promo) !== 'NONE' ? 'fw-bold text-primary' : 'fw-bold text-danger'}>{getRowCategoryName(promo)}</td>
                 <td className={getRowSubCategoryName(promo) !== 'NONE' ? 'fw-bold text-primary' : 'fw-bold text-danger'}>{getRowSubCategoryName(promo)}</td>
+                <td className={promo?.generalCartAmount ? 'fw-bold text-primary' : 'fw-bold text-danger'}>
+                  {promo?.generalCartAmount ? Number(promo.generalCartAmount) : 'NONE'}
+                </td>
                 <td>{promo.name}</td>
                 <td>{promo.purcentage}%</td>
                 <td className='text-success fw-bold'>
@@ -567,7 +614,7 @@ export const PromotionCodeAdmin = () => {
             ))}
             {filteredPromotions.length === 0 && (
               <tr>
-                <td colSpan="9" className="text-center">Aucune promotion trouvée.</td>
+                <td colSpan="10" className="text-center">Aucune promotion trouvée.</td>
               </tr>
             )}
           </tbody>
@@ -602,8 +649,11 @@ export const PromotionCodeAdmin = () => {
                   value={formData.name}
                   onChange={handleInputChange}
                   placeholder="ex: CODEPROMO10"
-                  required
+                  required={noTargetSelected} // CHANGED: obligatoire si aucune cible
                 />
+                {noTargetSelected && (
+                  <small className="text-muted">Obligatoire si aucune catégorie / sous-catégorie / produit n’est sélectionné.</small>
+                )}
               </div>
 
               {/* Catégorie */}
@@ -658,6 +708,24 @@ export const PromotionCodeAdmin = () => {
                     </option>
                   ))}
                 </select>
+              </div>
+
+              {/* NEW: Montant Panier Global */}
+              <div className="mb-3">
+                <label>Panier (generalCartAmount)</label>
+                <input
+                  type="number"
+                  name="generalCartAmount"
+                  className="form-control"
+                  value={formData.generalCartAmount}
+                  onChange={handleInputChange}
+                  min="0"
+                  step="0.01"
+                  required={noTargetSelected} // obligatoire si aucune cible
+                />
+                <small className="text-muted">
+                  Saisir un montant &gt; 0 si la promo s’applique au panier entier (aucune catégorie / sous-catégorie / produit sélectionné).
+                </small>
               </div>
 
               <div className="mb-3">

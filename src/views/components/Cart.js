@@ -93,7 +93,17 @@ const readPromoMap = () => {
     return {};
   }
 };
-const writePromoMap = (map) => localStorage.setItem("promo_map", JSON.stringify(map));
+const writePromoMap = (map) =>
+  localStorage.setItem("promo_map", JSON.stringify(map));
+
+/** id numérique (string) non-collisant pour le code "panier" */
+const genPromoId = (mapObj) => {
+  let k = String(Date.now());
+  while (mapObj && Object.prototype.hasOwnProperty.call(mapObj, k)) {
+    k = String(Number(k) + 1);
+  }
+  return k;
+};
 
 /* ---------- Component ---------- */
 export const Cart = () => {
@@ -104,27 +114,29 @@ export const Cart = () => {
   const reduxItems = useSelector((s) => s?.items?.items) || [];
   const products = useSelector((s) => s?.products?.products) || [];
   const images = useSelector((s) => s?.images?.images) || [];
-  const promotionCodes = useSelector((s) => s?.promotionCodes?.promotionCodes) || [];
+  const promotionCodes =
+    useSelector((s) => s?.promotionCodes?.promotionCodes) || [];
   const usingRedux = reduxItems.length > 0;
   const promotions = useSelector((s) => s?.promotions?.promotions) || [];
   const categories = useSelector((s) => s?.categories?.categories) || [];
-  const subCategories = useSelector((s) => s?.subCategories?.subCategories) || [];
+  const subCategories =
+    useSelector((s) => s?.subCategories?.subCategories) || [];
   const stocks = useSelector((s) => s?.stocks?.stocks) || [];
 
-//je recupere le current user 
+  // current user / customer
   const { user } = useSelector((s) => s.account);
   const customers = useSelector((s) => s?.customers?.customers) || [];
   const uid = user?.id || null;
   const currentCustomer = customers.find((c) => c.idAspNetUser === uid);
 
-
-  const customerPromotionCodes = useSelector((s) => s?.customerPromotionCodes?.customerPromotionCodes) || [];
-// garde TOUS les codes du client dans un tableau
-const currentCustomerPromotionCodes = (customerPromotionCodes || []).filter(
-  (cp) =>
-    String(cp?.idCutomer ?? cp?.idCustomer ?? cp?.IdCustomer) ===
-    String(currentCustomer?.id)
-);
+  // customer promotion codes
+  const customerPromotionCodes =
+    useSelector((s) => s?.customerPromotionCodes?.customerPromotionCodes) || [];
+  const currentCustomerPromotionCodes = (customerPromotionCodes || []).filter(
+    (cp) =>
+      String(cp?.idCutomer ?? cp?.idCustomer ?? cp?.IdCustomer) ===
+      String(currentCustomer?.id)
+  );
 
   const payment = useSelector((s) => s?.payment) || {};
   const paymentConfirmed = !!payment.confirmed;
@@ -140,12 +152,15 @@ const currentCustomerPromotionCodes = (customerPromotionCodes || []).filter(
   const closePromoModal = () =>
     setPromoModal({ open: false, message: "", variant: "" });
 
-  // map produit -> code appliqué
+  // map produit -> code appliqué (et on y ajoutera une entrée "panier" avec id généré)
   const [promoAppliedMap, setPromoAppliedMap] = useState(() => readPromoMap());
   const clearPromoMap = () => {
     localStorage.removeItem("promo_map");
     setPromoAppliedMap({});
   };
+
+  // montant de remise panier à appliquer (calculé dynamiquement)
+  const [totalFixedDiscount, setTotalFixedDiscount] = useState(0);
 
   // Charger panier + codes promos au montage
   useEffect(() => {
@@ -153,10 +168,9 @@ const currentCustomerPromotionCodes = (customerPromotionCodes || []).filter(
     dispatch(getPromotionCodesRequest());
   }, [dispatch]);
 
-  // Persister Redux → LS à chaque changement + purge map si panier vide
+  // ⚠️ Ne vide plus promo_map ici : on attend d'avoir l'état réel du panier
   useEffect(() => {
     dispatch(saveCartRequest(reduxItems));
-    if ((reduxItems?.length ?? 0) === 0) clearPromoMap();
   }, [reduxItems, dispatch]);
 
   // Purge post-paiement
@@ -166,6 +180,7 @@ const currentCustomerPromotionCodes = (customerPromotionCodes || []).filter(
       localStorage.setItem("items", "[]");
       dispatch(saveCartRequest([]));
       setAppliedCode(null);
+      setTotalFixedDiscount(0);
     }
   }, [paymentConfirmed, dispatch]);
 
@@ -207,19 +222,36 @@ const currentCustomerPromotionCodes = (customerPromotionCodes || []).filter(
   }, [usingRedux, reduxItems, products, images, clock]);
 
   // Nettoyer promoAppliedMap quand des produits quittent le panier
+  // ➜ ne pas nettoyer tant que les promoCodes ne sont pas chargés (sinon on perd la remise panier au boot)
   useEffect(() => {
+    if (!promotionCodes || promotionCodes.length === 0) return;
+
     const ids = new Set(items.map((i) => String(i.id)));
     const next = Object.fromEntries(
-      Object.entries(promoAppliedMap).filter(([pid]) => ids.has(String(pid)))
+      Object.entries(promoAppliedMap).filter(([pid, val]) => {
+        // garder si l'id correspond à un produit encore présent
+        if (ids.has(String(pid))) return true;
+        // sinon, garder si c'est un code "remise panier" (purcentage 0 + generalCartAmount > 0)
+        const p = promotionCodes.find((x) => norm(x?.name) === norm(val));
+        const isCartCode =
+          p &&
+          (Number(p?.purcentage || 0) <= 0) &&
+          Number(p?.generalCartAmount || 0) > 0 &&
+          isPromoActive(p);
+        return isCartCode;
+      })
     );
     if (JSON.stringify(next) !== JSON.stringify(promoAppliedMap)) {
       setPromoAppliedMap(next);
       writePromoMap(next);
     }
-    if (items.length === 0 && Object.keys(promoAppliedMap).length > 0) {
+    if (items.length === 0 && Object.keys(next).length === 0) {
+      // panier vide ET plus aucun code connu → on purge
       clearPromoMap();
+      setAppliedCode(null);
+      setTotalFixedDiscount(0);
     }
-  }, [items, promoAppliedMap]);
+  }, [items, promoAppliedMap, promotionCodes]);
 
   // Helpers LS-only
   const persistLsItems = (next) => {
@@ -267,7 +299,11 @@ const currentCustomerPromotionCodes = (customerPromotionCodes || []).filter(
     const next = items.filter((it) => it.id !== id);
     setItems(next);
     persistLsItems(next);
-    if (next.length === 0) clearPromoMap();
+    if (next.length === 0) {
+      // on ne purge promo_map que si vraiment plus rien (le hook de nettoyage s'en chargera)
+      setAppliedCode(null);
+      setTotalFixedDiscount(0);
+    }
   };
 
   // Stock UI (badge)
@@ -288,7 +324,9 @@ const currentCustomerPromotionCodes = (customerPromotionCodes || []).filter(
   const getAvailableQty = (productId) => {
     const st = stocks.find(
       (s) =>
-        String(s?.idProduct ?? s?.Id_product ?? s?.IdProduct) === String(productId)
+        String(s?.idProduct ?? s?.Id_product ?? s?.IdProduct) === String(
+          productId
+        )
     );
     const q = Number(
       st?.quantity ?? st?.Quantity ?? st?.qty ?? st?.Qty ?? 0
@@ -305,20 +343,18 @@ const currentCustomerPromotionCodes = (customerPromotionCodes || []).filter(
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stocks, items.map(i => `${i.id}:${i.qty}`).join("|")]);
+  }, [stocks, items.map((i) => `${i.id}:${i.qty}`).join("|")]);
 
   // ======== Appliquer un code promo ========
   const applyPromo = () => {
     const code = norm(promoInput);
     if (!code) return;
-  
+
     // ⛔ Déjà utilisé par ce client ?
-    const getPromotionCode = promotionCodes.find((p) => norm(p?.name) === code)
-
-    const isCustomerUsedTheCode = currentCustomerPromotionCodes.find((cp) => cp.idPromotion === getPromotionCode.id)
-
-    console.log("isCustomerUsedTheCode",isCustomerUsedTheCode?.isUsed)
-
+    const getPromotionCode = promotionCodes.find((p) => norm(p?.name) === code);
+    const isCustomerUsedTheCode = currentCustomerPromotionCodes.find(
+      (cp) => String(cp.idPromotion) === String(getPromotionCode?.id)
+    );
     if (isCustomerUsedTheCode?.isUsed) {
       setAppliedCode(null);
       setPromoModal({
@@ -326,9 +362,9 @@ const currentCustomerPromotionCodes = (customerPromotionCodes || []).filter(
         variant: "warning",
         message: "Ce code promo a déjà été utilisé !",
       });
-      return; // on n'applique pas
+      return;
     }
-  
+
     if ((promotionCodes?.length ?? 0) === 0) {
       setPromoModal({
         open: true,
@@ -337,13 +373,15 @@ const currentCustomerPromotionCodes = (customerPromotionCodes || []).filter(
       });
       return;
     }
-  
-    // (le reste de ta fonction inchangé)
+
     const promo =
       promotionCodes.find(
-        (p) => norm(p?.name) === code || norm(p?.code) === code || norm(p?.Code) === code
+        (p) =>
+          norm(p?.name) === code ||
+          norm(p?.code) === code ||
+          norm(p?.Code) === code
       ) || null;
-  
+
     if (!promo || !isPromoActive(promo)) {
       setAppliedCode(null);
       setPromoModal({
@@ -353,18 +391,69 @@ const currentCustomerPromotionCodes = (customerPromotionCodes || []).filter(
       });
       return;
     }
-  
+
     const pct = Number(promo.purcentage) || 0;
-    if (pct <= 0) {
+    const fixed = Number(promo?.generalCartAmount ?? 0);
+    const hasFixed = Number.isFinite(fixed) && fixed > 0;
+
+    // === CAS REMISE PANIER (pas de %) ===
+    if (pct <= 0 && hasFixed) {
+      const sub = items.reduce((s, it) => s + it.price * it.qty, 0);
+      if (sub <= 0) {
+        setAppliedCode(null);
+        setPromoModal({
+          open: true,
+          variant: "warning",
+          message:
+            "Votre panier est vide, la remise ne peut pas être appliquée.",
+        });
+        return;
+      }
+
+      // supprime un éventuel ancien code PANIER du promo_map (mais conserve les codes produits)
+      const cleanMap = { ...(promoAppliedMap || {}) };
+      for (const [idKey, val] of Object.entries(cleanMap)) {
+        const p = promotionCodes.find((x) => norm(x?.name) === norm(val));
+        if (
+          p &&
+          (Number(p?.purcentage || 0) <= 0) &&
+          Number(p?.generalCartAmount || 0) > 0
+        ) {
+          delete cleanMap[idKey];
+        }
+      }
+
+      // ajoute l'entrée panier "id généré" -> "CODE"
+      const newId = genPromoId(cleanMap);
+      const nextMap = { ...cleanMap, [newId]: code };
+      setPromoAppliedMap(nextMap);
+      writePromoMap(nextMap);
+
+      // calcule et affiche la remise (clamp pour éviter négatif)
+      const toApply = Math.min(fixed, sub);
+      setAppliedCode(code);
+      setTotalFixedDiscount(toApply);
+      setPromoModal({
+        open: true,
+        variant: "success",
+        message: `Code promo appliqué sur le montant total : -${fmt(
+          toApply
+        )}.`,
+      });
+      return;
+    }
+
+    // === CAS % produit/catégorie/sous-catégorie ===
+    if (pct <= 0 && !hasFixed) {
       setAppliedCode(null);
       setPromoModal({
         open: true,
-        message: "Ce code n'a pas de pourcentage valide.",
+        message: "Ce code n'a ni pourcentage ni montant panier valide.",
         variant: "warning",
       });
       return;
     }
-  
+
     const promoId = promo.id ?? promo.idPromotionCode ?? promo.promoId;
     const promoCategoryId =
       promo?.idCategory ?? promo?.IdCategory ?? promo?.categoryId ?? null;
@@ -372,52 +461,72 @@ const currentCustomerPromotionCodes = (customerPromotionCodes || []).filter(
       promo?.idSubCategory ?? promo?.IdSubCategory ?? promo?.subCategoryId ?? null;
     const promoProductId =
       promo?.idProduct ?? promo?.IdProduct ?? promo?.productId ?? null;
-  
+
     const byCode = products
-      .filter((p) => String(p?.idPromotionCode ?? p?.IdPromotionCode) === String(promoId))
+      .filter(
+        (p) =>
+          String(p?.idPromotionCode ?? p?.IdPromotionCode) === String(promoId)
+      )
       .map((p) => p.id);
-  
+
     const byCategory =
       promoCategoryId != null
         ? products
-            .filter((p) => String(getCategoryIdFromProduct(p)) === String(promoCategoryId))
+            .filter(
+              (p) =>
+                String(getCategoryIdFromProduct(p)) === String(promoCategoryId)
+            )
             .map((p) => p.id)
         : [];
-  
+
     const bySubCategory =
       promoSubCategoryId != null
         ? products
-            .filter((p) => String(getSubCategoryIdFromProduct(p)) === String(promoSubCategoryId))
+            .filter(
+              (p) =>
+                String(getSubCategoryIdFromProduct(p)) ===
+                String(promoSubCategoryId)
+            )
             .map((p) => p.id)
         : [];
-  
-    const byDirectProduct = promoProductId != null ? [String(promoProductId)] : [];
-  
+
+    const byDirectProduct =
+      promoProductId != null ? [String(promoProductId)] : [];
+
     const affectedProductIds = Array.from(
-      new Set([...byCode, ...byCategory, ...bySubCategory, ...byDirectProduct].map(String))
+      new Set(
+        [...byCode, ...byCategory, ...bySubCategory, ...byDirectProduct].map(
+          String
+        )
+      )
     );
-  
+
     if (affectedProductIds.length === 0) {
       setAppliedCode(null);
       setPromoModal({
         open: true,
-        message: "Code valide, mais aucun article correspondant dans votre panier.",
+        message:
+          "Code valide, mais aucun article correspondant dans votre panier.",
         variant: "warning",
       });
       return;
     }
-  
+
     const updatedItems = [...items];
     const changedNames = [];
     const changedIds = [];
-  
+
     for (const it of items) {
       if (!affectedProductIds.includes(String(it.id))) continue;
-  
+
       const product = products.find((p) => String(p.id) === String(it.id));
-      const category = categories.find((p) => String(p.name) === String(product?.category));
-      const subCategory = subCategories.find((p) => String(p.id) === String(product?.idSubCategory));
-  
+      const category = categories.find(
+        (p) => String(p.name) === String(product?.category)
+      );
+      const subCategory = subCategories.find(
+        (p) => String(p.id) === String(product?.idSubCategory)
+      );
+
       let totalPurcentage = calculPriceForApplyPromoCode(
         product,
         promotions,
@@ -426,35 +535,40 @@ const currentCustomerPromotionCodes = (customerPromotionCodes || []).filter(
         subCategory
       );
       totalPurcentage += pct;
-  
+
       const base = Number(product?.price) || 0;
       let newPrice = base - (base * totalPurcentage) / 100;
       newPrice = newPrice + (newPrice * (product?.tva || 0)) / 100;
       newPrice = newPrice + (product?.taxWithoutTvaAmount || 0);
-  
+
       if (Math.abs((Number(product?.price) || 0) - newPrice) < 0.001) continue;
-  
+
       const idx = updatedItems.findIndex((u) => u.id === it.id);
       if (idx >= 0) updatedItems[idx] = { ...updatedItems[idx], price: newPrice };
-  
+
       if (usingRedux) {
         const orig =
-          reduxItems.find((i) => String(i.id) === String(it.id)) || { id: it.id, qty: it.qty };
+          reduxItems.find((i) => String(i.id) === String(it.id)) || {
+            id: it.id,
+            qty: it.qty,
+          };
         const updated = { ...orig, price: newPrice };
         dispatch(updateCartRequest(updated, it.qty));
         updateLsPrice(it.id, newPrice);
       } else {
-        const next = items.map((i) => (i.id === it.id ? { ...i, price: newPrice } : i));
+        const next = items.map((i) =>
+          i.id === it.id ? { ...i, price: newPrice } : i
+        );
         setItems(next);
         persistLsItems(next);
       }
-  
+
       changedNames.push(it.name);
       changedIds.push(it.id);
     }
-  
+
     setItems(updatedItems);
-  
+
     if (changedNames.length > 0) {
       setAppliedCode(code);
       setPromoModal({
@@ -462,10 +576,13 @@ const currentCustomerPromotionCodes = (customerPromotionCodes || []).filter(
         message:
           changedNames.length === 1
             ? `Code promo appliqué sur le produit « ${changedNames[0]} ».`
-            : `Code promo appliqué sur ${changedNames.length} produits : ${changedNames.join(", ")}.`,
+            : `Code promo appliqué sur ${changedNames.length} produits : ${changedNames.join(
+                ", "
+              )}.`,
         variant: "success",
       });
-  
+
+      // on ajoute/merge les codes produits dans promo_map
       const nextMap = { ...promoAppliedMap };
       for (const id of changedIds) nextMap[String(id)] = code;
       setPromoAppliedMap(nextMap);
@@ -474,22 +591,133 @@ const currentCustomerPromotionCodes = (customerPromotionCodes || []).filter(
       setAppliedCode(null);
       setPromoModal({
         open: true,
-        message: "Code valide, mais aucun article correspondant dans votre panier.",
+        message:
+          "Code valide, mais aucun article correspondant dans votre panier.",
         variant: "warning",
       });
     }
   };
-  
 
+  // ---------- REHYDRATATION au F5 : réapplique les codes produits & la remise panier ----------
+  // 1) Recalcule (et corrige) les prix des produits en fonction du promo_map
+  useEffect(() => {
+    if (!items.length) return;
+    if (!promotionCodes.length) return;
+
+    let anyChange = false;
+    const updated = [...items];
+
+    for (const it of items) {
+      const codeOnThis = promoAppliedMap[String(it.id)];
+      if (!codeOnThis) continue;
+
+      const promo =
+        promotionCodes.find((p) => norm(p?.name) === norm(codeOnThis)) || null;
+      if (!promo || !isPromoActive(promo)) continue;
+
+      // si c'est une remise panier, on n'ajuste pas unitaire ici
+      const pct = Number(promo?.purcentage) || 0;
+      if (pct <= 0 && Number(promo?.generalCartAmount || 0) > 0) continue;
+
+      const product = products.find((p) => String(p.id) === String(it.id));
+      if (!product) continue;
+
+      const category = categories.find(
+        (p) => String(p.name) === String(product?.category)
+      );
+      const subCategory = subCategories.find(
+        (p) => String(p.id) === String(product?.idSubCategory)
+      );
+
+      let totalPct = calculPriceForApplyPromoCode(
+        product,
+        promotions,
+        promotionCodes,
+        category,
+        subCategory
+      );
+      totalPct += pct;
+
+      const base = Number(product?.price) || 0;
+      let newPrice = base - (base * totalPct) / 100;
+      newPrice = newPrice + (newPrice * (product?.tva || 0)) / 100;
+      newPrice = newPrice + (product?.taxWithoutTvaAmount || 0);
+
+      if (Math.abs(Number(it.price) - newPrice) > 0.001) {
+        anyChange = true;
+        const idx = updated.findIndex((u) => u.id === it.id);
+        if (idx >= 0) updated[idx] = { ...updated[idx], price: newPrice };
+
+        if (usingRedux) {
+          const orig =
+            reduxItems.find((i) => String(i.id) === String(it.id)) || {
+              id: it.id,
+              qty: it.qty,
+            };
+          const upd = { ...orig, price: newPrice };
+          dispatch(updateCartRequest(upd, it.qty));
+          updateLsPrice(it.id, newPrice);
+        }
+      }
+    }
+
+    if (!usingRedux && anyChange) {
+      setItems(updated);
+      persistLsItems(updated);
+    }
+  }, [
+    // dépendances
+    promotionCodes,
+    products,
+    categories,
+    subCategories,
+    promotions,
+    promoAppliedMap,
+    items.map((i) => `${i.id}:${i.price}:${i.qty}`).join("|"),
+    usingRedux,
+    reduxItems,
+    dispatch,
+  ]);
+
+  // 2) Recalcule la remise panier (montant fixe) depuis promo_map
   const subTotal = items.reduce((s, it) => s + it.price * it.qty, 0);
-  const grandTotal = Math.max(0, subTotal);
+  useEffect(() => {
+    if (!promotionCodes.length) return;
+
+    let cartCode = null;
+    let cartAmount = 0;
+
+    for (const val of Object.values(promoAppliedMap || {})) {
+      const promo = promotionCodes.find((p) => norm(p?.name) === norm(val));
+      if (
+        promo &&
+        Number(promo?.purcentage || 0) <= 0 &&
+        Number(promo?.generalCartAmount || 0) > 0 &&
+        isPromoActive(promo)
+      ) {
+        cartCode = val;
+        cartAmount = Number(promo.generalCartAmount) || 0;
+      }
+    }
+
+    if (!cartCode || cartAmount <= 0) {
+      setTotalFixedDiscount(0);
+      return;
+    }
+
+    setAppliedCode(cartCode);
+    setTotalFixedDiscount(Math.min(cartAmount, subTotal));
+  }, [promoAppliedMap, promotionCodes, subTotal]);
+
+  const effectiveDiscount = Math.min(totalFixedDiscount, subTotal);
+  const grandTotal = Math.max(0, subTotal - effectiveDiscount);
   const hasItems = items.length > 0;
 
   // ======== BLOQUE LA COMMANDE SI RUPTURE ========
   const outOfStockList = useMemo(
     () => items.filter((it) => getAvailableQty(it.id) <= 0),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [items, stocks.map(s => `${s.IdProduct ?? s.idProduct}:${s.quantity ?? s.Quantity ?? s.qty ?? 0}`).join("|")]
+    [items, stocks.map((s) => `${s.IdProduct ?? s.idProduct}:${s.quantity ?? s.Quantity ?? s.qty ?? 0}`).join("|")]
   );
   const hasOutOfStock = outOfStockList.length > 0;
 
@@ -514,7 +742,11 @@ const currentCustomerPromotionCodes = (customerPromotionCodes || []).filter(
             <span className="col-sub">Sous-total</span>
           </div>
 
-          {items.length === 0 && <div className="cart-empty text-center fw-bold text-danger">Votre panier est vide.</div>}
+          {items.length === 0 && (
+            <div className="cart-empty text-center fw-bold text-danger">
+              Votre panier est vide.
+            </div>
+          )}
 
           {items.map((it) => {
             const { cls, label, isOut } = getStockUi(it.id);
@@ -524,32 +756,31 @@ const currentCustomerPromotionCodes = (customerPromotionCodes || []).filter(
             const cap = Math.min(available, 50);
             const qtyOptions =
               cap > 0 ? Array.from({ length: cap }, (_, i) => i + 1) : [];
-
             const disableSelect = isOut || available <= 0;
 
             return (
               <div key={it.id} className="cart-line">
                 <div className="line-left">
-                  {/* media = image seule */}
                   <div className="line-media">
                     <Link to={`/product/${it.id}`}>
-                      <img className="cart-thumb" src={toMediaUrl(it.imageUrl)} alt={it.name} />
+                      <img
+                        className="cart-thumb"
+                        src={toMediaUrl(it.imageUrl)}
+                        alt={it.name}
+                      />
                     </Link>
                   </div>
 
-                  {/* infos = nom + badge stock (+ messages) */}
                   <div className="line-info">
                     <div className="line-title">
-                      <Link className="line-name" to={`/product/${it.id}`}>{it.name}</Link>
+                      <Link className="line-name" to={`/product/${it.id}`}>
+                        {it.name}
+                      </Link>
                       <span className={`card-stock ${cls}`}>
                         <span className={`card-stock-dot ${cls}`} />
                         {label}
                       </span>
                     </div>
-
-                    {/* {available <= 0 && (
-                      <div className="line-alert">Rupture de stock</div>
-                    )} */}
 
                     {codeOnThis && (
                       <span className="line-code">Code appliqué : {codeOnThis}</span>
@@ -564,11 +795,21 @@ const currentCustomerPromotionCodes = (customerPromotionCodes || []).filter(
                     className="qty-select"
                     disabled={disableSelect}
                     aria-disabled={disableSelect}
-                    title={disableSelect ? "Article en rupture" : "Changer la quantité"}
+                    title={
+                      disableSelect
+                        ? "Article en rupture"
+                        : "Changer la quantité"
+                    }
                   >
-                    {qtyOptions.length === 0
-                      ? <option value={it.qty}>—</option>
-                      : qtyOptions.map((n) => <option key={n} value={n}>{n}</option>)}
+                    {qtyOptions.length === 0 ? (
+                      <option value={it.qty}>—</option>
+                    ) : (
+                      qtyOptions.map((n) => (
+                        <option key={n} value={n}>
+                          {n}
+                        </option>
+                      ))
+                    )}
                   </select>
                 </div>
 
@@ -614,8 +855,15 @@ const currentCustomerPromotionCodes = (customerPromotionCodes || []).filter(
 
         {/* Colonne droite: récap */}
         <aside className="cart-summary">
-          <h3 className="sum-title  ">Montant total</h3>
+          <h3 className="sum-title">Montant total</h3>
+
           <div className="sum-amount">{fmt(grandTotal)}</div>
+
+          {effectiveDiscount > 0 && (
+            <div style={{ fontWeight: 700, marginTop: 6, fontSize: 14 }}>
+              Remise panier : -{fmt(effectiveDiscount)}
+            </div>
+          )}
 
           {hasOutOfStock && (
             <div
@@ -675,7 +923,9 @@ const currentCustomerPromotionCodes = (customerPromotionCodes || []).filter(
         variant={promoModal.variant}
         title="Code promo"
         message={promoModal.message}
-        actions={[{ label: "OK", variant: "primary", onClick: closePromoModal, autoFocus: true }]}
+        actions={[
+          { label: "OK", variant: "primary", onClick: closePromoModal, autoFocus: true },
+        ]}
       />
     </div>
   );

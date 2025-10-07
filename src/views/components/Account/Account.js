@@ -463,12 +463,28 @@ export const Account = () => {
                             <span className="order-item__qty" aria-hidden="true">&nbsp;</span>
                           </div>
                           <hr />
+                          {o?.cartDiscount && (
+                            <>
+                            <div className="order-item order-item--shipping lineBackgroundColor">
+                              <span className="shipping-label text-success">Remise panier</span>
+                              <span className="text-dark fw-bold">
+                                {fmtPrice(Number(o?.cartDiscount))}
+                              </span>
+                              <span className="order-item__qty" aria-hidden="true">&nbsp;</span>
+                            </div>
+                            <hr />
+                            </>
+                            )}
                           <div className="order-item order-item--shipping lineBackgroundColor">
                             <span className="shipping-label text-success">N° de suivi</span>
                             <span className="text-dark fw-bold">
-                              <a href={o?.trackingLink} target="_blank" rel="">
-                                {o?.trackingNumber}
-                              </a>
+                              {o?.trackingLink ? (
+                                <a href={o?.trackingLink} target="_blank" rel="">
+                                  {o?.trackingNumber}
+                                </a>
+                              ) : (
+                                <span className="text-muted">non disponible pour le moment</span>
+                              )}
                             </span>
                             <span className="order-item__qty" aria-hidden="true">&nbsp;</span>
                           </div>
