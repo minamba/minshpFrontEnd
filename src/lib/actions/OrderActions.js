@@ -7,7 +7,6 @@ export const actionsOrder = {
     GET_ORDER_PAGED_USER_SUCCESS : "GET_ORDER_PAGED_USER_SUCCESS",
     GET_ORDER_PAGED_USER_FAILURE : "GET_ORDER_PAGED_USER_FAILURE",
 
-
     UPDATE_ORDER_REQUEST : "UPDATE_ORDER_REQUEST",
     UPDATE_ORDER_SUCCESS : "UPDATE_ORDER_SUCCESS",
     UPDATE_ORDER_FAILURE : "UPDATE_ORDER_FAILURE",
@@ -58,6 +57,7 @@ export function getOrderPagedUserRequest(payload) {
   export function getOrderPagedUserFailure(error) {
     return { type: actionsOrder.GET_ORDER_PAGED_USER_FAILURE, payload: { error } };
   }
+
 
 
 //update

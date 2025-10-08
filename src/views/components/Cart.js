@@ -1,5 +1,5 @@
 // src/pages/cart/Cart.jsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import "bootstrap-icons/font/bootstrap-icons.css";
 import "../../styles/pages/cart.css";
@@ -154,10 +154,15 @@ export const Cart = () => {
 
   // map produit -> code appliqué (et on y ajoutera une entrée "panier" avec id généré)
   const [promoAppliedMap, setPromoAppliedMap] = useState(() => readPromoMap());
-  const clearPromoMap = () => {
-    localStorage.removeItem("promo_map");
-    setPromoAppliedMap({});
-  };
+
+  // ⚠️ idempotent : ne change l'état que si non vide → vide
+  const clearPromoMap = useCallback(() => {
+    setPromoAppliedMap((prev) => {
+      if (!prev || Object.keys(prev).length === 0) return prev;
+      localStorage.removeItem("promo_map");
+      return {};
+    });
+  }, []);
 
   // montant de remise panier à appliquer (calculé dynamiquement)
   const [totalFixedDiscount, setTotalFixedDiscount] = useState(0);
@@ -168,10 +173,23 @@ export const Cart = () => {
     dispatch(getPromotionCodesRequest());
   }, [dispatch]);
 
-  // ⚠️ Ne vide plus promo_map ici : on attend d'avoir l'état réel du panier
+  /* ===== Sauvegarde serveur dédupliquée (anti-boucle) ===== */
+  const lastSavedSigRef = useRef("");
   useEffect(() => {
+    if (!usingRedux) return;
+    const sig = JSON.stringify(
+      [...reduxItems]
+        .map((i) => ({
+          id: String(i.id ?? i.productId),
+          qty: Number(i.qty ?? 1),
+          price: Number(i.price ?? i.priceTtc ?? 0),
+        }))
+        .sort((a, b) => a.id.localeCompare(b.id))
+    );
+    if (sig === lastSavedSigRef.current) return;
+    lastSavedSigRef.current = sig;
     dispatch(saveCartRequest(reduxItems));
-  }, [reduxItems, dispatch]);
+  }, [usingRedux, reduxItems, dispatch]);
 
   // Purge post-paiement
   useEffect(() => {
@@ -179,30 +197,40 @@ export const Cart = () => {
       clearPromoMap();
       localStorage.setItem("items", "[]");
       dispatch(saveCartRequest([]));
-      setAppliedCode(null);
-      setTotalFixedDiscount(0);
+      setAppliedCode((prev) => (prev ? null : prev));
+      setTotalFixedDiscount((prev) => (prev !== 0 ? 0 : prev));
     }
-  }, [paymentConfirmed, dispatch]);
+  }, [paymentConfirmed, dispatch, clearPromoMap]);
 
   // enrichir lignes (nom, img, prix)
-  const enrich = (arr) =>
-    (arr || []).map((it) => {
-      const pid = it.productId ?? it.id;
-      const prod = products.find((p) => String(p.id) === String(pid));
-      const name = it.name || it.title || prod?.name || prod?.title || "Produit";
-      const img =
-        it.image ||
-        it.imageUrl ||
-        images.find((im) => String(im.idProduct) === String(pid))?.url ||
-        "/Images/placeholder.jpg";
+  const enrich = useCallback(
+    (arr) =>
+      (arr || []).map((it) => {
+        const pid = it.productId ?? it.id;
+        const prod = products.find((p) => String(p.id) === String(pid));
+        const name =
+          it.name || it.title || prod?.name || prod?.title || "Produit";
+        const img =
+          it.image ||
+          it.imageUrl ||
+          images.find((im) => String(im.idProduct) === String(pid))?.url ||
+          "/Images/placeholder.jpg";
 
-      const price =
-        it.price != null
-          ? Number(it.price)
-          : Number(it.priceTtc ?? prod?.priceTtc ?? 0);
+        const price =
+          it.price != null
+            ? Number(it.price)
+            : Number(it.priceTtc ?? prod?.priceTtc ?? 0);
 
-      return { id: pid, name, price, qty: Number(it.qty ?? 1), imageUrl: img };
-    });
+        return {
+          id: pid,
+          name,
+          price,
+          qty: Number(it.qty ?? 1),
+          imageUrl: img,
+        };
+      }),
+    [products, images]
+  );
 
   const [clock, setClock] = useState(Date.now());
   useEffect(() => {
@@ -218,20 +246,16 @@ export const Cart = () => {
   useEffect(() => {
     const src = usingRedux ? reduxItems : readLsItems();
     setItems(enrich(src));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [usingRedux, reduxItems, products, images, clock]);
+  }, [usingRedux, reduxItems, enrich, clock]);
 
-  // Nettoyer promoAppliedMap quand des produits quittent le panier
-  // ➜ ne pas nettoyer tant que les promoCodes ne sont pas chargés (sinon on perd la remise panier au boot)
+  // Nettoyer promoAppliedMap quand des produits quittent le panier (sans boucle)
   useEffect(() => {
     if (!promotionCodes || promotionCodes.length === 0) return;
 
     const ids = new Set(items.map((i) => String(i.id)));
     const next = Object.fromEntries(
       Object.entries(promoAppliedMap).filter(([pid, val]) => {
-        // garder si l'id correspond à un produit encore présent
         if (ids.has(String(pid))) return true;
-        // sinon, garder si c'est un code "remise panier" (purcentage 0 + generalCartAmount > 0)
         const p = promotionCodes.find((x) => norm(x?.name) === norm(val));
         const isCartCode =
           p &&
@@ -241,17 +265,30 @@ export const Cart = () => {
         return isCartCode;
       })
     );
-    if (JSON.stringify(next) !== JSON.stringify(promoAppliedMap)) {
+
+    const changed =
+      Object.keys(next).length !== Object.keys(promoAppliedMap).length ||
+      Object.keys(next).some((k) => promoAppliedMap[k] !== next[k]);
+
+    if (changed) {
       setPromoAppliedMap(next);
       writePromoMap(next);
     }
+
+    // purge uniquement si on passe à vide
     if (items.length === 0 && Object.keys(next).length === 0) {
-      // panier vide ET plus aucun code connu → on purge
-      clearPromoMap();
-      setAppliedCode(null);
-      setTotalFixedDiscount(0);
+      clearPromoMap(); // idempotent
+      if (appliedCode) setAppliedCode(null);
+      if (totalFixedDiscount !== 0) setTotalFixedDiscount(0);
     }
-  }, [items, promoAppliedMap, promotionCodes]);
+  }, [
+    items,
+    promotionCodes,
+    promoAppliedMap,
+    clearPromoMap,
+    appliedCode,
+    totalFixedDiscount,
+  ]);
 
   // Helpers LS-only
   const persistLsItems = (next) => {
@@ -300,7 +337,6 @@ export const Cart = () => {
     setItems(next);
     persistLsItems(next);
     if (next.length === 0) {
-      // on ne purge promo_map que si vraiment plus rien (le hook de nettoyage s'en chargera)
       setAppliedCode(null);
       setTotalFixedDiscount(0);
     }
@@ -335,6 +371,13 @@ export const Cart = () => {
   };
 
   // Clamp auto si stock baisse
+  const stocksSig = stocks
+    .map(
+      (s) =>
+        `${s.IdProduct ?? s.idProduct}:${s.quantity ?? s.Quantity ?? s.qty ?? 0}`
+    )
+    .join("|");
+
   useEffect(() => {
     items.forEach((it) => {
       const available = getAvailableQty(it.id);
@@ -343,7 +386,7 @@ export const Cart = () => {
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stocks, items.map((i) => `${i.id}:${i.qty}`).join("|")]);
+  }, [stocksSig, items.map((i) => `${i.id}:${i.qty}`).join("|")]);
 
   // ======== Appliquer un code promo ========
   const applyPromo = () => {
@@ -567,7 +610,10 @@ export const Cart = () => {
       changedIds.push(it.id);
     }
 
-    setItems(updatedItems);
+    if (!usingRedux) {
+      setItems(updatedItems);
+      persistLsItems(updatedItems);
+    }
 
     if (changedNames.length > 0) {
       setAppliedCode(code);
@@ -582,7 +628,6 @@ export const Cart = () => {
         variant: "success",
       });
 
-      // on ajoute/merge les codes produits dans promo_map
       const nextMap = { ...promoAppliedMap };
       for (const id of changedIds) nextMap[String(id)] = code;
       setPromoAppliedMap(nextMap);
@@ -598,11 +643,27 @@ export const Cart = () => {
     }
   };
 
-  // ---------- REHYDRATATION au F5 : réapplique les codes produits & la remise panier ----------
-  // 1) Recalcule (et corrige) les prix des produits en fonction du promo_map
+  /* ---------- REHYDRATATION anti-boucle ---------- */
+  const rehydrateSigRef = useRef("");
+
+  // 1) Recalcule les prix unitaires d’après promo_map (hors remise panier)
   useEffect(() => {
     if (!items.length) return;
     if (!promotionCodes.length) return;
+
+    const sig = JSON.stringify({
+      items: items.map((i) => [String(i.id), +i.price, +i.qty]),
+      promoMap: promoAppliedMap,
+      codes: promotionCodes.map((p) => [
+        String(p.id ?? p.Id ?? p.idPromotionCode ?? ""),
+        +p.purcentage || 0,
+        +p.generalCartAmount || 0,
+        p.startDate ?? null,
+        p.endDate ?? null,
+      ]),
+    });
+    if (rehydrateSigRef.current === sig) return;
+    rehydrateSigRef.current = sig;
 
     let anyChange = false;
     const updated = [...items];
@@ -615,9 +676,8 @@ export const Cart = () => {
         promotionCodes.find((p) => norm(p?.name) === norm(codeOnThis)) || null;
       if (!promo || !isPromoActive(promo)) continue;
 
-      // si c'est une remise panier, on n'ajuste pas unitaire ici
       const pct = Number(promo?.purcentage) || 0;
-      if (pct <= 0 && Number(promo?.generalCartAmount || 0) > 0) continue;
+      if (pct <= 0 && Number(promo?.generalCartAmount || 0) > 0) continue; // remise panier → pas ici
 
       const product = products.find((p) => String(p.id) === String(it.id));
       if (!product) continue;
@@ -643,21 +703,21 @@ export const Cart = () => {
       newPrice = newPrice + (newPrice * (product?.tva || 0)) / 100;
       newPrice = newPrice + (product?.taxWithoutTvaAmount || 0);
 
-      if (Math.abs(Number(it.price) - newPrice) > 0.001) {
+      if (Math.abs(Number(it.price) - newPrice) <= 0.001) continue;
+
+      if (usingRedux) {
+        const orig =
+          reduxItems.find((i) => String(i.id) === String(it.id)) || {
+            id: it.id,
+            qty: it.qty,
+          };
+        const upd = { ...orig, price: newPrice };
+        dispatch(updateCartRequest(upd, it.qty));
+        updateLsPrice(it.id, newPrice);
+      } else {
         anyChange = true;
         const idx = updated.findIndex((u) => u.id === it.id);
         if (idx >= 0) updated[idx] = { ...updated[idx], price: newPrice };
-
-        if (usingRedux) {
-          const orig =
-            reduxItems.find((i) => String(i.id) === String(it.id)) || {
-              id: it.id,
-              qty: it.qty,
-            };
-          const upd = { ...orig, price: newPrice };
-          dispatch(updateCartRequest(upd, it.qty));
-          updateLsPrice(it.id, newPrice);
-        }
       }
     }
 
@@ -666,17 +726,15 @@ export const Cart = () => {
       persistLsItems(updated);
     }
   }, [
-    // dépendances
+    items.map((i) => `${i.id}:${i.price}:${i.qty}`).join("|"),
+    promoAppliedMap,
     promotionCodes,
     products,
     categories,
     subCategories,
     promotions,
-    promoAppliedMap,
-    items.map((i) => `${i.id}:${i.price}:${i.qty}`).join("|"),
     usingRedux,
-    reduxItems,
-    dispatch,
+    // pas de reduxItems ni dispatch ici → anti-boucle
   ]);
 
   // 2) Recalcule la remise panier (montant fixe) depuis promo_map
@@ -701,7 +759,7 @@ export const Cart = () => {
     }
 
     if (!cartCode || cartAmount <= 0) {
-      setTotalFixedDiscount(0);
+      setTotalFixedDiscount((prev) => (prev !== 0 ? 0 : prev));
       return;
     }
 
@@ -717,7 +775,7 @@ export const Cart = () => {
   const outOfStockList = useMemo(
     () => items.filter((it) => getAvailableQty(it.id) <= 0),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [items, stocks.map((s) => `${s.IdProduct ?? s.idProduct}:${s.quantity ?? s.Quantity ?? s.qty ?? 0}`).join("|")]
+    [items, stocksSig]
   );
   const hasOutOfStock = outOfStockList.length > 0;
 
@@ -924,7 +982,12 @@ export const Cart = () => {
         title="Code promo"
         message={promoModal.message}
         actions={[
-          { label: "OK", variant: "primary", onClick: closePromoModal, autoFocus: true },
+          {
+            label: "OK",
+            variant: "primary",
+            onClick: closePromoModal,
+            autoFocus: true,
+          },
         ]}
       />
     </div>

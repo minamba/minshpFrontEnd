@@ -387,3 +387,141 @@
 }
 
 
+/* ===== Pagination moderne (pastilles + slider) ===== */
+.orders-pagination-wrap{
+  display: grid;
+  gap: .6rem;
+  align-items: center;
+  margin: .5rem 0 1rem;
+}
+
+.orders-pagination{
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem;
+  align-items: center;
+}
+
+.pg-btn{
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  padding: .4rem .6rem;
+  border-radius: .6rem;
+  cursor: pointer;
+  font-weight: 800;
+  line-height: 1;
+  min-width: 36px;
+  text-align: center;
+  transition: background .15s ease, transform .06s ease;
+}
+.pg-btn:hover{ background: #f9fafb; }
+.pg-btn:active{ transform: translateY(1px); }
+.pg-btn.is-active{
+  color: #fff;
+  background: linear-gradient(135deg,#3b79ff,#2c5dff);
+  border-color: transparent;
+}
+.pg-btn:disabled{
+  opacity: .55;
+  cursor: not-allowed;
+  filter: grayscale(.2);
+}
+
+/* Focus visible (a11y) */
+.pg-btn:focus-visible,
+.pg-slider:focus-visible{
+  outline: 2px solid #2a60f5;
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+.pg-ellipsis{
+  padding: 0 .25rem;
+  color: #9ca3af;
+  user-select: none;
+}
+
+.orders-pagination__meta{
+  display: flex;
+  align-items: center;
+  gap: .8rem;
+  justify-content: space-between;
+}
+
+.pg-indicator{
+  color: #374151;
+  font-weight: 700;
+}
+
+.pg-slider{
+  flex: 1;
+  min-width: 160px;
+  height: 28px; /* pour une hit-area confortable */
+  accent-color: #2a60f5; /* couleur du pouce */
+}
+
+/* Réduction de mouvement */
+@media (prefers-reduced-motion: reduce){
+  .pg-btn{ transition: none; }
+}
+
+/* Petits écrans */
+@media (max-width: 576px){
+  .orders-pagination{ justify-content: center; }
+  .orders-pagination__meta{
+    gap: .6rem;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .pg-slider{ min-width: 100%; }
+}
+
+/* Variante compacte (si besoin sur mobile serré) */
+@media (max-width: 380px){
+  .pg-btn{ padding: .3rem .5rem; min-width: 32px; }
+}
+
+/* Mode sombre léger (si tu bascules un jour) */
+@media (prefers-color-scheme: dark){
+  .pg-btn{
+    background: #111827;
+    border-color: #1f2937;
+    color: #e5e7eb;
+  }
+  .pg-btn:hover{ background: #0f172a; }
+  .pg-ellipsis{ color: #6b7280; }
+  .orders-pagination__meta .pg-indicator{ color: #e5e7eb; }
+}
+
+
+/* ===== Pagination – flèches + numéros sur une seule ligne ===== */
+.orders-pagination{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:.35rem;
+  flex-wrap:nowrap;           /* une seule ligne */
+}
+
+.pg-strip{
+  display:flex;
+  align-items:center;
+  gap:.35rem;
+  overflow:hidden;            /* évite tout retour à la ligne */
+}
+
+.pg-arrow{
+  min-width:36px;
+  min-height:36px;
+  display:grid;
+  place-items:center;
+  padding:.4rem;
+}
+
+/* un peu plus compact sur mobile */
+@media (max-width:560px){
+  .pg-btn{ min-width:32px; padding:.35rem .5rem; }
+  .pg-arrow{ min-width:32px; min-height:32px; }
+}
+
+

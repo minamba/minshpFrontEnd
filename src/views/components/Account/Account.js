@@ -1,5 +1,5 @@
 // src/pages/account/Account.jsx
-import React, { useMemo, useState, useEffect, useRef } from "react";
+import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import "bootstrap-icons/font/bootstrap-icons.css";
 import "../../../styles/pages/account.css";
 
@@ -37,82 +37,160 @@ const labelForProduct = (p) => {
   return base || p?.name || p?.Name || p?.title || `#${getId(p)}`;
 };
 
-const fmtPrice = (n) =>
-  new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(Number(n || 0));
+const fmtPrice = (n) => new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(Number(n || 0));
 
-const parseDate = (d) => {
-  if (!d) return null;
-  if (d instanceof Date) return isNaN(d.getTime()) ? null : d;
-  const t = Date.parse(String(d));
-  return isNaN(t) ? null : new Date(t);
-};
-
+const parseDate = (d) => (d ? (d instanceof Date ? d : new Date(d)) : null);
 const orderRawDate = (o) =>
   o?.date ?? o?.orderDate ?? o?.createdAt ?? o?.created_on ?? o?.createdOn ?? o?.timestamp ?? null;
-
 const orderDate = (o) => parseDate(orderRawDate(o));
-
 const orderDateFR = (o) => {
   const d = orderDate(o);
-  return d
-    ? d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" })
-    : "—";
+  return d ? d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—";
 };
 
-const orderNumber = (o) =>
-  o?.orderNumber ?? o?.orderNo ?? o?.number ?? o?.reference ?? `#${getId(o)}`;
-
+const orderNumber = (o) => o?.orderNumber ?? o?.orderNo ?? o?.number ?? o?.reference ?? `#${getId(o)}`;
 const orderStatus = (o) => o?.status ?? o?.orderStatus ?? "—";
+const toNum = (v) => (typeof v === "number" ? v : parseFloat(v)) || 0;
 
-const norm = (s) =>
-  String(s || "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
-
+const norm = (s) => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 const isDelivered = (status) => {
   const n = norm(status);
   return n.includes("livre") || n.includes("delivre") || n.includes("delivered") || n.includes("effectuee");
 };
 
-const toNum = (v) => (typeof v === "number" ? v : parseFloat(v)) || 0;
+/* ===== Pager — numéros masqués & “Suivant” masqué si page vide ===== */
+const Pager = ({ page, setPage, totalPages, loading, hasItems }) => {
+  if (totalPages <= 1) return null;
 
-/* ===== Component ===== */
+  // taille de la fenêtre de numéros à l'écran
+  const windowSize = 10; // ↑ baisse un peu pour mobile
+  let start = Math.max(1, page - Math.floor(windowSize / 2));
+  let end = Math.min(totalPages, start + windowSize - 1);
+  if (end - start + 1 < windowSize) start = Math.max(1, end - windowSize + 1);
+
+  const pages = [];
+  for (let p = start; p <= end; p++) pages.push(p);
+
+  const go = (p) => setPage(Math.max(1, Math.min(totalPages, p)));
+
+  return (
+    <div className="orders-pagination" role="navigation" aria-label="Pagination">
+      {/* ← flèche gauche */}
+      <button
+        className="pg-btn pg-arrow"
+        aria-label="Page précédente"
+        disabled={page <= 1 || loading}
+        onClick={() => go(page - 1)}
+      >
+        <i className="bi bi-chevron-left" aria-hidden="true" />
+      </button>
+
+      {/* bandeau des numéros (fenêtre glissante) */}
+      <div className="pg-strip" aria-hidden={!hasItems}>
+        {start > 1 && (
+          <>
+            <button className="pg-btn" onClick={() => go(1)} disabled={loading}>1</button>
+            {start > 2 && <span className="pg-ellipsis">…</span>}
+          </>
+        )}
+
+        {pages.map((p) => (
+          <button
+            key={p}
+            className={`pg-btn ${p === page ? "is-active" : ""}`}
+            onClick={() => go(p)}
+            disabled={loading}
+            aria-current={p === page ? "page" : undefined}
+          >
+            {p}
+          </button>
+        ))}
+
+        {end < totalPages && (
+          <>
+            {end < totalPages - 1 && <span className="pg-ellipsis">…</span>}
+            <button className="pg-btn" onClick={() => go(totalPages)} disabled={loading}>
+              {totalPages}
+            </button>
+          </>
+        )}
+      </div>
+
+      {/* → flèche droite (masquée si page vide) */}
+      {hasItems && (
+        <button
+          className="pg-btn pg-arrow"
+          aria-label="Page suivante"
+          disabled={page >= totalPages || loading}
+          onClick={() => go(page + 1)}
+        >
+          <i className="bi bi-chevron-right" aria-hidden="true" />
+        </button>
+      )}
+    </div>
+  );
+};
+
+/* ===== Maps utilitaires ===== */
+const useMaps = (products, orderProducts) => {
+  const productsById = useMemo(() => {
+    const m = new Map();
+    for (const p of products || []) {
+      const pid = getId(p);
+      if (pid != null) m.set(String(pid), p);
+    }
+    return m;
+  }, [products]);
+
+  const opByOrder = useMemo(() => {
+    const m = new Map();
+    for (const op of orderProducts || []) {
+      const oid = String(getOrderIdFromOP(op));
+      if (!oid) continue;
+      if (!m.has(oid)) m.set(oid, []);
+      m.get(oid).push(op);
+    }
+    return m;
+  }, [orderProducts]);
+
+  return { productsById, opByOrder };
+};
+
+/* ===== Composant principal ===== */
 export const Account = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
-  // Store
+  // Slices
   const { user } = useSelector((s) => s.account);
   const customers = useSelector((s) => s?.customers?.customers) || [];
-
-  // Produits (paged-aware)
   const productsSlice = useSelector((s) => s?.products) || {};
   const products = useMemo(() => {
     const full = Array.isArray(productsSlice.products) ? productsSlice.products : null;
     const paged = Array.isArray(productsSlice.items) ? productsSlice.items : null;
-    return (full && full.length) ? full : (paged || []);
+    return full?.length ? full : (paged || []);
   }, [productsSlice]);
-
   const orderProducts = useSelector((s) => s?.orderProducts?.orderProducts) || [];
   const images = useSelector((s) => s?.images?.images) || [];
 
-  // Orders (paged)
   const orderSlice = useSelector((s) => s?.orders) || {};
-  const pagedOrders = Array.isArray(orderSlice.items) ? orderSlice.items : [];
-  const totalCount = Number(orderSlice.totalCount ?? 0);
+  const itemsServer = Array.isArray(orderSlice.items) ? orderSlice.items : [];
+  const serverTotalCount = Number(orderSlice.totalCount ?? 0); // comme OrderAdmin
   const loading = !!orderSlice.loading;
 
-  // Courant
+  // Client courant
   const uid = user?.id || null;
-  const currentCustomer = customers.find((c) => c.idAspNetUser === uid) || null;
+  const currentCustomer = useMemo(
+    () => customers.find((c) => c?.idAspNetUser && c.idAspNetUser === uid) || null,
+    [customers, uid]
+  );
 
   // UI
   const [activeMenu, setActiveMenu] = useState("orders");
   const [period, setPeriod] = useState("6m");
   const [openId, setOpenId] = useState(null);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(5);
+  const PAGE_SIZE = 10; // fixe
 
   // Période -> minDate ISO
   const minDateISO = useMemo(() => {
@@ -125,20 +203,20 @@ export const Account = () => {
     return d.toISOString();
   }, [period]);
 
-  // === Fix F5 : charge PIVOTS + PRODUITS dès le montage
+  // Boot
   useEffect(() => {
     dispatch(getOrderCustomerProductRequest());
     dispatch(getProductUserRequest());
   }, [dispatch]);
 
-  // Fetch paginé des commandes (filtré client + période)
+  // Fetch paginé SERVEUR (filtré client + période)
   const lastQueryRef = useRef("");
   useEffect(() => {
     if (!currentCustomer || activeMenu !== "orders") return;
 
     const payload = {
       page,
-      pageSize,
+      pageSize: PAGE_SIZE,
       sort: "CreationDate:desc",
       filter: {
         IdCustomer: currentCustomer.id,
@@ -155,142 +233,92 @@ export const Account = () => {
 
     dispatch(getOrderPagedUserRequest(payload));
     setOpenId(null);
-  }, [dispatch, currentCustomer, activeMenu, page, pageSize, minDateISO]);
+  }, [dispatch, currentCustomer, activeMenu, page, minDateISO]);
 
-  // Filtre local (safety)
-  const currentOrders = useMemo(() => {
+  // Sécurité côté UI : on n’affiche que les items du client + période
+  const listClient = useMemo(() => {
     if (!currentCustomer) return [];
-    const list = Array.isArray(pagedOrders) ? pagedOrders : [];
-    const hasCustomerField = list.some((o) => getCustomerIdFromOrder(o) != null);
-    const byClient = hasCustomerField
-      ? list.filter((o) => String(currentCustomer.id) === String(getCustomerIdFromOrder(o)))
-      : list;
+    const list = itemsServer.filter((o) => String(getCustomerIdFromOrder(o)) === String(currentCustomer.id));
     const min = new Date(minDateISO).getTime();
-    return byClient.filter((o) => {
+    return list.filter((o) => {
       const t = orderDate(o)?.getTime();
       return t == null || t >= min;
     });
-  }, [pagedOrders, currentCustomer?.id, minDateISO]);
+  }, [itemsServer, currentCustomer, minDateISO]);
 
-  // Compteur “en cours”
+  // Totaux et indices -> serveur (comme OrderAdmin)
+  const totalCount = serverTotalCount;
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const pageClamped = Math.max(1, Math.min(page, totalPages));
+  const startIdx = totalCount ? (pageClamped - 1) * PAGE_SIZE + 1 : 0;
+  const endIdx = totalCount ? Math.min(totalCount, pageClamped * PAGE_SIZE) : listClient.length;
+
+  // Compteur “en cours” (sur la page visible)
   const currentCount = useMemo(
-    () => currentOrders.filter((o) => !isDelivered(orderStatus(o))).length,
-    [currentOrders]
+    () => listClient.filter((o) => !isDelivered(orderStatus(o))).length,
+    [listClient]
   );
 
   // Maps
-  const productsById = useMemo(() => {
-    const m = new Map();
-    for (const p of products) {
-      const pid = getId(p);
-      if (pid != null) m.set(String(pid), p);
-    }
-    return m;
-  }, [products]);
+  const { productsById, opByOrder } = useMaps(products, orderProducts);
 
-  const opByOrder = useMemo(() => {
-    const m = new Map();
-    for (const op of orderProducts) {
-      const oid = String(getOrderIdFromOP(op));
-      if (!oid) continue;
-      if (!m.has(oid)) m.set(oid, []);
-      m.get(oid).push(op);
-    }
-    return m;
-  }, [orderProducts]);
-
-  // Détails: n’EMPÊCHE PAS le rendu si un produit manque.
-  const itemsForOrder = (order) => {
-    const oid = String(getId(order));
-
-    // 1) pivots (source principale)
-    const pivots = opByOrder.get(oid) || [];
-    if (pivots.length > 0) {
-      return pivots.map((l) => {
-        const pid = String(getProductIdFromOP(l));
-        const prod = productsById.get(pid);
-        const qty = getQtyFromOP(l);
-        const unit = toNum(l?.productUnitPrice ?? l?.price ?? l?.priceTtc ?? prod?.priceTtc ?? prod?.price);
-
-        return {
-          name: prod ? labelForProduct(prod) : `Article #${pid}`,
-          qty,
-          productId: prod?.id ?? prod?.Id ?? Number(pid),
-          price: unit,
-        };
-      });
-    }
-
-    // 2) fallback: produits *inline* (si un jour la page renvoie les produits)
-    const inline = Array.isArray(order?.products)
-      ? order.products
-      : Array.isArray(order?.Products)
-      ? order.Products
-      : [];
-    return inline.map((p) => ({
-      name: labelForProduct(p),
-      qty: toNum(p?.quantity ?? p?.Quantity) || 1,
-      productId: p?.id ?? p?.Id,
-      price: toNum(p?.priceTtc ?? p?.PriceTtc ?? p?.price ?? p?.Price),
-    }));
-  };
+  const itemsForOrder = useCallback(
+    (order) => {
+      const oid = String(getId(order));
+      const pivots = opByOrder.get(oid) || [];
+      if (pivots.length > 0) {
+        return pivots.map((l) => {
+          const pid = String(getProductIdFromOP(l));
+          const prod = productsById.get(pid);
+          const qty = getQtyFromOP(l);
+          const unit = toNum(l?.productUnitPrice ?? l?.price ?? l?.priceTtc ?? prod?.priceTtc ?? prod?.price);
+          return {
+            name: prod ? labelForProduct(prod) : `Article #${pid}`,
+            qty,
+            productId: prod?.id ?? prod?.Id ?? Number(pid),
+            price: unit,
+          };
+        });
+      }
+      const inline = Array.isArray(order?.products)
+        ? order.products
+        : Array.isArray(order?.Products)
+        ? order.Products
+        : [];
+      return inline.map((p) => ({
+        name: labelForProduct(p),
+        qty: Number(p?.quantity ?? p?.Quantity ?? 1),
+        productId: p?.id ?? p?.Id,
+        price: Number(p?.priceTtc ?? p?.PriceTtc ?? p?.price ?? p?.Price ?? 0),
+      }));
+    },
+    [opByOrder, productsById]
+  );
 
   const amountForOrder = (order) => (order?.amount != null ? Number(order.amount) : 0);
 
-  // Image avec fallbacks (placeholder si rien)
-  const getImage = (id) => {
-    const pid = String(id);
-
-    const imgRec = images.find(
-      (i) => String(i?.idProduct ?? i?.IdProduct ?? i?.productId ?? i?.ProductId ?? "") === pid
-    );
-
-    const prod = productsById.get(pid);
-    const prodUrl =
-      prod?.images?.[0]?.url ??
-      prod?.Images?.[0]?.url ??
-      prod?.image ??
-      prod?.Image ??
-      null;
-
-    const url = imgRec?.url ?? prodUrl ?? "/Imgs/placeholder.jpg";
-    return toMediaUrl(url);
-  };
-
-  // Pagination
-  const totalPages = Math.max(1, Math.ceil((totalCount || 0) / pageSize));
-  const startIdx = totalCount ? (page - 1) * pageSize + 1 : (page - 1) * pageSize + 1;
-  const endIdx = totalCount ? Math.min(totalCount, page * pageSize) : (page - 1) * pageSize + currentOrders.length;
-
-  const renderPagination = () => {
-    if (totalPages <= 1) return null;
-    const windowSize = 5;
-    let start = Math.max(1, page - Math.floor(windowSize / 2));
-    let end = Math.min(totalPages, start + windowSize - 1);
-    if (end - start + 1 < windowSize) start = Math.max(1, end - windowSize + 1);
-    const pages = [];
-    for (let p = start; p <= end; p++) pages.push(p);
-    return (
-      <nav className="orders-pagination" aria-label="Pagination des commandes">
-        <button className="pg-btn" disabled={page <= 1 || loading} onClick={() => setPage((x) => Math.max(1, x - 1))}>
-          ← Précédente
-        </button>
-        {pages.map((p) => (
-          <button key={p} className={`pg-btn ${p === page ? "is-active" : ""}`} onClick={() => setPage(p)} disabled={loading}>
-            {p}
-          </button>
-        ))}
-        <button className="pg-btn" disabled={page >= totalPages || loading} onClick={() => setPage((x) => Math.min(totalPages, x + 1))}>
-          Suivante →
-        </button>
-      </nav>
-    );
-  };
+  const getImage = useCallback(
+    (id) => {
+      const pid = String(id);
+      const imgRec = (images || []).find(
+        (i) => String(i?.idProduct ?? i?.IdProduct ?? i?.productId ?? i?.ProductId ?? "") === pid
+      );
+      const prod = productsById.get(pid);
+      const prodUrl =
+        prod?.images?.[0]?.url ?? prod?.Images?.[0]?.url ?? prod?.image ?? prod?.Image ?? null;
+      const url = imgRec?.url ?? prodUrl ?? "/Imgs/placeholder.jpg";
+      return toMediaUrl(url);
+    },
+    [images, productsById]
+  );
 
   const deconnect = () => {
     dispatch(logout());
     navigate("/");
   };
+
+  // Reset page si période change
+  useEffect(() => { setPage(1); setOpenId(null); }, [period]);
 
   return (
     <div className="account-page">
@@ -304,9 +332,7 @@ export const Account = () => {
               alt={user?.fullName || "Avatar"}
             />
           ) : (
-            <div className="account-avatar account-avatar--emoji" aria-hidden>
-              👨‍💻
-            </div>
+            <div className="account-avatar account-avatar--emoji" aria-hidden>👨‍💻</div>
           )}
           <div className="account-identity">
             <div className="account-name">
@@ -322,6 +348,7 @@ export const Account = () => {
               </div>
             )}
           </div>
+
           <button className="account-logout" onClick={deconnect}>
             <i className="bi bi-power text-danger fw-bold" aria-hidden="true" />
             <span>Se déconnecter</span>
@@ -352,9 +379,10 @@ export const Account = () => {
 
       {/* -------- MAIN -------- */}
       <section className="account-main">
+        {/* HERO */}
         <div className="account-hero">
           <div className="account-counter">
-            <div className="account-counter__num">{currentCount}</div>
+            <div className="account-counter__num">{listClient.filter(o => !isDelivered(orderStatus(o))).length}</div>
             <div className="account-counter__label">Commande en cours</div>
           </div>
           {currentCustomer && (
@@ -375,10 +403,7 @@ export const Account = () => {
                 <select
                   className="form-select account-select"
                   value={period}
-                  onChange={(e) => {
-                    setPeriod(e.target.value);
-                    setPage(1);
-                  }}
+                  onChange={(e) => { setPeriod(e.target.value); }}
                 >
                   <option value="3m">Depuis les 3 derniers mois</option>
                   <option value="6m">Depuis les 6 derniers mois</option>
@@ -388,6 +413,9 @@ export const Account = () => {
               </div>
             </header>
 
+
+
+            {/* Liste */}
             <div className="orders-table">
               <div className="orders-head">
                 <span>N° commande</span>
@@ -399,12 +427,12 @@ export const Account = () => {
 
               {loading && <div className="orders-empty">Chargement…</div>}
 
-              {!loading && currentOrders.length === 0 && (
+              {!loading && listClient.length === 0 && (
                 <div className="orders-empty">Aucune commande sur la période sélectionnée.</div>
               )}
 
               {!loading &&
-                currentOrders.map((o) => {
+                listClient.map((o) => {
                   const oid = String(getId(o));
                   const open = openId === oid;
                   const items = itemsForOrder(o);
@@ -421,13 +449,14 @@ export const Account = () => {
                           className="order-detail-btn"
                           onClick={() => setOpenId(open ? null : oid)}
                           aria-expanded={open}
+                          aria-controls={`order-details-${oid}`}
                         >
                           Détails <i className={`bi bi-chevron-${open ? "up" : "down"}`} />
                         </button>
                       </div>
 
                       {open && (
-                        <div className="order-details">
+                        <div className="order-details" id={`order-details-${oid}`}>
                           {items.length === 0 ? (
                             <div className="orders-empty">Aucun article pour cette commande.</div>
                           ) : (
@@ -440,9 +469,7 @@ export const Account = () => {
                                         src={getImage(it.productId)}
                                         alt={it.name}
                                         width={60}
-                                        onError={(e) => {
-                                          e.currentTarget.src = "/Imgs/placeholder.jpg";
-                                        }}
+                                        onError={(e) => { e.currentTarget.src = "/Imgs/placeholder.jpg"; }}
                                       />
                                     </Link>
                                     <span className="fw-bold">{it.name}</span>
@@ -463,24 +490,24 @@ export const Account = () => {
                             <span className="order-item__qty" aria-hidden="true">&nbsp;</span>
                           </div>
                           <hr />
-                          {o?.cartDiscount && (
+
+                          {o?.cartDiscount ? (
                             <>
-                            <div className="order-item order-item--shipping lineBackgroundColor">
-                              <span className="shipping-label text-success">Remise panier</span>
-                              <span className="text-dark fw-bold">
-                                {fmtPrice(Number(o?.cartDiscount))}
-                              </span>
-                              <span className="order-item__qty" aria-hidden="true">&nbsp;</span>
-                            </div>
-                            <hr />
+                              <div className="order-item order-item--shipping lineBackgroundColor">
+                                <span className="shipping-label text-success">Remise panier</span>
+                                <span className="text-dark fw-bold">{fmtPrice(Number(o?.cartDiscount))}</span>
+                                <span className="order-item__qty" aria-hidden="true">&nbsp;</span>
+                              </div>
+                              <hr />
                             </>
-                            )}
+                          ) : null}
+
                           <div className="order-item order-item--shipping lineBackgroundColor">
                             <span className="shipping-label text-success">N° de suivi</span>
                             <span className="text-dark fw-bold">
                               {o?.trackingLink ? (
-                                <a href={o?.trackingLink} target="_blank" rel="">
-                                  {o?.trackingNumber}
+                                <a href={o?.trackingLink} target="_blank" rel="noreferrer">
+                                  {o?.trackingNumber || "Lien de suivi"}
                                 </a>
                               ) : (
                                 <span className="text-muted">non disponible pour le moment</span>
@@ -505,29 +532,18 @@ export const Account = () => {
                 })}
             </div>
 
-            {/* Pagination (style mobile) */}
-            {renderPagination()}
-
-            {/* Infos + page size */}
-            <div className="d-flex align-items-center gap-3 mt-2">
-              <span className="ms-auto">
-                {startIdx}–{endIdx} {totalCount ? `sur ${totalCount}` : ""}
+            {/* Pager BOTTOM + compteur */}
+            <div className="d-flex align-items-center justify-content-between mt-2 flex-wrap gap-2">
+              <span className="text-muted">
+                {totalCount ? `${startIdx}–${endIdx} sur ${totalCount}` : "—"}
               </span>
-              <select
-                className="form-select"
-                style={{ width: 110 }}
-                value={pageSize}
-                onChange={(e) => {
-                  setPageSize(Number(e.target.value));
-                  setPage(1);
-                }}
-              >
-                {[5, 10, 20].map((n) => (
-                  <option key={n} value={n}>
-                    {n} / page
-                  </option>
-                ))}
-              </select>
+              <Pager
+                page={pageClamped}
+                setPage={setPage}
+                totalPages={totalPages}
+                loading={loading}
+                hasItems={listClient.length > 0}
+              />
             </div>
           </>
         )}
@@ -535,12 +551,6 @@ export const Account = () => {
         {activeMenu === "profile" && <UserInformation user={user} />}
         {activeMenu === "addresses" && (
           <Address user={user} enableAddressAutocomplete={true} preservePhoneOnFavorite={true} />
-        )}
-
-        {["carts", "credits", "settings"].includes(activeMenu) && (
-          <div className="account-placeholder">
-            <p>Section “{activeMenu}” à brancher.</p>
-          </div>
         )}
       </section>
     </div>
