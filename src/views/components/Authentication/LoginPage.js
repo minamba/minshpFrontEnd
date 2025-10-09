@@ -5,6 +5,7 @@ import "../../../styles/pages/auth.css";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { loginRequest } from "../../../lib/actions/AccountActions";
+import { LoadingOverlay } from "../../../components";
 
 const API_HOST = window.location.hostname;     // ex: "localhost" ou "192.168.1.63"
 const API_PORT = 5054;                         // ton port API HTTP
@@ -303,6 +304,14 @@ export default function LoginPage() {
           </div>
         </div>
       )}
+
+<LoadingOverlay
+        show={!!loading}
+        text="Connexion en cours..."
+        fullscreen
+        blur
+        spinnerSize={72}
+      />
     </div>
   );
 }

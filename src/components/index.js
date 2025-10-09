@@ -25,7 +25,9 @@ import { addNewsletterRequest } from '../lib/actions/NewLetterActions';
 import { getProductsPagedUserRequest } from '../lib/actions/ProductActions';
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
+import { createPortal } from "react-dom";
 import LinkExt from "@tiptap/extension-link";
+import "../styles/components/loading.css";
 
 
 
@@ -1888,6 +1890,54 @@ export const PromoTicker = memo(function PromoTicker({ messages = [] }) {
     </>
   );
 });
+
+
+/////////////////////////// Loader ///////////////////////////////////////////////////
+/** Petit loader réutilisable (taille et texte optionnels) */
+export const Loader = ({ size = 56, label }) => {
+  return (
+    <div className="lds-wrap" role="status" aria-live="polite">
+      <svg
+        className="lds-ring"
+        viewBox="0 0 44 44"
+        width={size}
+        height={size}
+        aria-hidden="true"
+      >
+        <g fill="none" strokeWidth="4">
+          <circle className="ring-bg" cx="22" cy="22" r="18" />
+          <path className="ring-fg" d="M22 4 a18 18 0 0 1 0 36 a18 18 0 0 1 0-36" />
+        </g>
+      </svg>
+      {label ? <div className="lds-label">{label}</div> : null}
+    </div>
+  );
+};
+
+
+export const LoadingOverlay = ({
+  show,
+  text,
+  fullscreen = false,
+  blur = false,
+  spinnerSize = 64,
+  children, // optionnel : tu peux wrap du contenu si tu veux
+}) => {
+  if (!show) return children || null;
+
+  const content = (
+    <div className={`loading-overlay ${fullscreen ? "is-fullscreen" : "is-local"}`}>
+      <div className={`loading-scrim ${blur ? "with-blur" : ""}`} />
+      <div className="loading-box">
+        <Loader size={spinnerSize} label={text} />
+      </div>
+    </div>
+  );
+
+  return fullscreen
+    ? createPortal(content, document.body)
+    : <div className="loading-local-wrap">{content}{children}</div>;
+}
 
 
 

@@ -8,6 +8,7 @@ import { GenericModal } from '../../components';
 import { calculPrice } from '../../lib/utils/Helpers';
 import { toMediaUrl } from '../../lib/utils/mediaUrl';
 import { getProductsPagedUserRequest } from '../../lib/actions/ProductActions';
+import { LoadingOverlay } from '../../components';
 
 export const Home = () => {
   const prodState     = useSelector((s) => s.products) || {};
@@ -43,6 +44,13 @@ export const Home = () => {
 
   const items     = useSelector((state) => state.items.items) || [];
   const promotionCodes = useSelector((state) => state.promotionCodes.promotionCodes) || [];
+
+  const isBusy =
+  !!prodState.loading ||
+  !!images.loading ||
+  !!videos.loading ||
+  !!categoriesFromStore.loading;
+
 
   const dispatch  = useDispatch();
   const navigate  = useNavigate();
@@ -433,6 +441,13 @@ export const Home = () => {
           { label: "Continuer mes achats", variant: "light", onClick: closeAdded },
           { label: "Voir mon panier", variant: "primary", onClick: goToCart, autoFocus: true },
         ]}
+      />
+
+<LoadingOverlay
+        show={isBusy}
+        text="Chargement de la page d’accueil..."
+        fullscreen
+        blur
       />
     </div>
   );

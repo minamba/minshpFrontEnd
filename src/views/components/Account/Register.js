@@ -8,22 +8,22 @@ import { getCustomerRequest } from "../../../lib/actions/CustomerActions";
 
 /* ========= Phone helpers (indicatifs + formatage E.164) ========= */
 const PHONE_COUNTRIES = [
-  { iso: "AE", label: "Dubaï (EAU)", dial: "+971", trunk: "0" },
-  { iso: "DE", label: "Allemagne",    dial: "+49",  trunk: "0" },
-  { iso: "DZ", label: "Algérie",      dial: "+213", trunk: "0" },
-  { iso: "SA", label: "Arabie saoudite", dial: "+966", trunk: "0" },
-  { iso: "BE", label: "Belgique",     dial: "+32",  trunk: "0" },
-  { iso: "CA", label: "Canada",       dial: "+1",   trunk: ""  },
-  { iso: "ES", label: "Espagne",      dial: "+34",  trunk: "0" },
-  { iso: "US", label: "États-Unis",   dial: "+1",   trunk: ""  },
+  // { iso: "AE", label: "Dubaï (EAU)", dial: "+971", trunk: "0" },
+  // { iso: "DE", label: "Allemagne",    dial: "+49",  trunk: "0" },
+  // { iso: "DZ", label: "Algérie",      dial: "+213", trunk: "0" },
+  // { iso: "SA", label: "Arabie saoudite", dial: "+966", trunk: "0" },
+  // { iso: "BE", label: "Belgique",     dial: "+32",  trunk: "0" },
+  // { iso: "CA", label: "Canada",       dial: "+1",   trunk: ""  },
+  // { iso: "ES", label: "Espagne",      dial: "+34",  trunk: "0" },
+  // { iso: "US", label: "États-Unis",   dial: "+1",   trunk: ""  },
   { iso: "FR", label: "France",       dial: "+33",  trunk: "0" },
-  { iso: "IE", label: "Irlande",      dial: "+353", trunk: "0" },
-  { iso: "IT", label: "Italie",       dial: "+39",  trunk: "0" },
-  { iso: "LU", label: "Luxembourg",   dial: "+352", trunk: ""  },
-  { iso: "MA", label: "Maroc",        dial: "+212", trunk: "0" },
-  { iso: "ML", label: "Mali",         dial: "+223", trunk: ""  },
-  { iso: "SN", label: "Sénégal",      dial: "+221", trunk: ""  },
-  { iso: "CH", label: "Suisse",       dial: "+41",  trunk: "0" },
+  // { iso: "IE", label: "Irlande",      dial: "+353", trunk: "0" },
+  // { iso: "IT", label: "Italie",       dial: "+39",  trunk: "0" },
+  // { iso: "LU", label: "Luxembourg",   dial: "+352", trunk: ""  },
+  // { iso: "MA", label: "Maroc",        dial: "+212", trunk: "0" },
+  // { iso: "ML", label: "Mali",         dial: "+223", trunk: ""  },
+  // { iso: "SN", label: "Sénégal",      dial: "+221", trunk: ""  },
+  // { iso: "CH", label: "Suisse",       dial: "+41",  trunk: "0" },
 ];
 
 const PHONE_COUNTRIES_SORTED = [...PHONE_COUNTRIES].sort((a, b) =>
