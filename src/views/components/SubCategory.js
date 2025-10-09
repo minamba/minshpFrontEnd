@@ -15,10 +15,35 @@ const toNumOrNull = (v) => {
   const n = typeof v === "number" ? v : parseFloat(v);
   return Number.isFinite(n) ? n : null;
 };
+
+// ✅ Robust booleans (some APIs send string "true"/"false")
+const toBool = (v) => {
+  if (typeof v === "string") {
+    const t = v.trim().toLowerCase();
+    if (t === "true" || t === "1" || t === "yes" || t === "oui") return true;
+    if (t === "false" || t === "0" || t === "no" || t === "non") return false;
+  }
+  return Boolean(v);
+};
+
+// ✅ Robust ID normalizers (handle id/Id/idProduct/IdProduct, etc.)
+const getProductId = (p) =>
+  Number(p?.id ?? p?.Id ?? p?.productId ?? p?.ProductId ?? NaN);
+
+const getImageProductId = (img) =>
+  Number(img?.idProduct ?? img?.IdProduct ?? img?.productId ?? img?.ProductId ?? NaN);
+
+const getImageSubCategoryId = (img) =>
+  Number(img?.idSubCategory ?? img?.IdSubCategory ?? img?.subCategoryId ?? img?.SubCategoryId ?? NaN);
+
 const getSubCategoryIdFromProduct = (p) =>
   p?.idSubCategory ?? p?.subCategoryId ?? p?.IdSubCategory ?? p?.subcategoryId ?? p?.subCategory?.id ?? null;
+
 const getSubcatParentId = (sc) =>
   sc?.parentCategoryId ?? sc?.idCategory ?? sc?.categoryId ?? sc?.idCategorie ?? sc?.categorieId ?? sc?.parentId ?? sc?.idParent ?? null;
+
+// ✅ Display flag on products (display/Display/published/Published)
+const getDisplayFromProduct = (p) => toBool(p?.display ?? p?.Display ?? p?.published ?? p?.Published);
 
 /* -------- Component -------- */
 export const SubCategory = () => {
@@ -36,12 +61,10 @@ export const SubCategory = () => {
   const pagedItems   = Array.isArray(prodState.items)    ? prodState.items    : [];
 
   let productsAll  = fullProducts.length ? fullProducts : pagedItems;
-  const loading      = !!prodState.loading;
+  const loading    = !!prodState.loading;
 
-
-
-
-  productsAll = productsAll.filter((p) => p.display === true);
+  // ✅ Montre uniquement les produits réellement affichables
+  productsAll = productsAll.filter((p) => getDisplayFromProduct(p) === true);
 
   const images        = useSelector((s) => s.images?.images) || [];
   const items         = useSelector((s) => s.items?.items) || [];
@@ -58,11 +81,10 @@ export const SubCategory = () => {
     const isSub = subCategories.some((sc) => String(sc.id) === String(routeSubCategoryId));
     const isCat = categories.some((c) => String(c.id) === String(routeSubCategoryId));
 
-    // On recharge toujours la page 1 filtrée par l’onglet courant (évite le “vide après navigation”).
     dispatch(
       getProductsPagedUserRequest({
         page: 1,
-        pageSize: 24,               // ajuste si besoin
+        pageSize: 24,
         sort: "CreationDate:desc",
         filter: isSub
           ? { IdSubCategory: routeSubCategoryId }
@@ -134,29 +156,30 @@ export const SubCategory = () => {
   };
   const goTo = (p) => navigate(p.type === "category" ? `/category/${p.id}` : `/subcategory/${p.id}`);
 
-  // Bannière
+  // ✅ Bannière — robust idSubCategory + placeholder en minuscule
   const subCategoryBannerUrl = useMemo(() => {
-    const bySubCat = images.find((i) => String(i.idSubCategory) === String(routeSubCategoryId));
-    return bySubCat?.url || "/Images/placeholder.jpg";
+    const bySubCat = images.find((i) => getImageSubCategoryId(i) === Number(routeSubCategoryId));
+    return bySubCat?.url || "/images/placeholder.jpg";
   }, [images, routeSubCategoryId]);
 
+  // ✅ Image produit — robust idProduct + placeholder en minuscule
   const getProductImage = (productId) => {
-    const productImages = images.filter((i) => String(i.idProduct) === String(productId));
-    return productImages.length > 0 ? productImages[0].url : "/Images/placeholder.jpg";
+    const pid = Number(productId);
+    const first = images.find((i) => getImageProductId(i) === pid);
+    return first?.url || "/images/placeholder.jpg";
   };
 
   const promotionCodes  = useSelector((s) => s.promotionCodes?.promotionCodes) || [];
 
-  // ---------- Sélection produits (si on a déjà une liste full en mémoire, on filtre côté client) ----------
+  // ---------- Sélection produits ----------
   const subCategoryProducts = useMemo(() => {
     if (!routeSubCategoryId) return [];
 
     const isSub = subCategories.some((sc) => String(sc.id) === String(routeSubCategoryId));
     const isCat = categories.some((c) => String(c.id) === String(routeSubCategoryId));
 
-    if (!productsAll.length) return []; // on attend la réponse serveur (items filtrés)
+    if (!productsAll.length) return [];
 
-    // si la liste vient d’un fetch filtré, elle est déjà bonne; sinon on filtre fullProducts
     return productsAll.filter((p) => {
       const subId = getSubCategoryIdFromProduct(p);
       const catId = p?.idCategory ?? p?.categoryId;
@@ -208,9 +231,7 @@ export const SubCategory = () => {
         return toNumOrNull(dPrice);
       })();
 
-
       const displayPrice = calculPrice(product, promotionCodes);
-      
       const hasAnyPromo  = priceCat != null || hasProductPromo;
 
       const creationTs = (() => {
@@ -339,7 +360,8 @@ export const SubCategory = () => {
           )}
 
           {filteredSorted.map(({ product, name, priceRef, displayPrice, hasAnyPromo }) => {
-            const img = getProductImage(product.id);
+            const pid = getProductId(product);
+            const img = getProductImage(pid);
             const [euros, cents] = displayPrice.toFixed(2).split(".");
             const raw = (product?.stockStatus ?? "").trim();
             const lower = raw.toLowerCase();
@@ -349,9 +371,9 @@ export const SubCategory = () => {
             const stockLabel = lower.includes("plus que") ? "Bientôt en rupture" : raw || "Disponibilité limitée";
 
             return (
-              <article key={product.id} className="product-card" data-aos="zoom-in">
+              <article key={pid} className="product-card" data-aos="zoom-in">
                 <div className="product-thumb">
-                  <Link to={`/product/${product.id}`} className="thumb-link">
+                  <Link to={`/product/${pid}`} className="thumb-link">
                     <img src={toMediaUrl(img)} alt={name} />
                   </Link>
                   {hasAnyPromo && <span className="promo-pill">Promotion</span>}
@@ -362,9 +384,9 @@ export const SubCategory = () => {
                       className="thumb-add-btn"
                       onClick={(e) => {
                         e.preventDefault(); e.stopPropagation();
-                        const payloadItem = { id: product.id, name, price: displayPrice, image: img, packageProfil: product.packageProfil, containedCode: product.containedCode };
+                        const payloadItem = { id: pid, name, price: displayPrice, image: img, packageProfil: product.packageProfil, containedCode: product.containedCode };
                         dispatch(addToCartRequest(payloadItem, 1));
-                        setLastAdded({ id: product.id, name });
+                        setLastAdded({ id: pid, name });
                         setShowAdded(true);
                       }}
                     >

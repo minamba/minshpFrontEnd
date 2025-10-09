@@ -27,26 +27,26 @@ export const SubCategoryAdmin = () => {
     [];
 
   const categoriesFromStore = root?.categories?.categories || [];
-  const imagesFromStore = root?.images?.images || [];
-  const productsFromStore = root?.products?.products || [];
-  const taxesFromStore = root?.taxes?.taxes || [];
-  const packageProfils = root?.packageProfils?.packageProfils || [];
-  const contentCategories = root?.shipping?.contentCategories || [];
+  const imagesFromStore     = root?.images?.images || [];
+  const productsFromStore   = root?.products?.products || [];
+  const taxesFromStore      = root?.taxes?.taxes || [];
+  const packageProfils      = root?.packageProfils?.packageProfils || [];
+  const contentCategories   = root?.shipping?.contentCategories || [];
 
   // ───────── UI state ─────────
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [currentId, setCurrentId] = useState(null);
 
-  const [formData, setFormData] = useState({ name: "", display: false }); // ✅ display dans le state
+  const [formData, setFormData] = useState({ name: "", display: false });
   const [idImage, setIdImage] = useState("");
   const [selectedProductId, setSelectedProductId] = useState("");
 
-  const [selectedTaxIds, setSelectedTaxIds] = useState([]); // string[]
+  const [selectedTaxIds, setSelectedTaxIds] = useState([]);              // string[]
   const [selectedPackageProfilId, setSelectedPackageProfilId] = useState(""); // string
-  const [selectedContentCode, setSelectedContentCode] = useState(""); // string
-  const [contentCodeQuery, setContentCodeQuery] = useState(""); // recherche code produit
-  const [selectedCategoryId, setSelectedCategoryId] = useState(""); // Catégorie (id, string)
+  const [selectedContentCode, setSelectedContentCode] = useState("");    // string
+  const [contentCodeQuery, setContentCodeQuery] = useState("");          // recherche code produit
+  const [selectedCategoryId, setSelectedCategoryId] = useState("");      // Catégorie (id, string)
 
   // ───────── Fetch data ─────────
   useEffect(() => {
@@ -177,7 +177,7 @@ export const SubCategoryAdmin = () => {
   const handleAddClick = () => {
     setIsEditing(false);
     setCurrentId(null);
-    setFormData({ name: "", display: false }); // ✅ reset display
+    setFormData({ name: "", display: false });
     setIdImage("");
     setSelectedProductId("");
     setSelectedTaxIds([]);
@@ -194,7 +194,7 @@ export const SubCategoryAdmin = () => {
     setFormData({
       id: subcat.id,
       name: subcat.name,
-      display: Boolean(subcat.display), // ✅ pré-rempli
+      display: Boolean(subcat.display),
     });
 
     // Pré-sélections
@@ -216,7 +216,7 @@ export const SubCategoryAdmin = () => {
     const productsInSub = productsFromStore.filter(
       (p) => String(getProductSubCatId(p)) === String(subcat.id)
     );
-    if (img?.idProduct) setSelectedProductId(String(img.idProduct));
+    if (img?.idProduct ?? img?.IdProduct) setSelectedProductId(String(img.idProduct ?? img.IdProduct));
     else if (productsInSub.length > 0) setSelectedProductId(String(productsInSub[0].id));
     else setSelectedProductId("");
 
@@ -242,21 +242,29 @@ export const SubCategoryAdmin = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const idsTaxesCsv = selectedTaxIds.join(",");
-    const pkgIdNum = selectedPackageProfilId !== "" ? Number(selectedPackageProfilId) : null;
-    const contentCodeId = selectedContentCode !== "" ? Number(selectedContentCode) : null;
-    const catIdNum = selectedCategoryId !== "" ? Number(selectedCategoryId) : null;
+    // ✅ NULL si aucune taxe sélectionnée
+    const idsTaxesCsvOrNull =
+      selectedTaxIds.length > 0 ? selectedTaxIds.join(",") : null;
+
+    const pkgIdNum =
+      selectedPackageProfilId !== "" ? Number(selectedPackageProfilId) : null;
+
+    const contentCodeId =
+      selectedContentCode !== "" ? Number(selectedContentCode) : null;
+
+    const catIdNum =
+      selectedCategoryId !== "" ? Number(selectedCategoryId) : null;
 
     if (isEditing) {
       await dispatch(
         updateSubCategoryRequest({
           id: currentId,
           name: formData.name,
-          idTaxe: idsTaxesCsv,
+          idTaxe: idsTaxesCsvOrNull,         // ← null si aucune taxe
           IdPackageProfil: pkgIdNum,
           ContentCode: contentCodeId,
           IdCategory: catIdNum,
-          Display: !!formData.display, // ✅ ENVOI Display en UPDATE
+          Display: !!formData.display,
         })
       );
       if (idImage) {
@@ -271,14 +279,25 @@ export const SubCategoryAdmin = () => {
       await dispatch(
         addSubCategoryRequest({
           name: formData.name,
-          IdTaxe: idsTaxesCsv,
+          IdTaxe: idsTaxesCsvOrNull,        // ← null si aucune taxe (on garde la même clé que ton code)
           IdPackageProfil: pkgIdNum,
           ContentCode: contentCodeId,
           IdCategory: catIdNum,
-          Display: !!formData.display, // ✅ ENVOI Display en ADD
+          Display: !!formData.display,
         })
       );
       await dispatch(getSubCategoryRequest());
+
+      // 🔗 si une image a été choisie à la création, on la relie à la sous-catégorie nouvellement créée
+      const created = [...subcategoriesFromStore].reverse().find((sc) => sc.name === formData.name);
+      if (idImage && created?.id) {
+        await dispatch(
+          updateImageRequest({
+            id: Number(idImage),
+            IdSubCategory: Number(created.id),
+          })
+        );
+      }
     }
 
     await dispatch(getImageRequest());
@@ -297,7 +316,8 @@ export const SubCategoryAdmin = () => {
 
   const getSubCategoryImageUrl = (idSubCategory) => {
     const image = imagesFromStore.find((i) => imageMatchesSubCat(i, idSubCategory));
-    return image ? image.url : "/Images/placeholder.jpg";
+    // minuscule pour éviter 404
+    return image ? image.url : "/images/placeholder.jpg";
   };
 
   const productsInCurrentSubCategory = useMemo(() => {
@@ -309,7 +329,9 @@ export const SubCategoryAdmin = () => {
 
   const imagesOfSelectedProduct = useMemo(() => {
     if (!isEditing || !selectedProductId) return [];
-    return imagesFromStore.filter((img) => Number(img.idProduct) === Number(selectedProductId));
+    return imagesFromStore.filter(
+      (img) => Number(img.idProduct ?? img.IdProduct) === Number(selectedProductId)
+    );
   }, [isEditing, selectedProductId, imagesFromStore]);
 
   const imagesForCreate = useMemo(() => {
@@ -340,23 +362,22 @@ export const SubCategoryAdmin = () => {
               <th>Taxes</th>
               <th>Code produit</th>
               <th>Package profil</th>
-              <th>Afficher</th> {/* ✅ nouvelle colonne */}
+              <th>Afficher</th>
               <th style={{ width: 180 }}>Actions</th>
             </tr>
           </thead>
           <tbody>
             {sortedSubCategories.map((sc) => {
-              const taxNames = (() => {
-                const ids = extractTaxIdsFromEntity(sc, taxesFromStore);
-                if (!ids.length) return "—";
-                const names = ids
-                  .map(
-                    (id) =>
-                      taxesFromStore.find((t) => String(t.id) === String(id))?.name || `#${id}`
-                  )
-                  .join(", ");
-                return names || "—";
-              })();
+              const ids = extractTaxIdsFromEntity(sc, taxesFromStore);
+              const taxNames = ids.length
+                ? ids
+                    .map(
+                      (id) =>
+                        taxesFromStore.find((t) => String(t.id) === String(id))?.name ||
+                        `#${id}`
+                    )
+                    .join(", ")
+                : "—";
 
               return (
                 <tr
@@ -365,7 +386,11 @@ export const SubCategoryAdmin = () => {
                   style={{ cursor: "pointer" }}
                 >
                   <td>
-                    <img src={toMediaUrl(getSubCategoryImageUrl(sc.id))} width={100} alt={sc.name} />
+                    <img
+                      src={toMediaUrl(getSubCategoryImageUrl(sc.id))}
+                      width={100}
+                      alt={sc.name}
+                    />
                   </td>
                   <td>{sc.name}</td>
                   <td>{getCategoryNameForSubCat(sc)}</td>
@@ -577,7 +602,7 @@ export const SubCategoryAdmin = () => {
                           title={img.fileName || img.url}
                         >
                           <img
-                            src={img.url}
+                            src={toMediaUrl(img.url)}
                             alt={img.fileName || `img-${img.id}`}
                             style={{ width: "100%", height: 80, objectFit: "cover", borderRadius: 6 }}
                           />
@@ -617,7 +642,7 @@ export const SubCategoryAdmin = () => {
                         title={img.fileName || img.url}
                       >
                         <img
-                          src={img.url}
+                          src={toMediaUrl(img.url)}
                           alt={img.fileName || `img-${img.id}`}
                           style={{ width: "100%", height: 80, objectFit: "cover", borderRadius: 6 }}
                         />

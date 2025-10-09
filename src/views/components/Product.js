@@ -32,7 +32,7 @@ export const Product = () => {
   const promotionCodes  = useSelector((s) => s.promotionCodes?.promotionCodes) || [];
   const stocks          = useSelector((s) => s.stocks?.stocks) || [];
 
-  images = images.filter((i) => i.display === true);
+  images = images.filter((i) => i.display === true &&  i.position !== 99);
   videos = videos.filter((v) => v.display === true);
 
   // Sauvegarde panier

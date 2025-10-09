@@ -72,6 +72,19 @@ export const CategoryAdmin = () => {
     return Boolean(v);
   };
 
+  // 🔐 Normalisation d'IDs pour éviter les mismatches
+  const getProductId = (p) =>
+    Number(p?.id ?? p?.Id ?? p?.productId ?? p?.ProductId ?? NaN);
+
+  const getImageProductId = (img) =>
+    Number(img?.idProduct ?? img?.IdProduct ?? img?.productId ?? img?.ProductId ?? NaN);
+
+  const getImageCategoryId = (img) =>
+    Number(img?.idCategory ?? img?.IdCategory ?? NaN);
+
+  const getProductCategoryId = (p) =>
+    Number(p?.idCategory ?? p?.IdCategory ?? NaN);
+
   const getDisplayFromCategory = (cat) => {
     const v = cat?.display ?? cat?.Display ?? cat?.isDisplayed ?? cat?.IsDisplayed ?? cat?.published ?? cat?.Published;
     return toBool(v);
@@ -195,15 +208,27 @@ export const CategoryAdmin = () => {
     setSelectedContentCode(ccId != null ? String(ccId) : '');
     setContentCodeQuery(''); // reset recherche quand on ouvre
 
-    // Image liée
-    const img = imagesFromStore.find((i) => Number(i.idCategory) === Number(category.id));
+    // Image liée à la catégorie
+    const img = imagesFromStore.find((i) => getImageCategoryId(i) === Number(category.id));
     setIdImage(img ? String(img.id) : '');
 
-    // Produit (pour grille d’images)
-    const productsInCat = productsFromStore.filter((p) => Number(p.idCategory) === Number(category.id));
-    if (img?.idProduct) setSelectedProductId(String(img.idProduct));
-    else if (productsInCat.length > 0) setSelectedProductId(String(productsInCat[0].id));
-    else setSelectedProductId('');
+    // Produits rattachés à la catégorie (par idCategory si dispo, sinon via le nom comme avant)
+    const productsInCatById = productsFromStore.filter(
+      (p) => getProductCategoryId(p) === Number(category.id)
+    );
+    let nextSelectedProductId = '';
+    if (img && !Number.isNaN(getImageProductId(img))) {
+      nextSelectedProductId = String(getImageProductId(img));
+    } else if (productsInCatById.length > 0) {
+      nextSelectedProductId = String(getProductId(productsInCatById[0]));
+    } else {
+      // fallback ancien mapping par nom de catégorie si nécessaire
+      const byName = productsFromStore.filter(
+        (p) => String(p.category) === String(category.name)
+      );
+      if (byName.length > 0) nextSelectedProductId = String(getProductId(byName[0]));
+    }
+    setSelectedProductId(nextSelectedProductId);
 
     // Taxes pré-cochées
     setSelectedTaxIds(extractTaxIdsFromCategory(category, taxesFromStore));
@@ -239,9 +264,12 @@ export const CategoryAdmin = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const idsTaxesCsv = selectedTaxIds.join(',');
+    // null si aucune taxe sélectionnée
+    const idsTaxesCsvOrNull = selectedTaxIds.length > 0 ? selectedTaxIds.join(',') : null;
+
     const pkgIdNum =
       selectedPackageProfilId !== '' ? Number(selectedPackageProfilId) : null;
+
     // On envoie UNIQUEMENT l'id du “code produit”
     const contentCodeId = selectedContentCode !== '' ? Number(selectedContentCode) : null;
 
@@ -249,7 +277,7 @@ export const CategoryAdmin = () => {
       await dispatch(updateCategoryRequest({
         id: currentId,
         name: formData.name,
-        idTaxe: idsTaxesCsv,
+        idTaxe: idsTaxesCsvOrNull,          // ← null si aucune taxe
         IdPackageProfil: pkgIdNum,
         ContentCode: contentCodeId,
         Display: !!formData.display,
@@ -260,7 +288,7 @@ export const CategoryAdmin = () => {
     } else {
       const addPayload = {
         name: formData.name,
-        idsTaxes: idsTaxesCsv,
+        idsTaxes: idsTaxesCsvOrNull,        // ← null si aucune taxe
         IdPackageProfil: pkgIdNum,
         ContentCode: contentCodeId,
         Display: !!formData.display,
@@ -288,11 +316,12 @@ export const CategoryAdmin = () => {
   );
 
   const getCategoryImage = (idCategory) => {
-    const image = imagesFromStore.find((i) => Number(i.idCategory) === Number(idCategory));
-    return image ? image.url : '/Images/placeholder.jpg';
+    const image = imagesFromStore.find((i) => getImageCategoryId(i) === Number(idCategory));
+    // évite le 404 'Images/placeholder.jpg' → 'images/placeholder.jpg'
+    return image ? image.url : '/images/placeholder.jpg';
   };
 
-  const getCategoryId = (catName) => {
+  const getCategoryIdByName = (catName) => {
     const category = categoriesFromStore.find((c) => c.name === catName);
     return category ? category.id : null;
   };
@@ -308,21 +337,30 @@ export const CategoryAdmin = () => {
     return '—';
   };
 
+  // Produits de la catégorie courante
   const productsInCurrentCategory = useMemo(() => {
     if (!isEditing || !currentId) return [];
-    return productsFromStore.filter(
-      (p) => Number(getCategoryId(p.category)) === Number(currentId)
+    // d'abord par idCategory
+    const byId = productsFromStore.filter(
+      (p) => getProductCategoryId(p) === Number(currentId)
     );
-  }, [isEditing, currentId, productsFromStore]);
+    if (byId.length) return byId;
+    // fallback par nom si certains produits n'ont pas idCategory mais seulement le nom
+    return productsFromStore.filter(
+      (p) => Number(getCategoryIdByName(p.category)) === Number(currentId)
+    );
+  }, [isEditing, currentId, productsFromStore, categoriesFromStore]);
 
+  // ✅ Images du produit sélectionné – comparaison robuste
   const imagesOfSelectedProduct = useMemo(() => {
     if (!isEditing || !selectedProductId) return [];
-    return imagesFromStore.filter((img) => Number(img.idProduct) === Number(selectedProductId));
+    const selId = Number(selectedProductId);
+    return imagesFromStore.filter((img) => getImageProductId(img) === selId);
   }, [isEditing, selectedProductId, imagesFromStore]);
 
   const imagesForCreate = useMemo(() => {
     if (isEditing) return [];
-    return imagesFromStore.filter((i) => !i.idCategory);
+    return imagesFromStore.filter((i) => !i.idCategory && !i.IdCategory);
   }, [isEditing, imagesFromStore]);
 
   /* ───────── UI ───────── */
@@ -429,7 +467,7 @@ export const CategoryAdmin = () => {
                 </label>
               </div>
 
-              {/* Package profil (avant images) */}
+              {/* Package profil */}
               <div className="mb-3">
                 <label>Package profil</label>
                 <select
@@ -501,7 +539,7 @@ export const CategoryAdmin = () => {
                 </div>
               </div>
 
-              {/* Images (inchangé) */}
+              {/* Images */}
               {isEditing ? (
                 <>
                   <div className="mb-3">
@@ -510,18 +548,21 @@ export const CategoryAdmin = () => {
                       className="form-select mt-2"
                       value={selectedProductId}
                       onChange={(e) => {
-                        setSelectedProductId(e.target.value);
+                        setSelectedProductId(e.target.value); // string OK
                         setIdImage('');
                       }}
                     >
                       {productsInCurrentCategory.length === 0 && (
                         <option value="">Aucun produit dans cette catégorie</option>
                       )}
-                      {productsInCurrentCategory.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name || p.title || `Produit #${p.id}`}
-                        </option>
-                      ))}
+                      {productsInCurrentCategory.map((p) => {
+                        const pid = getProductId(p);
+                        return (
+                          <option key={pid} value={String(pid)}>
+                            {p.name || p.title || `Produit #${pid}`}
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
 

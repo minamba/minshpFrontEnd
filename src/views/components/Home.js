@@ -32,8 +32,10 @@ export const Home = () => {
   });
 
 
-  const images    = useSelector((state) => state.images.images) || [];
-  const videos    = useSelector((state) => state.videos.videos) || [];
+  let images    = useSelector((state) => state.images.images) || [];
+  images = images.filter((i) => i.display === true);
+  let videos    = useSelector((state) => state.videos.videos) || [];
+  videos = videos.filter((i) => i.display === true);
 
   let categoriesFromStore = useSelector((state) => state.categories.categories) || [];
   categoriesFromStore = categoriesFromStore.filter((c) => c.display === true);

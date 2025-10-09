@@ -13,17 +13,17 @@ import {
 // Liste brute
 const PHONE_COUNTRIES_BASE = [
   { iso: "FR", label: "France",        dial: "+33",  trunk: "0" },
-  { iso: "BE", label: "Belgique",      dial: "+32",  trunk: "0" },
-  { iso: "ES", label: "Espagne",       dial: "+34",  trunk: "0" },
-  { iso: "IT", label: "Italie",        dial: "+39",  trunk: "0" },
-  { iso: "DE", label: "Allemagne",     dial: "+49",  trunk: "0" },
-  { iso: "IE", label: "Irlande",       dial: "+353", trunk: "0" },
-  { iso: "US", label: "États-Unis",    dial: "+1",   trunk: ""  },
-  { iso: "ML", label: "Mali",          dial: "+223", trunk: ""  },
-  { iso: "SN", label: "Sénégal",       dial: "+221", trunk: ""  },
-  { iso: "MA", label: "Maroc",         dial: "+212", trunk: "0" },
-  { iso: "DZ", label: "Algérie",       dial: "+213", trunk: "0" },
-  { iso: "AE", label: "Dubaï (EAU)",   dial: "+971", trunk: "0" },
+  // { iso: "BE", label: "Belgique",      dial: "+32",  trunk: "0" },
+  // { iso: "ES", label: "Espagne",       dial: "+34",  trunk: "0" },
+  // { iso: "IT", label: "Italie",        dial: "+39",  trunk: "0" },
+  // { iso: "DE", label: "Allemagne",     dial: "+49",  trunk: "0" },
+  // { iso: "IE", label: "Irlande",       dial: "+353", trunk: "0" },
+  // { iso: "US", label: "États-Unis",    dial: "+1",   trunk: ""  },
+  // { iso: "ML", label: "Mali",          dial: "+223", trunk: ""  },
+  // { iso: "SN", label: "Sénégal",       dial: "+221", trunk: ""  },
+  // { iso: "MA", label: "Maroc",         dial: "+212", trunk: "0" },
+  // { iso: "DZ", label: "Algérie",       dial: "+213", trunk: "0" },
+  // { iso: "AE", label: "Dubaï (EAU)",   dial: "+971", trunk: "0" },
 ];
 
 // Tri alphabétique par label (locale FR)
@@ -36,10 +36,13 @@ const DEFAULT_DIAL = "+33";
 const byDial = Object.fromEntries(PHONE_COUNTRIES.map((c) => [c.dial, c]));
 const cleanDigits = (s) => String(s || "").replace(/[^\d]/g, "");
 
+// Limite max de chiffres pour le champ local
+const LOCAL_MAX = 10;
+
 /** Assemble en E.164: dial + local (retire la tête nationale "trunk" si présente) */
 function composeE164(dial, local) {
   const meta = byDial[dial] || { trunk: "" };
-  let loc = cleanDigits(local);
+  let loc = cleanDigits(local).slice(0, LOCAL_MAX); // ⬅️ limite à 10
   if (meta.trunk && loc.startsWith(meta.trunk)) {
     loc = loc.slice(meta.trunk.length);
   }
@@ -52,13 +55,13 @@ function splitE164(phone) {
   const match = PHONE_COUNTRIES
     .sort((a, b) => b.dial.length - a.dial.length)
     .find((c) => raw.startsWith(c.dial));
-  if (!match) return { dial: DEFAULT_DIAL, local: cleanDigits(raw) };
+  if (!match) return { dial: DEFAULT_DIAL, local: cleanDigits(raw).slice(0, LOCAL_MAX) };
 
   let rest = raw.slice(match.dial.length);
   if (match.trunk && rest && !rest.startsWith(match.trunk)) {
     rest = `${match.trunk}${rest}`;
   }
-  return { dial: match.dial, local: cleanDigits(rest) };
+  return { dial: match.dial, local: cleanDigits(rest).slice(0, LOCAL_MAX) };
 }
 
 /* =================== UI: Modal générique succès =================== */
@@ -99,9 +102,15 @@ function PhoneInput({ dial, local, onChange }) {
         className="form-control"
         placeholder="n° national (ex: 06 24 95 75 58)"
         value={local || ""}
-        onChange={(e) => onChange({ dial: dial || DEFAULT_DIAL, local: cleanDigits(e.target.value) })}
+        onChange={(e) =>
+          onChange({
+            dial: dial || DEFAULT_DIAL,
+            local: cleanDigits(e.target.value).slice(0, LOCAL_MAX), // ⬅️ coupe à 10
+          })
+        }
         inputMode="tel"
         autoComplete="tel-national"
+        maxLength={LOCAL_MAX} // ⬅️ bloque au clavier
       />
     </div>
   );
@@ -124,10 +133,8 @@ export const UserInformation = ({ user = {} }) => {
   const currentCustomer = customers.find((c) => c.idAspNetUser === user.id);
 
   // ---- Newsletters
-
   const newsletters = useSelector((s) => s?.newsletters?.newsletters) || [];
-  const currentNewsletter = newsletters.find((n) => n.mail === currentCustomer?.email).suscribe;
-
+  const currentNewsletter = newsletters.find((n) => n.mail === currentCustomer?.email)?.suscribe;
 
   // ---- États du formulaire "infos perso"
   const rawBirthDate = currentCustomer?.birthDate ?? null;
@@ -159,37 +166,31 @@ export const UserInformation = ({ user = {} }) => {
   const [openProfileModal, setOpenProfileModal] = useState(false);
   const [openPasswordModal, setOpenPasswordModal] = useState(false);
 
-  //abonné
+  // abonné
   const [subscribed, setSubscribed] = useState(false);
-
 
   useEffect(() => {
     setSubscribed(Boolean(currentNewsletter));
   }, [currentNewsletter]);
-
 
   // Si currentCustomer arrive après le premier rendu, re-synchroniser les champs
   useEffect(() => {
     const d = currentCustomer?.birthDate;
     setBirthdate(d ? d.slice(0, 10) : "");
 
-
-
     if (currentCustomer) {
       if (currentCustomer.firstName != null) setFirstName(currentCustomer.firstName);
       if (currentCustomer.lastName != null) setLastName(currentCustomer.lastName);
-      // ✅ resync pseudo même si null côté API
       setPseudo(currentCustomer?.pseudo ?? "");
       if (currentCustomer.civilite != null) setCivility(currentCustomer.civilite);
 
-      // ✅ resync email si chargé après coup
       if (currentCustomer.email != null) setEmail(currentCustomer.email);
 
       // 🔁 resync phone {dial, local} depuis currentCustomer.phoneNumber
       const p = currentCustomer.phoneNumber ?? "";
       const { dial, local } = splitE164(p);
       setPhoneDial(dial);
-      setPhoneLocal(local);
+      setPhoneLocal(local.slice(0, LOCAL_MAX)); // sécurité
     }
   }, [currentCustomer]);
 
@@ -247,11 +248,10 @@ export const UserInformation = ({ user = {} }) => {
       LastName: lastName.trim(),
       Email: email,
       BirthDate: birthdate || null,
-      // ✅ envoyer null si vide
       Pseudo: (pseudo || "").trim() || null,
       Actif: true,
       Phone: phoneE164,
-      Subscribe: subscribed, // ⬅️ valeur de la checkbox
+      Subscribe: subscribed,
     };
     setSaving(true);
     await dispatch(updateUserRequest(payload));
@@ -387,23 +387,27 @@ export const UserInformation = ({ user = {} }) => {
             placeholder="Votre pseudo (optionnel)"
           />
 
-            <span className="mt-">Abonné à la newsletter</span>
-            <div className="form-check mb-3">
-              <input
-                id="newsletter-subscribed"
-                className="form-check-input"
-                type="checkbox"
-                checked={subscribed}
-                onChange={(e) => setSubscribed(e.target.checked)}
-              />
-              <label className="form-check-label" htmlFor="newsletter-subscribed">
-                Recevoir les nouveautés et offres
-              </label>
-            </div>
+          <span className="mt-">Abonné à la newsletter</span>
+          <div className="form-check mb-3">
+            <input
+              id="newsletter-subscribed"
+              className="form-check-input"
+              type="checkbox"
+              checked={subscribed}
+              onChange={(e) => setSubscribed(e.target.checked)}
+            />
+            <label className="form-check-label" htmlFor="newsletter-subscribed">
+              Recevoir les nouveautés et offres
+            </label>
+          </div>
         </div>
 
         <div style={{ gridColumn: "1 / -1", marginTop: 6 }}>
-          <button type="submit" className="gbtn gbtn--primary mt-3 mb-4" disabled={!profileValid || saving}>
+          <button
+            type="submit"
+            className="gbtn gbtn--primary mt-3 mb-4"
+            disabled={!profileValid || saving}
+          >
             {saving ? "Enregistrement…" : "Mettre à jour"}
           </button>
           {/* Erreur MAJ profil */}
