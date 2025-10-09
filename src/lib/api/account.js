@@ -3,8 +3,8 @@ import axios from "axios";
 
 const API_HOST = window.location.hostname;     // ex: "localhost" ou "192.168.1.63"
 const API_PORT = 5098;
-const baseurl = `http://${API_HOST}:${API_PORT}`;
-//const baseurl = "https://auth.minshp.com";                              // ton port API HTTP
+//const baseurl = `http://${API_HOST}:${API_PORT}`;
+const baseurl = "https://auth.minshp.com";                              // ton port API HTTP
 
 
 const idp = axios.create({ 

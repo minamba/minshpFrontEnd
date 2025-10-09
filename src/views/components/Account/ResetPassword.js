@@ -7,7 +7,8 @@ import axios from "axios";
 
 // ---- Config API ----
 // const API       = import.meta.env.VITE_API_BASE ?? "https://localhost:7183";
-const RESET_URL = `https://localhost:7183/account/reset-password`;
+//const RESET_URL = `https://localhost:7183/account/reset-password`;
+const RESET_URL = `https://auth.minshp.com/account/reset-password`;
 
 // petite aide pour masquer l'email
 const maskEmail = (e) => {
