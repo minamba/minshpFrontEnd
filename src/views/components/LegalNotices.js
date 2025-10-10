@@ -115,7 +115,7 @@ export function LegalNotices(){
               <h2 id="h-ml-5" className="legal-h2">5. Responsabilités</h2>
               <p className="legal-p">MINS CORP ne saurait être tenue responsable des dommages indirects résultant de l’utilisation du site ou de l’accès à des sites tiers via des liens hypertextes. L’utilisateur est seul responsable de la compatibilité de son équipement et de la protection de ses données.</p>
               <div className="legal-divider" />
-              <p className="legal-footer">MINS CORP – 2 rue Jules Vallès, 91000 Évry-Courcouronnes – SIRET 924 291 800 00010</p>
+              <p className="legal-footer">MINS CORP – 8 rue Adnré Lalande, 91000 Évry-Courcouronnes – SIRET 924 291 800 00010</p>
             </article>
           </section>
         </div>
@@ -227,7 +227,7 @@ export function PrivacyPolicy(){
               <h2 id="h-pc-10" className="legal-h2">10. Contact données personnelles</h2>
               <p className="legal-p">Pour toute question relative à cette politique ou à vos données, contactez‑nous à <a className="legal-accent" href="mailto:contact@minshp.com">contact@minshp.com</a>.</p>
               <div className="legal-divider" />
-              <p className="legal-footer">MINS CORP – 2 rue Jules Vallès, 91000 Évry-Courcouronnes – SIRET 924 291 800 00010</p>
+              <p className="legal-footer">MINS CORP – 8 rue Adnré Lalande, 91000 Évry-Courcouronnes – SIRET 924 291 800 00010</p>
             </article>
           </section>
         </div>

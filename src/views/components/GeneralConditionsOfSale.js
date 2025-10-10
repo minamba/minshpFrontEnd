@@ -88,8 +88,8 @@ export default function GeneralConditionsOfSale() {
               <p className="cgv-p"><span className="cgv-strong">Min’s Shop</span> (minshp.com) est édité par <span className="cgv-strong">MINS CORP</span>.</p>
               <ul className="cgv-list">
                 <li>SIRET : 924 291 800 00010</li>
-                <li>Siège social : 2 rue Jules Vallès, 91000 Évry-Courcouronnes, France</li>
-                <li>Contact : <a className="cgv-accent" href="mailto:contact@minshp.com">contact@minshp.com</a> – 06 24 95 75 58</li>
+                <li>Siège social : 8 rue Adnré Lalande, 91000 Évry-Courcouronnes, France</li>
+                <li>Contact : <a className="cgv-accent" href="mailto:contact@minshp.com">contact@minshp.com</a></li>
               </ul>
             </article>
 
@@ -153,7 +153,7 @@ export default function GeneralConditionsOfSale() {
               <h2 id="h-art12" className="cgv-h2">Article 12 – Droit applicable et litiges</h2>
               <p className="cgv-p">Les présentes CGV sont soumises au droit français. En cas de litige, une solution amiable sera recherchée. À défaut, les tribunaux compétents du ressort du siège social de MINS CORP seront saisis.</p>
               <div className="cgv-divider" />
-              <p className="cgv-footer">MINS CORP – 2 rue Jules Vallès, 91000 Évry-Courcouronnes – SIRET 924 291 800 00010</p>
+              <p className="cgv-footer">MINS CORP – 8 rue Adnré Lalande, 91000 Évry-Courcouronnes – SIRET 924 291 800 00010</p>
             </article>
           </section>
         </div>
