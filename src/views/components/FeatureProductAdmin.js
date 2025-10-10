@@ -101,7 +101,7 @@ export const FeatureProductAdmin = () => {
 
   const getProductName = (id) => {
     const product = productsFromStore.find((p) => p.id === id);
-    return product ? product.name : 'Produit inconnu';
+    return product ? product.brand + ' - ' + product.model : 'Produit inconnu';
   };
 
   const getFeatureDescription = (id) => {
@@ -260,7 +260,7 @@ export const FeatureProductAdmin = () => {
                   <option value="">Sélectionnez un produit</option>
                   {productsFromStore.map((product) => (
                     <option key={product.id} value={product.id}>
-                      {product.name}
+                      {product.brand + ' - ' + product.model}
                     </option>
                   ))}
                 </select>

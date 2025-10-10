@@ -470,6 +470,11 @@ export const Category = () => {
                 </div>
 
                 <h3 className="product-name">{product.brand + " " + product.model}</h3>
+                {product.previewDescription && (
+                  <p className="product-desc text-muted" title={product.previewDescription}>
+                    {product.previewDescription}
+                  </p>
+                )}
 
                 <div className="new-price-row">
                   <span className={`card-stock ${stockCls}`}>

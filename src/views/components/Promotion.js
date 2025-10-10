@@ -185,7 +185,7 @@ export const Promotion = () => {
     return (productsAll || [])
       .map((product, index) => {
         const name  =
-          product.name ||
+          product.brand + ' - ' + product.model ||
           product.title ||
           `${product.brand || ""} ${product.model || ""}`.trim() ||
           `Produit ${index + 1}`;
@@ -346,6 +346,11 @@ export const Promotion = () => {
 
                 <h3 className="product-name">{(product.brand || "") + " " + (product.model || name)}</h3>
 
+                {product.previewDescription && (
+                  <p className="product-desc text-muted" title={product.previewDescription}>
+                    {product.previewDescription}
+                  </p>
+                )}
                 <div className="new-price-row">
                   <span className={`card-stock ${stockCls}`}>
                     <span className={`card-stock-dot ${stockCls}`} />

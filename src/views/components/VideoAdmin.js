@@ -129,7 +129,7 @@ export const VideoAdmin = () => {
 
   const getProductName = (id) => {
     const product = productsFromStore.find(p => p.id === id);
-    return product ? product.name + ' - ' + product.model : 'Produit inconnu';
+    return product ? product.brand + ' - ' + product.model : 'Produit inconnu';
   };
 
   const sortedVideos = [...videosFromStore].sort((a, b) => {
@@ -315,7 +315,7 @@ export const VideoAdmin = () => {
                   <option value="">Sélectionnez un produit</option>
                   {productsFromStore.map((product) => (
                     <option key={product.id} value={product.id}>
-                      {product.name}
+                      {product.brand + ' - ' + product.model}
                     </option>
                   ))}
                 </select>

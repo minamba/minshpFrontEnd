@@ -581,7 +581,7 @@ export const SubCategoryAdmin = () => {
                       )}
                       {productsInCurrentSubCategory.map((p) => (
                         <option key={p.id} value={p.id}>
-                          {p.name || p.title || `Produit #${p.id}`}
+                          {p.brand + ' - ' + p.model || p.title || `Produit #${p.id}`}
                         </option>
                       ))}
                     </select>

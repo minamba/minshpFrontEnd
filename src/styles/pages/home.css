@@ -418,13 +418,6 @@
       -webkit-overflow-scrolling: touch;
       
     }
-    @media (max-width: 980px){
-      .home-container .new-grid .product-card{
-        flex: 0 0 60% !important;   /* était 70% */
-        max-width: 60% !important;
-        scroll-snap-align: center;
-      }
-    }
     .home-container .new-grid::-webkit-scrollbar{ display:none; }
   
     .home-container .new-grid .product-card{
@@ -494,3 +487,358 @@
     .home-container .product-card .price--big .cents{ font-size:.8rem !important; top:-.4em !important; }
   }
   
+
+
+  /* === HOME: empêcher le crop des images produit === */
+.home-container .product-card .product-thumb{
+  /* cadre stable pour l'image */
+  aspect-ratio: 4 / 3;        /* ajuste à 1/1 ou 16/9 si tes visuels sont différents */
+  width: 100%;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #f6f7f9;
+  display: block;
+}
+
+.home-container .product-card .product-thumb .thumb-link,
+.home-container .product-card .product-thumb img{
+  width: 100%;
+  height: 100%;
+  object-fit: contain !important;  /* montrer l’image entière */
+}
+
+/* Plus petit mobile : un peu plus haut pour respirer */
+@media (max-width: 480px){
+  .home-container .product-card .product-thumb{
+    aspect-ratio: 1 / 1;      /* carré = souvent plus “safe” sur très petit écran */
+  }
+}
+
+/* Sécurité : si un height fixe traîne quelque part, on neutralise */
+.home-container .product-card .product-thumb img{
+  max-height: none !important;
+}
+
+
+
+
+/* --- Nouveautés : taille des cartes par palier --- */
+
+/* 981+ : grille classique */
+@media (min-width: 981px){
+  .home-container .new-grid{
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0,1fr)) !important;
+    gap: 16px !important;
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+}
+
+/* 641–980 px : 2 cartes quasi plein écran (≈ 2 par vue) */
+@media (min-width: 641px) and (max-width: 980px){
+  .home-container .new-grid{
+    display: flex !important;
+    gap: 12px !important;
+    overflow-x: auto !important;
+    padding: 8px 6px 2px !important;
+    scroll-snap-type: x mandatory;
+  }
+  .home-container .new-grid .product-card{
+    flex: 0 0 46% !important;   /* <= règle unique qui prime */
+    max-width: 46% !important;
+    scroll-snap-align: center;
+  }
+}
+
+/* ≤640 px : 1 carte large */
+@media (max-width: 640px){
+  .home-container .new-grid .product-card{
+    flex: 0 0 85% !important;
+    max-width: 85% !important;
+  }
+}
+
+
+
+/* ====== NOUVEAUTÉS — version compacte (desktop + mobile) ====== */
+
+/* 1) Cards moins hautes (comme Catégories) */
+.home-container .new-grid .product-card{
+  padding: 12px !important;
+  border-radius: 16px !important;
+  gap: 8px !important;
+  background: #fff !important;                 /* look + “catégories” */
+  box-shadow: 0 10px 30px rgba(0,0,0,.08) !important;
+}
+
+/* Visuel produit plus bas (hauteur fixe plutôt qu’aspect-ratio 4/3) */
+.home-container .new-grid .product-thumb{
+  aspect-ratio: auto !important;
+  height: 160px !important;                     /* ≈ image Catégories (160px) */
+  background: #f6f7f9 !important;
+  border-radius: 12px !important;
+  padding: 8px !important;
+}
+
+/* Image bien contenue */
+.home-container .new-grid .product-thumb img{
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+  max-height: none !important;
+}
+
+/* Texte compact */
+.home-container .new-grid .product-name{
+  font-size: 1rem !important;
+  line-height: 1.3 !important;
+  margin-top: 2px !important;
+}
+
+/* Prix compact */
+.home-container .new-grid .price .euros{ font-size: 1.05rem !important; }
+.home-container .new-grid .price .cents{ font-size: .8rem !important; top: -.35em !important; }
+
+/* Chip stock compact */
+.home-container .new-grid .card-stock{
+  padding: 4px 8px !important;
+  font-size: .85rem !important;
+}
+
+
+/* 2) Carrousel mobile : voir 2 cards sans scroller (≤640px) */
+@media (max-width: 640px){
+  .home-container .new-grid{
+    display: flex !important;
+    gap: 10px !important;
+    overflow-x: auto !important;
+    padding: 8px 8px 2px !important;
+    scroll-snap-type: x mandatory;
+  }
+  .home-container .new-grid .product-card{
+    flex: 0 0 48% !important;   /* 2 cartes visibles */
+    max-width: 48% !important;
+    scroll-snap-align: center;
+  }
+
+  /* On baisse un peu la hauteur de l’image pour garder 2 cartes “respirantes” */
+  .home-container .new-grid .product-thumb{
+    height: 140px !important;
+  }
+}
+
+/* 3) Tablettes (641–980px) : on garde ~2 cartes par vue, un peu plus larges */
+@media (min-width: 641px) and (max-width: 980px){
+  .home-container .new-grid{
+    display: flex !important;
+    gap: 12px !important;
+    overflow-x: auto !important;
+    padding: 8px 6px 2px !important;
+    scroll-snap-type: x mandatory;
+  }
+  .home-container .new-grid .product-card{
+    flex: 0 0 46% !important;   /* ~2 cartes */
+    max-width: 46% !important;
+    scroll-snap-align: center;
+  }
+}
+
+/* 4) Desktop (≥981px) : grille 4 colonnes, mais plus compacte en hauteur */
+@media (min-width: 981px){
+  .home-container .new-grid{
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0,1fr)) !important;
+    gap: 16px !important;
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+  .home-container .new-grid .product-thumb{
+    height: 160px !important;
+  }
+}
+
+
+
+/* ====== NOUVEAUTÉS — ≤515px : chip stock + prix propres ====== */
+@media (max-width: 515px){
+
+  /* Ligne "stock + prix" en grille 2 colonnes */
+  .home-container .new-grid .new-price-row{
+    display: grid !important;
+    grid-template-columns: 1fr auto;  /* stock prend l'espace, prix à largeur auto */
+    align-items: center;
+    column-gap: 8px;
+  }
+
+  /* Chip stock : compact + une seule ligne */
+  .home-container .new-grid .card-stock{
+    white-space: nowrap;            /* évite le passage sur 2 lignes */
+    font-size: .82rem !important;
+    padding: 4px 8px !important;
+    line-height: 1 !important;
+  }
+  .home-container .new-grid .card-stock-dot{
+    width: 7px; height: 7px;
+  }
+
+  /* Colonne prix (à droite) plus compacte */
+  .home-container .new-grid .new-price-row > div{
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-end !important;  /* prix aligné à droite */
+    line-height: 1.05 !important;
+    gap: 2px !important;
+  }
+
+  /* Prix principal un poil plus petit pour laisser respirer le chip */
+  .home-container .new-grid .price .euros{ font-size: 1rem !important; }
+  .home-container .new-grid .price .cents{ font-size: .75rem !important; top: -.35em !important; }
+
+  /* Ancien prix (si promo) sous le prix, discret */
+  .home-container .new-grid .price-old{
+    font-size: .85rem !important;
+    opacity: .9;
+    margin: 0 !important;
+  }
+}
+
+/* Option "ultra-serré" si ça passe encore à 2 lignes sur certains mobiles étroits */
+@media (max-width: 400px){
+  .home-container .new-grid .card-stock{
+    padding: 3px 7px !important;
+    font-size: .78rem !important;
+    letter-spacing: .1px;
+  }
+  .home-container .new-grid .price .euros{ font-size: .95rem !important; }
+  .home-container .new-grid .price .cents{ font-size: .72rem !important; }
+}
+
+
+
+
+/* ===== Fix "Bientôt en rupture" qui pousse le prix — ≤480px ===== */
+@media (max-width: 480px){
+  /* La ligne devient une grille : colonne gauche compressible, prix à droite */
+  .home-container .new-grid .new-price-row{
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto;  /* ← clé : la 1ʳᵉ colonne PEUT rétrécir */
+    align-items: center;
+    column-gap: 6px;
+    overflow: hidden; /* sécurité */
+  }
+
+  /* Le chip accepte de se compresser et coupe proprement avec ellipsis */
+  .home-container .new-grid .card-stock{
+    min-width: 0;            /* ← autorise le shrink */
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;  /* … si trop long */
+    padding: 3px 7px !important;
+    font-size: .78rem !important;
+    line-height: 1 !important;
+  }
+  .home-container .new-grid .card-stock-dot{
+    width: 7px; height: 7px;
+  }
+
+  /* Colonne prix compacte, collée à droite */
+  .home-container .new-grid .new-price-row > div{
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-end !important;
+    line-height: 1.05 !important;
+    gap: 2px !important;
+  }
+  .home-container .new-grid .price .euros{ font-size: .98rem !important; }
+  .home-container .new-grid .price .cents{ font-size: .70rem !important; top: -.30em !important; }
+
+  /* Sécurité anti-débordement général */
+  .home-container .new-grid .product-card{
+    overflow: hidden;  /* évite tout dépassement visuel */
+  }
+}
+
+/* Fallback de mise en page si certains très petits appareils posent encore souci */
+@media (max-width: 400px){
+  /* On passe chip sur 1ʳᵉ ligne, prix sur 2ᵉ ligne à droite */
+  .home-container .new-grid .new-price-row{
+    grid-template-columns: 1fr;
+    row-gap: 4px;
+  }
+  .home-container .new-grid .new-price-row .card-stock{ justify-self: start; }
+  .home-container .new-grid .new-price-row > div{ justify-self: end; }
+}
+
+
+
+/* Le layout "stock + prix" tient la largeur, même si le chip fait 2 lignes */
+@media (max-width: 480px){
+  .home-container .new-grid .new-price-row{
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto; /* chip compressible + prix */
+    align-items: start;
+    column-gap: 8px;
+  }
+
+  /* Par défaut, les chips restent sur 1 ligne */
+  .home-container .new-grid .card-stock{
+    white-space: nowrap;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  /* Seulement "Bientôt en rupture" peut passer sur 2 lignes */
+  .home-container .new-grid .card-stock--long{
+    white-space: normal !important;
+    line-height: 1.15;
+    padding-block: 6px;        /* un peu plus haut si 2 lignes */
+  }
+
+  /* Colonne prix compact, à droite, sans déborder */
+  .home-container .new-grid .new-price-row > div{
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    line-height: 1.05;
+    gap: 2px;
+  }
+}
+
+
+/* Aspect "muted" et 2 lignes max */
+.product-desc {
+  margin-top: 0;
+  font-size: .9rem;
+  font-weight: 600;
+  line-height: 1.3;
+  opacity: .75;              /* effet muted si tu n'utilises pas Bootstrap */
+  display: -webkit-box;      /* clamp 2 lignes */
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.text-muted { opacity: .75; } /* optionnel si tu veux une classe générique */
+
+
+
+/* Titre du produit : colle-le un peu au paragraphe */
+.product-card .product-name {
+  margin-top: .25rem;     /* ou 4px */
+  margin-bottom: .15rem;  /* réduit l’espace sous le h3 */
+  line-height: 1.2;
+}
+
+/* Description muted : aucune marge au-dessus */
+.product-card .product-desc {
+  margin-top: 0;          /* clé pour supprimer le “trou” */
+  margin-bottom: .35rem;  /* laisse un tout petit espace avant le bloc suivant */
+  font-size: .95rem;
+  opacity: .70;           /* effet muted si besoin */
+  display: -webkit-box;   /* clamp éventuel */
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+

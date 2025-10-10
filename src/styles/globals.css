@@ -255,17 +255,17 @@
 /* ===== Bloquer l'usage en mode paysage sur mobile/tablette ===== */
 @media screen and (max-width: 1024px) and (orientation: landscape) {
   /* Empêche le scroll sous l'overlay */
-  html, body {
+ /* html, body {
     height: 100vh;
     overflow: hidden;
   }
 
   /* Masque visuellement le contenu dessous (optionnel) */
-  #root {
+/*  #root {
     filter: blur(2px);
   }
 
-  /* Overlay bloquant */
+  Overlay bloquant
   body::before {
     content: "Veuillez pivoter votre appareil en mode portrait pour continuer.";
     position: fixed;
@@ -278,16 +278,85 @@
 
     padding: 32px;
     background: #111;                    /* fond opaque */
-    color: #fff;
+ /*   color: #fff;
     font-weight: 800;
     font-size: clamp(16px, 3.5vw, 22px);
     line-height: 1.4;
 
     /* support iOS zones sûres */
-    padding-left: calc(32px + env(safe-area-inset-left));
+ /*   padding-left: calc(32px + env(safe-area-inset-left));
     padding-right: calc(32px + env(safe-area-inset-right));
     padding-bottom: calc(32px + env(safe-area-inset-bottom));
     padding-top: calc(32px + env(safe-area-inset-top));
+  }*/
+}
+
+
+
+
+/* === Fix images coupées en très petit écran === */
+@media (max-width: 480px){
+  /* Laisse respirer l'image : pas de ratio imposé 4/3 */
+  .product-thumb{
+    aspect-ratio: auto;        /* on libère */
+    min-height: 240px;         /* hauteur stable et confortable */
+    padding: 8px;              /* un poil moins de padding */
+  }
+
+  /* Garantit l’affichage entier sans crop */
+  .product-thumb img,
+  .product-thumb picture>img{
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain !important;
   }
 }
+
+
+
+
+/* ===== RESET MEDIA SIZING (desktop + mobile) ===== */
+
+/* conteneur média : coin arrondi + zone centrée, sans ratio imposé */
+.product-card .product-thumb{
+  aspect-ratio: auto !important;       /* stop 4/3 partout */
+  width: 100%;
+  min-height: clamp(220px, 28vw, 360px);/* hauteur confortable à toutes résolutions */
+  padding: 10px;
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;                     /* pour les coins, mais pas de crop avec contain */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* le lien doit occuper toute la zone */
+.product-card .product-thumb .thumb-link{
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* image toujours entière */
+.product-card .product-thumb img,
+.product-card .product-thumb picture > img{
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  object-fit: contain !important;       /* clé : montrer l’image en entier */
+}
+
+/* filet de sécurité contre toute règle externe qui met une hauteur fixe */
+.product-card .product-thumb img{ height: auto !important; }
+.product-card .product-thumb img{ height: 100% !important; } /* puis on remet 100% pour le conteneur flex */
+
+
+
 

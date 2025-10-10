@@ -559,7 +559,7 @@ export const CategoryAdmin = () => {
                         const pid = getProductId(p);
                         return (
                           <option key={pid} value={String(pid)}>
-                            {p.name || p.title || `Produit #${pid}`}
+                            {p.brand + ' - ' + p.model || p.title || `Produit #${pid}`}
                           </option>
                         );
                       })}

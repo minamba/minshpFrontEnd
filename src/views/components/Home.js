@@ -4,56 +4,49 @@ import "../../styles/pages/home.css";
 import { useSelector, useDispatch } from 'react-redux';
 import { Link, useNavigate } from "react-router-dom";
 import { addToCartRequest, saveCartRequest } from '../../lib/actions/CartActions';
-import { GenericModal } from '../../components';
+import { GenericModal, LoadingOverlay } from '../../components';
 import { calculPrice } from '../../lib/utils/Helpers';
 import { toMediaUrl } from '../../lib/utils/mediaUrl';
 import { getProductsPagedUserRequest } from '../../lib/actions/ProductActions';
-import { LoadingOverlay } from '../../components';
 
 export const Home = () => {
   const prodState     = useSelector((s) => s.products) || {};
   const fullProducts  = Array.isArray(prodState.products) ? prodState.products : [];
   const pagedItems    = Array.isArray(prodState.items)    ? prodState.items    : [];
-  
+
   let allProducts   = fullProducts.length ? fullProducts : pagedItems;
-  allProducts = allProducts.filter((p) => p.display === true && p.categoryVm.display === true || p.subCategoryVm?.display === true);
+  allProducts = allProducts.filter(
+    (p) => (p.display === true && p.categoryVm.display === true) || p.subCategoryVm?.display === true
+  );
 
-
+  // si la sous-catégorie est masquée, masque le produit
   allProducts.forEach((p) => {
-    if (p.subCategoryVm?.display === false) {
-      p.display = false;
-    }
+    if (p.subCategoryVm?.display === false) p.display = false;
+  });
+  // si la catégorie est masquée, masque le produit
+  allProducts.forEach((p) => {
+    if (p.categoryVm?.display === false) p.display = false;
   });
 
-
-  allProducts.forEach((p) => {
-    if (p.categoryVm?.display === false) {
-      p.display = false;
-    }
-  });
-
-
-  let images    = useSelector((state) => state.images.images) || [];
+  let images = useSelector((state) => state.images.images) || [];
   images = images.filter((i) => i.display === true);
-  let videos    = useSelector((state) => state.videos.videos) || [];
+  let videos = useSelector((state) => state.videos.videos) || [];
   videos = videos.filter((i) => i.display === true);
 
   let categoriesFromStore = useSelector((state) => state.categories.categories) || [];
   categoriesFromStore = categoriesFromStore.filter((c) => c.display === true);
 
-
-  const items     = useSelector((state) => state.items.items) || [];
+  const items = useSelector((state) => state.items.items) || [];
   const promotionCodes = useSelector((state) => state.promotionCodes.promotionCodes) || [];
 
   const isBusy =
-  !!prodState.loading ||
-  !!images.loading ||
-  !!videos.loading ||
-  !!categoriesFromStore.loading;
+    !!prodState.loading ||
+    !!images.loading ||
+    !!videos.loading ||
+    !!categoriesFromStore.loading;
 
-
-  const dispatch  = useDispatch();
-  const navigate  = useNavigate();
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
 
   const [showAdded, setShowAdded] = useState(false);
   const [lastAdded, setLastAdded] = useState(null);
@@ -63,10 +56,7 @@ export const Home = () => {
       : false
   );
 
-
-  
-
-
+  // Charge une première page si rien en store
   useEffect(() => {
     if (!fullProducts.length && !pagedItems.length) {
       dispatch(getProductsPagedUserRequest({
@@ -77,8 +67,9 @@ export const Home = () => {
     }
   }, [dispatch, fullProducts.length, pagedItems.length]);
 
-
+  // Suit les changements de viewport mobile
   useEffect(() => {
+    if (typeof window === 'undefined') return;
     const mm = window.matchMedia('(max-width: 768px)');
     const handler = (e) => setIsMobile(e.matches);
     if (mm.addEventListener) mm.addEventListener('change', handler);
@@ -89,12 +80,13 @@ export const Home = () => {
     };
   }, []);
 
+  // Sauvegarde panier quand items changent
   useEffect(() => { dispatch(saveCartRequest(items)); }, [items, dispatch]);
 
   const NEW_MAX = 5;
 
-  const mainProduct      = allProducts.find((p) => p.main === true) || null;
-  const galleryProducts  = allProducts.filter((p) => p.id !== mainProduct?.id);
+  const mainProduct     = allProducts.find((p) => p.main === true) || null;
+  const galleryProducts = allProducts.filter((p) => p.id !== mainProduct?.id);
 
   // --- Media du produit principal ---
   const mainProductImages = mainProduct
@@ -111,17 +103,15 @@ export const Home = () => {
   // Image "hero" fallback (position 99)
   const heroImage99 = mainProductImages.find((img) => Number(img.position) === 99);
 
-  // Bleu foncé fallback (SVG data URI)
-  // const BLUE_FALLBACK =
-  //   'data:image/svg+xml;utf8,' +
-  //   encodeURIComponent(
-  //     `<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900">
-  //        <rect width="100%" height="100%" fill="#0B1B3A"/>
-  //      </svg>`
-  //   );
-
   const IMAGE_FALLBACK = "/Images//background_fallback.png";
 
+  // Affiche la vidéo si elle existe — y compris en mobile.
+  // `poster` affichera l’image 99 pendant le chargement.
+  const shouldShowVideo = !!heroVideo?.url;
+
+  const heroImageSrc = heroImage99?.url
+    ? toMediaUrl(heroImage99.url)
+    : IMAGE_FALLBACK;
 
   const getProductImage = (id) => {
     const productImages = images.filter((i) => String(i.idProduct) === String(id));
@@ -150,24 +140,26 @@ export const Home = () => {
   const closeAdded = () => setShowAdded(false);
   const goToCart = () => { setShowAdded(false); navigate('/cart'); };
 
-  // --- HERO: logique d’affichage ---
-  const shouldShowVideo = !!heroVideo?.url && !isMobile;
-  const heroImageSrc = heroImage99?.url
-    ? toMediaUrl(heroImage99.url)
-    : IMAGE_FALLBACK;
-
   return (
     <div className="home-container">
       {/* ===================== HERO ===================== */}
       <section className="hero-section">
         {shouldShowVideo ? (
-          <video className="hero-video" autoPlay muted loop playsInline>
+          <video
+            className="hero-video"
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="metadata"
+            poster={heroImageSrc}                 // image position 99
+          >
             <source src={toMediaUrl(heroVideo.url)} type="video/mp4" />
           </video>
         ) : (
           <img
             className="hero-image"
-            src={heroImageSrc}
+            src={heroImageSrc}                    // image position 99 (ou fallback)
             alt={heroImage99?.title || 'Hero'}
           />
         )}
@@ -187,7 +179,7 @@ export const Home = () => {
       {mainProductImages.length > 0 && (
         <section className="features-section" id="features">
           {mainProductImages
-            .filter((image) => image && Number(image.position) !== 99) // on évite de re-afficher la 99 ici
+            .filter((image) => image && Number(image.position) !== 99) // évite de réafficher la 99 ici
             .sort((a, b) => Number(a.position) - Number(b.position))
             .map((image, index) => (
               <div
@@ -241,7 +233,6 @@ export const Home = () => {
             ))}
           </div>
 
-          {/* Indice “balayez” (visible en mobile via CSS) */}
           <div className="swipe-indicator" aria-hidden="true">
             <span className="chev">‹</span>
             <span className="swipe-text">Balayez</span>
@@ -266,14 +257,16 @@ export const Home = () => {
           </div>
         </div>
 
-        <div className="new-grid" {...(isMobile ? { 'data-aos': 'fade-up', 'data-aos-once': 'true' } : {})}>
+        <div
+          className="new-grid"
+          {...(isMobile ? { 'data-aos': 'fade-up', 'data-aos-once': 'true' } : {})}
+        >
           {newestProducts.map((product, index) => {
             const img = getProductImage(product.id);
             const name =
               (product.brand ? `${product.brand} ` : '') +
               (product.model || product.title || `Produit ${index + 1}`);
 
-            // Prix de référence
             const priceRef =
               Number(
                 typeof product.priceTtc === 'number'
@@ -281,7 +274,7 @@ export const Home = () => {
                   : parseFloat(product.priceTtc)
               ) || 0;
 
-            // ==== PROMO PRODUIT (dates inclusives, fin à 23:59:59) ====
+            // ==== PROMO PRODUIT (dates inclusives) ====
             const p0 = product?.promotions?.[0];
             const hasProductPromo = (() => {
               if (!p0) return false;
@@ -306,12 +299,11 @@ export const Home = () => {
                 : parseFloat(product.priceHtPromoted)
             );
 
-            // Prix promo “produit” uniquement si la promo est ACTIVE
             const productPromoPrice = hasProductPromo
               ? (Number.isFinite(promotedVal) ? promotedVal : computedPromo)
               : null;
 
-            // ==== PROMO PAR CODES (priorité sous-cat puis cat) ====
+            // ==== PROMO PAR CODES ====
             const subCatCodeVal = Number(
               typeof product.priceHtSubCategoryCodePromoted === 'number'
                 ? product.priceHtSubCategoryCodePromoted
@@ -322,19 +314,16 @@ export const Home = () => {
                 ? product.priceHtCategoryCodePromoted
                 : parseFloat(product.priceHtCategoryCodePromoted)
             );
-
             const codePrice =
               Number.isFinite(subCatCodeVal)
                 ? subCatCodeVal
                 : (Number.isFinite(catCodeVal) ? catCodeVal : null);
 
-            // ==== Prix affiché & indicateurs UI ====
             const displayPrice = calculPrice(product, promotionCodes);
             const hasAnyPromo = (codePrice != null) || (productPromoPrice != null);
-
             const [euros, cents] = displayPrice.toFixed(2).split('.');
 
-            // Statut stock
+            // Stock
             const raw = (product?.stockStatus ?? '').trim();
             const lower = raw.toLowerCase();
             const isIn = lower === 'en stock';
@@ -344,8 +333,8 @@ export const Home = () => {
               lower.includes('plus que') ? 'Bientôt en rupture' :
               raw || 'Disponibilité limitée';
 
-            // 👉 Animation par carte : seulement desktop
             const cardAosProps = isMobile ? {} : { 'data-aos': 'zoom-in' };
+            const isSoon = /bient[oô]t/i.test(stockLabel);
 
             return (
               <article
@@ -356,62 +345,66 @@ export const Home = () => {
                 <div className="product-thumb">
                   <Link to={`/product/${product.id}`} className="thumb-link">
                     <img src={toMediaUrl(img)} alt={name} />
-          </Link>
+                  </Link>
 
-                {hasAnyPromo && <span className="promo-pill">Promotion</span>}
-                <div className="thumb-overlay" aria-hidden="true" />
-                {!isOut && (
-                  <button
-                    type="button"
-                    className="thumb-add-btn"
-                    title="Ajouter au panier"
-                    aria-label="Ajouter au panier"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      const payloadItem = {
-                        id: product.id,
-                        name,
-                        price: displayPrice,
-                        image: img,
-                        packageProfil: product.packageProfil,
-                        containedCode: product.containedCode
-                      };
-                      dispatch(addToCartRequest(payloadItem, 1));
-                      setLastAdded({ id: product.id, name });
-                      setShowAdded(true);
-                    }}
-                  >
-                    <i className="bi bi-cart-plus" aria-hidden="true"></i>
-                  </button>
-                )}
-              </div>
-
-              <h3 className="product-name">{name}</h3>
-
-              <div className="new-price-row">
-                <span className={`card-stock ${stockCls}`}>
-                  <span className={`card-stock-dot ${stockCls}`} />
-                  {stockLabel}
-                </span>
-
-                <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', lineHeight:1.1 }}>
-                  {hasAnyPromo && (
-                    <span className="price-old">
-                      {priceRef.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
-                    </span>
+                  {hasAnyPromo && <span className="promo-pill">Promotion</span>}
+                  <div className="thumb-overlay" aria-hidden="true" />
+                  {!isOut && (
+                    <button
+                      type="button"
+                      className="thumb-add-btn"
+                      title="Ajouter au panier"
+                      aria-label="Ajouter au panier"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const payloadItem = {
+                          id: product.id,
+                          name,
+                          price: displayPrice,
+                          image: img,
+                          packageProfil: product.packageProfil,
+                          containedCode: product.containedCode
+                        };
+                        dispatch(addToCartRequest(payloadItem, 1));
+                        setLastAdded({ id: product.id, name });
+                        setShowAdded(true);
+                      }}
+                    >
+                      <i className="bi bi-cart-plus" aria-hidden="true"></i>
+                    </button>
                   )}
-                  <div className={`price ${hasAnyPromo ? 'price--promo' : ''}`}>
-                    <span className="euros">{euros}€</span>
-                    <sup className="cents">{cents}</sup>
+                </div>
+
+                <h3 className="product-name">{name}</h3>
+                {product.previewDescription && (
+                  <p className="product-desc text-muted" title={product.previewDescription}>
+                    {product.previewDescription}
+                  </p>
+                )}
+
+                <div className="new-price-row">
+                  <span className={`card-stock ${stockCls} ${isSoon ? 'card-stock--long' : ''}`}>
+                    <span className={`card-stock-dot ${stockCls}`} />
+                    {stockLabel}
+                  </span>
+
+                  <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', lineHeight:1.1 }}>
+                    {hasAnyPromo && (
+                      <span className="price-old">
+                        {priceRef.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+                      </span>
+                    )}
+                    <div className={`price ${hasAnyPromo ? 'price--promo' : ''}`}>
+                      <span className="euros">{euros}€</span>
+                      <sup className="cents">{cents}</sup>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </article>
-          );
-        })}
-      </div>
-
+              </article>
+            );
+          })}
+        </div>
 
         {/* Bouton “+” en bas sur mobile */}
         <div className="new-actions new-actions--mobile">
@@ -443,7 +436,7 @@ export const Home = () => {
         ]}
       />
 
-<LoadingOverlay
+      <LoadingOverlay
         show={isBusy}
         text="Chargement de la page d’accueil..."
         fullscreen

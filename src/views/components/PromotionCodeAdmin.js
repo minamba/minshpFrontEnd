@@ -21,6 +21,8 @@ export const PromotionCodeAdmin = () => {
   const subCategoriesFromStore  = useSelector((s) => s.subCategories?.subCategories) || [];
   const cartItems               = useSelector((s) => s?.items?.items) ?? JSON.parse(localStorage.getItem('items') || '[]');
 
+  console.log("promotionCodesFromStore OUUUUUUUUUUUUAIS", promotionCodesFromStore);
+
   // ===== UI =====
   const [showModal, setShowModal]     = useState(false);
   const [isEditing, setIsEditing]     = useState(false);
@@ -510,7 +512,7 @@ export const PromotionCodeAdmin = () => {
     const prod =
       productsFromStore.find(p => String(p.id) === String(promo?.idProduct)) ||
       productsFromStore.find(p => String(p.idPromotionCode) === String(promo?.id));
-    return prod?.name || prod?.title || 'NONE';
+    return prod? (prod?.brand + ' - ' + prod?.model) : 'NONE';
   };
 
   const getRowCategoryName = (promo) => {
@@ -704,7 +706,7 @@ export const PromotionCodeAdmin = () => {
                   <option value="">— Sélectionnez un produit —</option>
                   {filteredProductsForModal.map((product) => (
                     <option key={product.id} value={String(product.id)}>
-                      {product.name}
+                      {product.brand + ' - ' + product.model}
                     </option>
                   ))}
                 </select>

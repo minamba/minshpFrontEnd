@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import "../styles/components/navbar.css";
-import { FaFacebookF, FaInstagram, FaTwitter, FaLinkedin, FaCheckCircle, FaTimesCircle } from 'react-icons/fa';
+import { FaFacebookF, FaInstagram, FaTwitter, FaLinkedin, FaCheckCircle, FaTimesCircle, FaYoutube } from 'react-icons/fa';
 import {Link, NavLink, useParams} from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { updateProductUserRequest } from '../lib/actions/ProductActions';
@@ -28,6 +28,7 @@ import StarterKit from "@tiptap/starter-kit";
 import { createPortal } from "react-dom";
 import LinkExt from "@tiptap/extension-link";
 import "../styles/components/loading.css";
+import { FaX } from 'react-icons/fa6';
 
 
 
@@ -827,7 +828,7 @@ export const ProductTable = () => {
 
   const [formData, setFormData] = useState({
     id: undefined,
-    name: "",
+    previewDescription: "",
     brand: "",
     model: "",
     description: "", // HTML
@@ -1018,7 +1019,7 @@ export const ProductTable = () => {
     setIsEditing(false);
     setFormData({
       id: undefined,
-      name: "",
+      previewDescription: "",
       brand: "",
       model: "",
       description: "",
@@ -1039,7 +1040,7 @@ export const ProductTable = () => {
     setIsEditing(true);
     setFormData({
       id: product.id,
-      name: product.name,
+      previewDescription: product.previewDescription,
       brand: product.brand,
       model: product.model,
       description: product.description, // HTML
@@ -1086,7 +1087,7 @@ export const ProductTable = () => {
       await dispatch(
         updateProductUserRequest({
           Id: formData.id,
-          Name: formData.name,
+          PreviewDescription: formData.previewDescription,
           Brand: formData.brand,
           Model: formData.model,
           Description: formData.description, // HTML
@@ -1102,7 +1103,7 @@ export const ProductTable = () => {
     } else {
       await dispatch(
         addProductUserRequest({
-          Name: formData.name,
+          PreviewDescription: formData.previewDescription,
           Brand: formData.brand,
           Model: formData.model,
           Description: formData.description, // HTML
@@ -1188,7 +1189,7 @@ export const ProductTable = () => {
           <thead className="table-dark">
             <tr>
               <th>Image</th>
-              <th>Nom</th>
+              <th>Preview description</th>
               <th>Marque</th>
               <th>Modèle</th>
               <th>Description</th>
@@ -1225,7 +1226,7 @@ export const ProductTable = () => {
                       />
                     </Link>
                   </td>
-                  <td>{prod.name}</td>
+                  <td>{prod.previewDescription}</td>
                   <td>{prod.brand}</td>
                   <td>{prod.model}</td>
                   <td className="text-truncate col-desc" style={{ maxWidth: 360 }}>
@@ -1398,12 +1399,12 @@ export const ProductTable = () => {
 
             <form onSubmit={handleSubmit}>
               <div className="mb-3">
-                <label>Nom</label>
+                <label>Preview description</label>
                 <input
                   type="text"
-                  name="name"
+                  name="previewDescription"
                   className="form-control"
-                  value={formData.name}
+                  value={formData.previewDescription}
                   onChange={handleInputChange}
                   required
                 />
@@ -1672,7 +1673,7 @@ export const ProductSpecs = (productId, productProp = null) => {
       product?.reference, product?.ref, product?.sku
     );
     const designationVal = pick(
-      product?.title, product?.Title, product?.name, product?.Name,
+      product?.category,
       [brandVal, modelVal].filter(Boolean).join(" ")
     );
 
@@ -2046,9 +2047,9 @@ export const Footer = () => {
 
         {/* Réseaux sociaux */}
         <div className="footer-socials mt-5">
-          <a href="https://facebook.com" target="_blank" rel="noopener noreferrer"><FaFacebookF /></a>
+          <a href="https://www.youtube.com/@mins_91/videos" target="_blank" rel="noopener noreferrer"><FaYoutube /></a>
           <a href="https://instagram.com" target="_blank" rel="noopener noreferrer"><FaInstagram /></a>
-          <a href="https://twitter.com" target="_blank" rel="noopener noreferrer"><FaTwitter /></a>
+          <a href="https://x.com/minstreamTv" target="_blank" rel="noopener noreferrer"><FaX /></a>
           <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer"><FaLinkedin /></a>
         </div>
 

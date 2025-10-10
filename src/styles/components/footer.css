@@ -19,4 +19,39 @@
    .footer-socials{ gap:1rem; display:flex; align-items:center; justify-content:center; }
    .footer-socials a{ font-size:1.25rem; display:inline-flex; align-items:center; }
    .footer-socials a:hover{ transform:translateY(-2px); }
+
+
+
+   /* Badges : même taille de “tuile” pour tous les logos */
+.footer-badges .badge-row{
+  display:flex; gap:12px; flex-wrap:wrap; justify-content:center;
+}
+
+/* Cadre fixe (desktop) */
+.footer-badges .badge-item{
+  width:70px;           /* ← largeur identique */
+  height:48px;           /* ← hauteur identique */
+  padding:6px;           /* un peu d’air autour du logo */
+  background:#fff;
+  border-radius:10px;
+  box-shadow:0 2px 6px rgba(0,0,0,.15);
+  display:flex; align-items:center; justify-content:center;
+}
+
+/* L’image remplit le cadre sans déformation */
+.footer-badges .badge-item img{
+  width:100%;
+  height:100%;
+  object-fit:contain;    /* garde le ratio, pas d’étirement */
+  display:block;
+}
+
+/* Un peu plus petit en mobile */
+@media (max-width: 480px){
+  .footer-badges .badge-item{
+    width:60px;
+    height:40px;
+    padding:4px;
+  }
+}
    

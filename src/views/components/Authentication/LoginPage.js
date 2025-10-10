@@ -305,7 +305,7 @@ export default function LoginPage() {
         </div>
       )}
 
-<LoadingOverlay
+        <LoadingOverlay
         show={!!loading}
         text="Connexion en cours..."
         fullscreen
