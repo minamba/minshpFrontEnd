@@ -273,3 +273,37 @@
     border-radius: 6px; /* optionnel : arrondir un peu les coins */
     padding: 1rem;      /* optionnel : aérer le contenu */
   }
+
+
+
+  /* La description occupe bien sa hauteur et passe devant si besoin */
+.product-description-html{
+  display: block;
+  max-height: none;
+  overflow: visible;
+  position: relative;
+  z-index: 2;
+}
+
+/* La section vidéo est en dessous et ne chevauche pas */
+.product-video-section{
+  position: relative;
+  z-index: 1;
+  margin-top: 1rem;   /* espace clair entre les deux */
+  clear: both;        /* évite toute remontée liée à des flottants éventuels */
+}
+
+.product-video{
+  display: block;     /* bloc standard, pas d'empilement étrange */
+}
+
+
+
+
+/* Page produit : la section Description doit rester un bloc normal */
+.product-page .product-desc {
+  display:block;
+  overflow:visible;
+  -webkit-line-clamp:unset;
+  -webkit-box-orient:unset;
+}

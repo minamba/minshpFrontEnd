@@ -347,7 +347,7 @@ export const Promotion = () => {
                 <h3 className="product-name">{(product.brand || "") + " " + (product.model || name)}</h3>
 
                 {product.previewDescription && (
-                  <p className="product-desc text-muted" title={product.previewDescription}>
+                  <p className="product-preview text-muted" title={product.previewDescription}>
                     {product.previewDescription}
                   </p>
                 )}

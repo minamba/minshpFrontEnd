@@ -378,7 +378,7 @@ export const Home = () => {
 
                 <h3 className="product-name">{name}</h3>
                 {product.previewDescription && (
-                  <p className="product-desc text-muted" title={product.previewDescription}>
+                  <p className="product-preview text-muted" title={product.previewDescription}>
                     {product.previewDescription}
                   </p>
                 )}
@@ -395,7 +395,7 @@ export const Home = () => {
                         {priceRef.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
                       </span>
                     )}
-                    <div className={`price ${hasAnyPromo ? 'price--promo' : ''}`}>
+                    <div className={`price price-big ${hasAnyPromo ? 'price--promo price--big' : ''}`}>
                       <span className="euros">{euros}€</span>
                       <sup className="cents">{cents}</sup>
                     </div>

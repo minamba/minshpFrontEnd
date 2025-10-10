@@ -65,18 +65,19 @@ export const Product = () => {
 
   const cleanDescriptionHtml = useMemo(() => {
     const raw = product?.description ?? '';
-    // Fallback si vide
-    const fallback = 'Découvrez ce produit au design soigné et aux performances solides. Idéal pour un usage quotidien comme pour les usages intensifs.';
+    const fallback = 'Découvrez ce produit au design soigné...';
     const html = raw && String(raw).trim() !== '' ? raw : `<p>${fallback}</p>`;
   
-    // Autorise un sous-ensemble sûr de balises/attributs
     return DOMPurify.sanitize(html, {
       ALLOWED_TAGS: [
         'p','br','ul','ol','li',
         'b','strong','i','em','u','s',
-        'h1','h2','h3','h4','blockquote','span','a'
+        'h1','h2','h3','h4','h5','h6',
+        'blockquote','span','a',
+        'table','thead','tbody','tr','th','td',
+        'img'
       ],
-      ALLOWED_ATTR: ['href','title','target','rel','class'],
+      ALLOWED_ATTR: ['href','title','target','rel','class','src','alt','width','height'],
     });
   }, [product?.description]);
 
