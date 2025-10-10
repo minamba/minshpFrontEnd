@@ -85,9 +85,14 @@ const initialState = {
 export default function AccountReducer(state = initialState, action) {
   switch (action.type) {
 
+
     //LOGIN
+
+    case actionsAccount.LOGIN_REQUEST:
+     return { ...state, loading: true, error: null };
+
     case actionsAccount.LOGIN_SUCCESS:
-      return { ...state, isAuth: true, user: action.payload.user, error: null };
+      return { ...state, loading:false, isAuth: true, user: action.payload.user, error: null };
 
     case actionsAccount.LOGIN_FAILURE:
       return { ...state, loading: false, error: action.payload.error || "Échec de connexion" };

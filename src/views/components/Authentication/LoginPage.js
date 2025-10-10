@@ -304,7 +304,6 @@ export default function LoginPage() {
           </div>
         </div>
       )}
-
         <LoadingOverlay
         show={!!loading}
         text="Connexion en cours..."
