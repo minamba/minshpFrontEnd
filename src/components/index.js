@@ -2024,8 +2024,9 @@ export const Footer = () => {
 
         {/* Liens */}
         <div className="footer-links">
-          <a href="#conditions">Conditions</a>
-          <a href="#privacy">Confidentialité</a>
+          <Link to="/generalConditionsOfSales">CGV</Link>
+          <Link to="/privacyPolicy">Confidentialité</Link>
+          <Link to="/legalNotices">Mentions légales</Link>
           {/* Ouvre le logiciel de mail par défaut avec le destinataire pré-rempli */}
           <a href="mailto:contact@minshp.com" aria-label="Envoyer un email à contact@minshp.com">
             Contact

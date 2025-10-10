@@ -28,6 +28,9 @@ import {PackageProfilAdmin} from './PackageProfilAdmin';
 import {SubCategoryAdmin} from './SubCategoryAdmin';
 import {InvoiceAdmin} from './InvoiceAdmin';
 import {CustomerPromotionAdmin} from './CustomerPromotionAdmin';
+import GeneralConditionsOfSale from './GeneralConditionsOfSale';
+import {LegalNotices} from './LegalNotices';
+import {PrivacyPolicy} from './LegalNotices';
 import CookieConsent from './CookieConsent';
 import Success from './Succes';
 import {Cancel} from './Cancel';
@@ -185,7 +188,11 @@ useEffect(() => {
                             <Route path="/maintenance" element={<Maintenance/>}/>
                         </Route>
                             {/* je  laisse la page de connexion accessible quand meme pour les admins */}
-                            <Route path="/login" element={<LoginPage/>}/> 
+                            <Route path="/login" element={<LoginPage/>}/>
+                            <Route path="/generalConditionsOfSales" element={<GeneralConditionsOfSale/>}/>
+                            <Route path="/legalNotices" element={<LegalNotices/>}/>
+                            <Route path="/privacyPolicy" element={<PrivacyPolicy/>}/>
+                             
                     </Routes>
                 </main>
                 {/* <CookieConsent/> */}
