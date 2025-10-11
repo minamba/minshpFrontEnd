@@ -439,7 +439,7 @@ export const Home = () => {
 
       <LoadingOverlay
         show={isBusy}
-        text="Chargement de la page d’accueil..."
+        text="Chargement..."
         fullscreen
         blur
       />
