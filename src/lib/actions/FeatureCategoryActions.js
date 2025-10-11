@@ -18,7 +18,12 @@ export const actionsFeatureCategory = {
     ADD_FEATURE_CATEGORY_REQUEST : "ADD_FEATURE_CATEGORY_REQUEST",
     ADD_FEATURE_CATEGORY_SUCCESS : "ADD_FEATURE_CATEGORY_SUCCESS",
     ADD_FEATURE_CATEGORY_FAILURE : "ADD_FEATURE_CATEGORY_FAILURE",
-}
+
+
+    CLEAR_FEATURES_ALL: "CLEAR_FEATURES_ALL",
+    CLEAR_FEATURES_FOR_PRODUCT: "CLEAR_FEATURES_FOR_PRODUCT",
+};
+
 
 
 //get
@@ -52,11 +57,19 @@ export function getFeaturesCategoryByProductRequest(idProduct) {
     }
 }
 
-export function getFeatureCategoryByProductSuccess(featuresCategoryByProduct) {
-    return {
-        type: actionsFeatureCategory.GET_FEATURE_CATEGORY_BY_PRODUCT_SUCCESS,
-        payload: featuresCategoryByProduct,
-    }
+// export function getFeatureCategoryByProductSuccess(featuresCategoryByProduct) {
+//     return {
+//         type: actionsFeatureCategory.GET_FEATURE_CATEGORY_BY_PRODUCT_SUCCESS,
+//         payload: featuresCategoryByProduct,
+//     }
+// }
+
+
+export function getFeatureCategoryByProductSuccess(productId, features) {
+  return {
+    type: actionsFeatureCategory.GET_FEATURE_CATEGORY_BY_PRODUCT_SUCCESS,
+    payload: { productId, features },
+  }
 }
 
 export function getFeatureCategoryByProductFailure(error) {
@@ -64,6 +77,17 @@ export function getFeatureCategoryByProductFailure(error) {
         type: actionsFeatureCategory.GET_FEATURE_CATEGORY_BY_PRODUCT_FAILURE,
         payload: error,
     }
+}
+
+
+// clear (tout)
+export function clearFeaturesAll() {
+  return { type: actionsFeatureCategory.CLEAR_FEATURES_ALL };
+}
+
+// clear (un seul produit)
+export function clearFeaturesForProduct(productId) {
+  return { type: actionsFeatureCategory.CLEAR_FEATURES_FOR_PRODUCT, payload: productId };
 }
 
 //update

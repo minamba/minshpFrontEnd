@@ -476,25 +476,37 @@ export const Category = () => {
                     {product.previewDescription}
                   </p>
                 )}
-
-                <div className="new-price-row">
-                  <span className={`card-stock ${stockCls}`}>
-                    <span className={`card-stock-dot ${stockCls}`} />
-                    {stockLabel}
-                  </span>
-
-                  <div className={`price-stack ${hasAnyPromo ? "has-promo" : ""}`}>
-                    {hasAnyPromo && (
-                      <span className="price-old">
-                        {priceRef.toLocaleString("fr-FR", { style: "currency", currency: "EUR" })}
-                      </span>
-                    )}
-                    <div className={`price ${hasAnyPromo ? "price--promo" : ""}`}>
-                      <span className="euros">{euros}€</span>
-                      <sup className="cents">{cents}</sup>
-                    </div>
+{/* Alignement identique à Home : statut compressible + prix à droite */}
+<div
+  className="new-price-row"
+  style={{
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr) auto",
+    alignItems: "center",
+    columnGap: 8,
+    overflow: "hidden",
+  }}
+>
+  {/* Statut : 1 seule ligne + ellipsis, accepte de se compresser */}
+<span className={`card-stock ${stockCls}`} title={stockLabel}>
+  <span className={`card-stock-dot ${stockCls}`} />
+  <span className="card-stock-txt">{stockLabel}</span>
+</span>
+                <div
+                  className={`price-stack ${hasAnyPromo ? "has-promo" : ""}`}
+                  style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2, lineHeight: 1.15 }}
+                >
+                  {hasAnyPromo && (
+                    <span className="price-old" style={{ margin: 0, fontSize: ".95rem" }}>
+                      {priceRef.toLocaleString("fr-FR", { style: "currency", currency: "EUR" })}
+                    </span>
+                  )}
+                  <div className={`price ${hasAnyPromo ? "price--promo" : ""}`}>
+                    <span className="euros">{euros}€</span>
+                    <sup className="cents">{cents}</sup>
                   </div>
                 </div>
+              </div>
               </article>
             );
           })}

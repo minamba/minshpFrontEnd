@@ -7,6 +7,10 @@ import { addToCartRequest, saveCartRequest } from '../../lib/actions/CartActions
 import { GenericModal } from '../../components/index';
 import { toMediaUrl } from '../../lib/utils/mediaUrl';
 import { getProductsPagedUserRequest } from "../../lib/actions/ProductActions"; // ✅ pagination
+import {
+  getFeaturesCategoryByProductRequest,
+  clearFeaturesForProduct,   // ou clearFeaturesAll()
+} from "../../lib/actions/FeatureCategoryActions";
 import "../../styles/pages/product.css";
 import { calculPrice } from '../../lib/utils/Helpers';
 import DOMPurify from 'dompurify';
@@ -20,6 +24,16 @@ export const Product = () => {
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
   }, [id]);
+
+
+
+  useEffect(() => {
+  if (!pid) return;
+  // nettoie l'entrée (évite de montrer l'ancien jeu pendant 1 tick)
+  dispatch(clearFeaturesForProduct(pid)); // ou clearFeaturesAll()
+  // récupère les specs du produit courant
+  dispatch(getFeaturesCategoryByProductRequest(pid));
+}, [dispatch, pid]);
 
   // ===== Store (✅ compatible pagination) =====
   const prodState       = useSelector((s) => s.products) || {};

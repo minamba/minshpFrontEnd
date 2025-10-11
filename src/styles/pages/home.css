@@ -1,1013 +1,442 @@
 /* ===========================
-   HOME PAGE
+   HOME PAGE — CSS PROPRE
    =========================== */
 
-/* HERO */
-.hero-section {
-    position: relative;
-    width: 100%;
-    height: 100vh;
-    overflow: hidden;
-    z-index: 0;  
-  }
-  .hero-video,
-  .hero-image {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    filter: brightness(.4);
-    z-index: -1;
-    pointer-events: none;
-  }
-  .hero-section::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background: linear-gradient(to bottom, rgba(0,0,0,.15), rgba(0,0,0,.45));
-    z-index: 0;
-  }
-  .hero-content {
-    position: absolute;
-    top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
-    text-align: center;
-    color: #fff;
-    padding: 0 16px;
-  }
-  .hero-title {
-    font-size: clamp(1.8rem, 5vw, 3rem);
-    font-weight: 800;
-    margin: 0 0 1rem;
-  }
-  .hero-subtitle {
-    font-size: clamp(1rem, 2.8vw, 1.4rem);
-    margin: 0 auto 1.5rem;
-    max-width: 640px;
-    line-height: 1.55;
-    opacity: .95;
-  }
-  .hero-button {
-    display: inline-block;
-    padding: .8rem 2rem;
-    border: 1px solid #fff;
-    border-radius: 50px;
-    color: #fff;
-    text-decoration: none;
-    font-weight: 700;
-    transition: background .25s,color .25s,transform .05s,box-shadow .2s;
-  }
-  .hero-button:hover {
-    background: #fff;
-    color: #000;
-    transform: translateY(-1px);
-    box-shadow: 0 10px 24px rgba(0,0,0,.12);
-  }
-  
-  /* FEATURES */
-  .features-section {
-    display: flex;
-    flex-direction: column;
-    gap: 5rem;
-    padding: 5rem 2rem;
-  }
-  .feature {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 3rem;
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 2rem;
-    border-radius: 20px;
-    background: #fff; /* fond blanc uniforme */
-    box-shadow: 0 10px 30px rgba(0,0,0,.08);
-  }
-  
-  .feature.reverse {
-    flex-direction: row-reverse;
-    background: #fff; /* plus de gris ici */
-  }
-  .feature-text {
-    flex: 1;
-    max-width: 500px;
-  }
-  .feature-text h2 { font-size: 2rem; margin-bottom: 1rem; }
-  .feature-text p { font-size: 1.1rem; color: #555; }
-  .feature img {
-    flex: 1;
-    width: 100%;
-    max-width: 500px;
-    border-radius: 20px;
-    object-fit: cover;
-    background: #fff; /* fond blanc derrière l’image */
-    padding: 8px;     /* petit espace blanc autour */
-
-  }
-  
-  /* CTA */
-  .features-cta {
-    display: flex;
-    gap: 16px;
-    justify-content: center;
-    margin: 16px auto 2rem;
-  }
-  .btn-pill {
-    display: inline-block;
-    padding: .8rem 1.6rem;
-    border-radius: 999px;
-    font-weight: 700;
-    text-decoration: none;
-    border: 1px solid transparent;
-  }
-
-
-  /* ===================== HOME — CATEGORIES ===================== */
-
-/* Section */
-.categories-section{
-    padding: 5rem 2rem;
-    background: var(--bg-alt, #f5f5f7);
-  }
-  
-  /* Grille desktop/tablette */
-  .categories-grid{
-    max-width: 1200px;
-    margin: 0 auto;
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 16px;
-  }
-  
-  /* Carte catégorie */
-  .category-card{
-    background: #fff;
-    border-radius: 20px;
-    box-shadow: var(--shadow-2, 0 10px 30px rgba(0,0,0,.08));
-    padding: 1.25rem;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: .75rem;
-    min-height: 230px;
-    transition: transform .12s, box-shadow .2s;
-  }
-  .category-card:hover{
-    transform: translateY(-2px);
-    box-shadow: 0 16px 36px rgba(0,0,0,.08);
-  }
-  
-  .category-title{
-    font-weight: 700;
-    color: #333;
-    margin: .25rem 0 .5rem;
-  }
-  
-  /* Image (cliquable) */
-  .category-image{
-    width: 100%;
-    height: 160px;
-    object-fit: contain;
-    background: #fff;      /* fond blanc */
-    border-radius: 12px;
-    padding: 8px;          /* optionnel : un peu d’air autour du visuel */
-    cursor: pointer;
-  }
-  
-  /* --------- Responsive / Carrousel mobile --------- */
-  
-  /* 3 colonnes sur large tablette */
-  @media (max-width:1024px){
-    .categories-grid{ grid-template-columns: repeat(3, minmax(0,1fr)); }
-  }
-  
-  /* En mobile : on passe en “carrousel” horizontal */
-  @media (max-width:768px){
-    .categories-grid.categories-carousel{
-      display: flex;
-      gap: 12px;
-      overflow-x: auto;
-      overflow-y: hidden;
-      padding: 8px 6px 2px;
-      scroll-snap-type: x mandatory;
-      scroll-padding: 6px;
-      -webkit-overflow-scrolling: touch;
-    }
-    .categories-grid.categories-carousel::-webkit-scrollbar{ display: none; }
-  
-    .categories-grid.categories-carousel .category-card{
-      flex: 0 0 50%;
-      min-width: 50%;
-      max-width: 50%;
-      scroll-snap-align: center;
-    }
-  }
-  
-  /* Indice “Balayez” (n’apparaît qu’en mobile) */
-  .swipe-indicator{
-    display: none;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    margin-top: 8px;
-    color: #6b7280;
-    font-weight: 700;
-    font-size: .95rem;
-  }
-  @media (max-width:768px){
-    .swipe-indicator{ display: flex; }
-  }
-  
-
-/* ===== Nouveautés : grille desktop + carrousel mobile ===== */
-
-/* conteneur de la section */
-.new-section{
-  padding: 3rem 2rem;
+/* ---------------------------
+   0) Variables (fallbacks)
+--------------------------- */
+:root{
+  --bg-alt: #f5f5f7;
+  --shadow-2: 0 10px 30px rgba(0,0,0,.08);
 }
 
-/* entête (déjà présent chez toi) */
-.new-header{
-  max-width: 1200px;
-  margin: 0 auto 12px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+/* ===========================
+   1) HERO
+=========================== */
+.hero-section{
+  position:relative;
+  width:100%;
+  height:100vh;
+  overflow:hidden;
+  z-index:0;
+}
+.hero-video,
+.hero-image{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  filter:brightness(.4);
+  z-index:-1;
+  pointer-events:none;
+}
+.hero-section::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  background:linear-gradient(to bottom, rgba(0,0,0,.15), rgba(0,0,0,.45));
+  z-index:0;
+}
+.hero-content{
+  position:absolute;
+  top:50%; left:50%;
+  transform:translate(-50%,-50%);
+  text-align:center;
+  color:#fff;
+  padding:0 16px;
+}
+.hero-title{
+  font-size:clamp(1.8rem,5vw,3rem);
+  font-weight:800;
+  margin:0 0 1rem;
+}
+.hero-subtitle{
+  font-size:clamp(1rem,2.8vw,1.4rem);
+  margin:0 auto 1.5rem;
+  max-width:640px;
+  line-height:1.55;
+  opacity:.95;
+}
+.hero-button{
+  display:inline-block;
+  padding:.8rem 2rem;
+  border:1px solid #fff;
+  border-radius:50px;
+  color:#fff;
+  text-decoration:none;
+  font-weight:700;
+  transition:background .25s, color .25s, transform .05s, box-shadow .2s;
+}
+.hero-button:hover{
+  background:#fff;
+  color:#000;
+  transform:translateY(-1px);
+  box-shadow:0 10px 24px rgba(0,0,0,.12);
 }
 
-/* --- Desktop / large tablette : 4 cartes sur une ligne --- */
-.new-grid{
-  max-width: 1200px;
-  margin: 0 auto;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
-  align-items: stretch;
-}
-
-/* s’assurer que les cartes ne forcent pas de largeur mini */
-.new-grid .product-card{
-  width: 100%;
-  min-width: 0;
-}
-
-/* --- Tablette & mobile : carrousel horizontal --- */
-@media (max-width: 980px){
-  .new-grid{
-    display: flex;
-    gap: 12px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    padding: 8px 6px 2px;
-    scroll-snap-type: x mandatory;
-    scroll-padding: 6px;
-    -webkit-overflow-scrolling: touch;
+/* — Hero : Mobile tweaks — */
+@media (max-width:768px){
+  .hero-content{ width:92vw; padding:0 8px; }
+  .hero-title{
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    line-height:1.15; letter-spacing:.2px;
+    font-size:clamp(1.2rem,7.6vw,2rem);
+    margin-bottom:.6rem;
   }
-  .new-grid::-webkit-scrollbar{ display: none; }
-
-  /* largeur “slide” (ajuste si tu veux voir 2/3 cartes à l’écran) */
-  .new-grid .product-card{
-    flex: 0 0 70%;
-    max-width: 70%;
-    scroll-snap-align: center;
+  .hero-subtitle{
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    line-height:1.35; font-size:clamp(.95rem,4vw,1.1rem);
+    max-width:none; margin-bottom:1rem;
+  }
+  .hero-section::after{
+    background:linear-gradient(to bottom, rgba(0,0,0,.20), rgba(0,0,0,.50));
   }
 }
 
-@media (max-width: 640px){
-  .new-grid .product-card{
-    flex: 0 0 85%;
-    max-width: 85%;
-  }
+/* ===========================
+   2) FEATURES (bloc images/texte)
+=========================== */
+.features-section{
+  display:flex; flex-direction:column;
+  gap:5rem; padding:5rem 2rem;
+}
+.feature{
+  display:flex; align-items:center; justify-content:space-between; gap:3rem;
+  max-width:1200px; margin:0 auto; padding:2rem;
+  border-radius:20px; background:#fff; box-shadow:var(--shadow-2);
+  transition: box-shadow .2s, transform .12s;
+}
+.feature:hover{ transform:translateY(-2px); box-shadow:0 16px 36px rgba(0,0,0,.08); }
+.feature.reverse{ flex-direction:row-reverse; }
+.feature-text{ flex:1; max-width:500px; }
+.feature-text h2{ font-size:2rem; margin-bottom:1rem; }
+.feature-text p{ font-size:1.1rem; color:#555; }
+.feature img{
+  flex:1; width:100%; max-width:500px; border-radius:20px; object-fit:cover;
+  background:#fff; padding:8px;
 }
 
-
-
-  /* ===================== HOME — FEATURES (MOBILE) ===================== */
-
-/* Desktop déjà OK : on garde l'alternance */
-.feature.reverse{ flex-direction: row-reverse; }     /* sécurité si tu utilises .reverse */
-@media (min-width: 821px){
-  .features-section{ display:flex; flex-direction:column; gap:5rem; padding:5rem 2rem; }
-  .feature{
-    display:flex; align-items:center; justify-content:space-between; gap:3rem;
-    max-width:1200px; margin:0 auto; padding:2rem; border-radius:20px; background:#fff;
-    box-shadow:var(--shadow-2, 0 10px 30px rgba(0,0,0,.08));
-    transition: box-shadow .2s, transform .12s;
-  }
-  .feature:hover{ transform:translateY(-2px); box-shadow:0 16px 36px rgba(0,0,0,.08); }
-  .feature-text{ flex:1; max-width:500px; }
-  .feature img{
-    flex: 1;
-    width: 100%;
-    max-width: 500px;
-    border-radius: 20px;
-    object-fit: cover;
-  }
-}
-
-/* ↓↓↓ MOBILE / TABLETTE ↓↓↓ */
-@media (max-width: 820px){
+/* — Features : Mobile/Tablet — */
+@media (max-width:820px){
   .features-section{ padding:3rem 1rem; gap:2rem; }
-  .feature {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 3rem;
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 2rem;
-    border-radius: 20px;
-    background: #fff; /* carte blanche */
-    box-shadow: 0 10px 30px rgba(0,0,0,.08); /* ombre uniquement sur la carte */
+  .feature{
+    flex-direction:column !important; align-items:center; text-align:center; gap:1rem;
+    padding:1.25rem 1rem; box-shadow:var(--shadow-2);
   }
-  .feature img {
-    flex: 1;
-    width: 100%;
-    max-width: 500px;
-    border-radius: 20px;
-    object-fit: cover;
-    background: #fff; /* fond blanc derrière l’image */
-    padding: 8px;     /* espace blanc autour du visuel */
-    box-shadow: none; /* ⛔ aucune ombre sur les images */
-  }
+  .feature.reverse{ flex-direction:column !important; }
   .feature-text{ max-width:none; }
-  .feature-text h2{ font-size:1.4rem; margin-bottom:.6rem; }
-  .feature-text p{ font-size:1rem; color:#555; }
-  .features-cta{ display:flex; flex-direction:column; align-items:center; gap:12px; margin:16px auto 2rem; }
-  .features-cta .btn-primary{ min-width:280px; }
+  .feature-text h2{ font-size:clamp(1.25rem,5.2vw,1.6rem); margin:0 0 .4rem; }
+  .feature-text p{
+    font-size:clamp(.95rem,4vw,1.05rem); color:#555; margin:0 auto 1rem; max-width:38ch;
+  }
+  .feature img{
+    display:block; width:100%; max-width:560px; border-radius:16px;
+    background:#fff; padding:10px; box-shadow:none !important; margin:0 auto; object-fit:contain;
+  }
+}
+/* Texte aligné à gauche sur mobile si souhaité */
+@media (max-width:820px){
+  .feature-text{ text-align:left !important; width:100%; max-width:560px; margin:0 auto; }
 }
 
-@media (max-width: 520px){
-  .features-cta .btn-primary{ min-width:82vw; } /* bouton large confort */
+/* Espacement harmonisé entre sections */
+.home-container .features-section{
+  margin-bottom:3rem !important; padding-bottom:2rem !important;
 }
 
-  /* ===== Nouveautés : grille desktop + carrousel mobile ===== */
+/* ===========================
+   3) CATEGORIES (tuiles)
+=========================== */
+.categories-section{
+  padding:5rem 2rem; background:var(--bg-alt, #f5f5f7);
+}
+.categories-grid{
+  max-width:1200px; margin:0 auto;
+  display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:16px;
+}
+.category-card{
+  background:#fff; border-radius:20px; box-shadow:var(--shadow-2);
+  padding:1.25rem; display:flex; flex-direction:column; align-items:center; gap:.75rem;
+  min-height:230px; transition:transform .12s, box-shadow .2s;
+}
+.category-card:hover{ transform:translateY(-2px); box-shadow:0 16px 36px rgba(0,0,0,.08); }
+.category-title{ font-weight:700; color:#333; margin:.25rem 0 .5rem; }
+.category-image{
+  width:100%; height:160px; object-fit:contain; background:#fff; border-radius:12px; padding:8px; cursor:pointer;
+}
 
-/* conteneur de la section */
-.new-section{
-    padding: 3rem 2rem;
+/* — Categories : desktop → tablet break — */
+@media (max-width:1024px){
+  .categories-grid{ grid-template-columns:repeat(3, minmax(0,1fr)); }
+}
+
+/* — Categories : carrousel mobile — */
+@media (max-width:768px){
+  .categories-grid.categories-carousel{
+    display:flex; gap:12px; overflow-x:auto; overflow-y:hidden;
+    padding:8px 6px 2px; scroll-snap-type:x mandatory; scroll-padding:6px;
+    -webkit-overflow-scrolling:touch;
   }
-  
-  /* entête (déjà présent chez toi) */
-  .new-header{
-    max-width: 1200px;
-    margin: 0 auto 12px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+  .categories-grid.categories-carousel::-webkit-scrollbar{ display:none; }
+  .categories-grid.categories-carousel .category-card{
+    flex:0 0 50%; min-width:50%; max-width:50%; scroll-snap-align:center;
   }
-  
-  /* --- Desktop / large tablette : 4 cartes sur une ligne --- */
+}
+/* Indice “Balayez” */
+.swipe-indicator{
+  display:none; align-items:center; justify-content:center; gap:10px;
+  margin-top:8px; color:#6b7280; font-weight:700; font-size:.95rem;
+}
+@media (max-width:768px){ .swipe-indicator{ display:flex; } }
+
+/* — Aligner Catégories comme Nouveautés — */
+.home-container .categories-section{ padding-left:0 !important; padding-right:0 !important; }
+.home-container .categories-section .new-header{ padding-left:2rem !important; padding-right:2rem !important; }
+.home-container .categories-section .categories-grid{ padding:0 2rem; }
+
+/* ===========================
+   4) NOUVEAUTÉS (grille/carrousel)
+=========================== */
+.new-section{ padding:3rem 2rem; }
+.new-header{
+  max-width:1200px; margin:0 auto 12px;
+  display:flex; align-items:center; justify-content:space-between;
+}
+
+/* Grille desktop */
+.new-grid{
+  max-width:1200px; margin:0 auto;
+  display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:16px; align-items:stretch;
+}
+.new-grid .product-card{ width:100%; min-width:0; }
+
+/* Carrousel tablette/mobile */
+@media (max-width:980px){
   .new-grid{
-    max-width: 1200px;
-    margin: 0 auto;
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 16px;
-    align-items: stretch;
+    display:flex; gap:12px; overflow-x:auto; overflow-y:hidden;
+    padding:8px 6px 2px; scroll-snap-type:x mandatory; scroll-padding:6px;
+    -webkit-overflow-scrolling:touch;
   }
-  
-  /* s’assurer que les cartes ne forcent pas de largeur mini */
-  .new-grid .product-card{
-    width: 100%;
-    min-width: 0;
-  }
-  
-  /* --- Tablette & mobile : carrousel horizontal --- */
-  @media (max-width: 980px){
-    .new-grid{
-      display: flex;
-      gap: 12px;
-      overflow-x: auto;
-      overflow-y: hidden;
-      padding: 8px 6px 2px;
-      scroll-snap-type: x mandatory;
-      scroll-padding: 6px;
-      -webkit-overflow-scrolling: touch;
-    }
-    .new-grid::-webkit-scrollbar{ display: none; }
-  
-    /* largeur “slide” (ajuste si tu veux voir 2/3 cartes à l’écran) */
-    .new-grid .product-card{
-      flex: 0 0 70%;
-      max-width: 70%;
-      scroll-snap-align: center;
-    }
-  }
-  
-  @media (max-width: 640px){
-    .new-grid .product-card{
-      flex: 0 0 85%;
-      max-width: 85%;
-    }
-  }
+  .new-grid::-webkit-scrollbar{ display:none; }
+  .new-grid .product-card{ flex:0 0 70%; max-width:70%; scroll-snap-align:center; }
+}
+@media (max-width:640px){
+  .new-grid .product-card{ flex:0 0 85%; max-width:85%; }
+}
 
-
-  /* ===== HOME — Nouveautés : 4 colonnes desktop, carrousel mobile ===== */
-
-/* on scope sous .home-container pour ne pas se faire écraser par l'autre .new-grid */
+/* — Version scoped HOME pour éviter conflits — */
 .home-container .new-grid{
-    max-width: 1200px;
-    margin: 0 auto;
-    display: grid !important;
-    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
-    gap: 16px !important;
-    align-items: stretch;
-  }
-  
-  /* empêcher des min-width hérités de casser la ligne */
-  .home-container .new-grid .product-card{
-    width: auto !important;
-    min-width: 0 !important;
-    flex: initial !important;
-  }
-  
-  /* Carrousel tablette/mobile */
-  @media (max-width: 980px){
-    .home-container .new-grid{
-      display: flex !important;
-      gap: 12px !important;
-      overflow-x: auto !important;
-      overflow-y: hidden !important;
-      padding: 8px 6px 2px !important;
-      scroll-snap-type: x mandatory;
-      scroll-padding: 6px;
-      -webkit-overflow-scrolling: touch;
-      
-    }
-    .home-container .new-grid::-webkit-scrollbar{ display:none; }
-  
-    .home-container .new-grid .product-card{
-      flex: 0 0 70% !important;
-      max-width: 70% !important;
-      scroll-snap-align: center;
-    }
-  }
-  
-  @media (max-width: 640px){
-    .home-container .new-grid .product-card{
-      flex: 0 0 85% !important;
-      max-width: 85% !important;
-    }
-  }
-  
-  
-  /* ==== HERO — Fix mobile: 1 ligne, pas de chevauchement ==== */
-@media (max-width: 768px){
-    .hero-content{
-      width: 92vw;                /* un peu de marge latérale */
-      padding: 0 8px;
-    }
-  
-    .hero-title{
-      white-space: nowrap;        /* une seule ligne */
-      overflow: hidden;           /* coupe si trop long */
-      text-overflow: ellipsis;    /* … si ça dépasse */
-      line-height: 1.15;          /* évite le “collage” vertical */
-      letter-spacing: .2px;
-      font-size: clamp(1.2rem, 7.6vw, 2rem); /* taille adaptée au viewport */
-      margin-bottom: .6rem;
-    }
-  
-    .hero-subtitle{
-      white-space: nowrap; 
-      overflow: hidden;
-      text-overflow: ellipsis;
-      line-height: 1.35;
-      font-size: clamp(.95rem, 4vw, 1.1rem);
-      max-width: none;            /* pas de contrainte de largeur ici */
-      margin-bottom: 1rem;
-    }
-  
-    /* Si tu veux un peu plus de lisibilité sur fond vidéo */
-    .hero-section::after{
-      background: linear-gradient(to bottom, rgba(0,0,0,.20), rgba(0,0,0,.50));
-    }
-  }
-
-
-  /* Carrousel tablette/mobile — cartes plus petites */
-@media (max-width: 980px){
-  .home-container .new-grid .product-card{
-    flex: 0 0 60% !important;   /* était 70% */
-    max-width: 60% !important;
-    scroll-snap-align: center;
-  }
+  max-width:1200px; margin:0 auto;
+  display:grid !important; grid-template-columns:repeat(4, minmax(0,1fr)) !important;
+  gap:16px !important; align-items:stretch;
 }
-
-
-  @media (max-width: 640px){
-    .home-container .product-card{ padding:12px !important; border-radius:14px !important; }
-    .home-container .product-card .product-thumb img{ height:140px !important; object-fit:contain; }
-    .home-container .product-card .product-name{ font-size:.95rem !important; }
-    .home-container .product-card .price--big .euros{ font-size:1.1rem !important; }
-    .home-container .product-card .price--big .cents{ font-size:.8rem !important; top:-.4em !important; }
-  }
-  
-
-
-  /* === HOME: empêcher le crop des images produit === */
-.home-container .product-card .product-thumb{
-  /* cadre stable pour l'image */
-  aspect-ratio: 4 / 3;        /* ajuste à 1/1 ou 16/9 si tes visuels sont différents */
-  width: 100%;
-  border-radius: 16px;
-  overflow: hidden;
-  background: #ffffff;
-  display: block;
-}
-
-.home-container .product-card .product-thumb .thumb-link,
-.home-container .product-card .product-thumb img{
-  width: 100%;
-  height: 100%;
-  object-fit: contain !important;  /* montrer l’image entière */
-}
-
-/* Plus petit mobile : un peu plus haut pour respirer */
-@media (max-width: 480px){
-  .home-container .product-card .product-thumb{
-    aspect-ratio: 1 / 1;      /* carré = souvent plus “safe” sur très petit écran */
-  }
-}
-
-/* Sécurité : si un height fixe traîne quelque part, on neutralise */
-.home-container .product-card .product-thumb img{
-  max-height: none !important;
-}
-
-
-
-
-/* --- Nouveautés : taille des cartes par palier --- */
-
-/* 981+ : grille classique */
-@media (min-width: 981px){
-  .home-container .new-grid{
-    display: grid !important;
-    grid-template-columns: repeat(4, minmax(0,1fr)) !important;
-    gap: 16px !important;
-    overflow: visible !important;
-    padding: 0 !important;
-  }
-}
-
-/* 641–980 px : 2 cartes quasi plein écran (≈ 2 par vue) */
-@media (min-width: 641px) and (max-width: 980px){
-  .home-container .new-grid{
-    display: flex !important;
-    gap: 12px !important;
-    overflow-x: auto !important;
-    padding: 8px 6px 2px !important;
-    scroll-snap-type: x mandatory;
-  }
-  .home-container .new-grid .product-card{
-    flex: 0 0 46% !important;   /* <= règle unique qui prime */
-    max-width: 46% !important;
-    scroll-snap-align: center;
-  }
-}
-
-/* ≤640 px : 1 carte large */
-@media (max-width: 640px){
-  .home-container .new-grid .product-card{
-    flex: 0 0 85% !important;
-    max-width: 85% !important;
-  }
-}
-
-
-
-/* ====== NOUVEAUTÉS — version compacte (desktop + mobile) ====== */
-
-/* 1) Cards moins hautes (comme Catégories) */
 .home-container .new-grid .product-card{
-  padding: 12px !important;
-  border-radius: 16px !important;
-  gap: 8px !important;
-  background: #fff !important;                 /* look + “catégories” */
-  box-shadow: 0 10px 30px rgba(0,0,0,.08) !important;
+  width:auto !important; min-width:0 !important; flex:initial !important;
+}
+/* Carrousel tablette/mobile (HOME) */
+@media (max-width:980px){
+  .home-container .new-grid{
+    display:flex !important; gap:12px !important; overflow-x:auto !important; overflow-y:hidden !important;
+    padding:8px 6px 2px !important; scroll-snap-type:x mandatory; scroll-padding:6px;
+    -webkit-overflow-scrolling:touch;
+  }
+  .home-container .new-grid::-webkit-scrollbar{ display:none; }
+  .home-container .new-grid .product-card{
+    flex:0 0 60% !important; max-width:60% !important; /* cartes un peu plus petites */
+    scroll-snap-align:center;
+  }
+}
+@media (max-width:640px){
+  .home-container .new-grid .product-card{ flex:0 0 85% !important; max-width:85% !important; }
 }
 
-/* Visuel produit plus bas (hauteur fixe plutôt qu’aspect-ratio 4/3) */
+/* — Tailles par paliers custom (HOME) — */
+@media (min-width:981px){
+  .home-container .new-grid{
+    display:grid !important; grid-template-columns:repeat(4, minmax(0,1fr)) !important;
+    gap:16px !important; overflow:visible !important; padding:0 !important;
+  }
+}
+@media (min-width:641px) and (max-width:980px){
+  .home-container .new-grid{
+    display:flex !important; gap:12px !important; overflow-x:auto !important; padding:8px 6px 2px !important;
+    scroll-snap-type:x mandatory;
+  }
+  .home-container .new-grid .product-card{ flex:0 0 46% !important; max-width:46% !important; }
+}
+
+/* ===========================
+   5) CARTES PRODUIT (Home)
+   (vignettes + textes compacts)
+=========================== */
+.home-container .new-grid .product-card{
+  padding:12px !important; border-radius:16px !important; gap:8px !important;
+  background:#fff !important; box-shadow:var(--shadow-2) !important;
+}
+
+/* Vignette : hauteur fixe + blanc, pas d’overflow */
 .home-container .new-grid .product-thumb{
-  aspect-ratio: auto !important;
-  height: 160px !important;                     /* ≈ image Catégories (160px) */
-  background: #fff !important;
-  border-radius: 12px !important;
-  padding: 8px !important;
+  position:relative; width:100%; height:160px;
+  background:#fff; border-radius:12px; overflow:hidden;
+  display:flex; align-items:center; justify-content:center; padding:8px;
+  transition:background-color .2s ease;
 }
-
-/* Image bien contenue */
-.home-container .new-grid .product-thumb img{
-  width: 100% !important;
-  height: 100% !important;
-  object-fit: contain !important;
-  max-height: none !important;
-}
-
-/* Texte compact */
-.home-container .new-grid .product-name{
-  font-size: 1rem !important;
-  line-height: 1.3 !important;
-  margin-top: 2px !important;
-}
-
-/* Prix compact */
-.home-container .new-grid .price .euros{ font-size: 1.05rem !important; }
-.home-container .new-grid .price .cents{ font-size: .8rem !important; top: -.35em !important; }
-
-/* Chip stock compact */
-.home-container .new-grid .card-stock{
-  padding: 4px 8px !important;
-  font-size: .85rem !important;
-}
-
-
-/* 2) Carrousel mobile : voir 2 cards sans scroller (≤640px) */
-@media (max-width: 640px){
-  .home-container .new-grid{
-    display: flex !important;
-    gap: 10px !important;
-    overflow-x: auto !important;
-    padding: 8px 8px 2px !important;
-    scroll-snap-type: x mandatory;
-  }
-  .home-container .new-grid .product-card{
-    flex: 0 0 48% !important;   /* 2 cartes visibles */
-    max-width: 48% !important;
-    scroll-snap-align: center;
-  }
-
-  /* On baisse un peu la hauteur de l’image pour garder 2 cartes “respirantes” */
-  .home-container .new-grid .product-thumb{
-    height: 140px !important;
-  }
-}
-
-/* 3) Tablettes (641–980px) : on garde ~2 cartes par vue, un peu plus larges */
-@media (min-width: 641px) and (max-width: 980px){
-  .home-container .new-grid{
-    display: flex !important;
-    gap: 12px !important;
-    overflow-x: auto !important;
-    padding: 8px 6px 2px !important;
-    scroll-snap-type: x mandatory;
-  }
-  .home-container .new-grid .product-card{
-    flex: 0 0 46% !important;   /* ~2 cartes */
-    max-width: 46% !important;
-    scroll-snap-align: center;
-  }
-}
-
-/* 4) Desktop (≥981px) : grille 4 colonnes, mais plus compacte en hauteur */
-@media (min-width: 981px){
-  .home-container .new-grid{
-    display: grid !important;
-    grid-template-columns: repeat(4, minmax(0,1fr)) !important;
-    gap: 16px !important;
-    overflow: visible !important;
-    padding: 0 !important;
-  }
-  .home-container .new-grid .product-thumb{
-    height: 160px !important;
-  }
-}
-
-
-
-/* ====== NOUVEAUTÉS — ≤515px : chip stock + prix propres ====== */
-@media (max-width: 515px){
-
-  /* Ligne "stock + prix" en grille 2 colonnes */
-  .home-container .new-grid .new-price-row{
-    display: grid !important;
-    grid-template-columns: 1fr auto;  /* stock prend l'espace, prix à largeur auto */
-    align-items: center;
-    column-gap: 8px;
-  }
-
-  /* Chip stock : compact + une seule ligne */
-  .home-container .new-grid .card-stock{
-    white-space: nowrap;            /* évite le passage sur 2 lignes */
-    font-size: .82rem !important;
-    padding: 4px 8px !important;
-    line-height: 1 !important;
-  }
-  .home-container .new-grid .card-stock-dot{
-    width: 7px; height: 7px;
-  }
-
-  /* Colonne prix (à droite) plus compacte */
-  .home-container .new-grid .new-price-row > div{
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: flex-end !important;  /* prix aligné à droite */
-    line-height: 1.05 !important;
-    gap: 2px !important;
-  }
-
-  /* Prix principal un poil plus petit pour laisser respirer le chip */
-  .home-container .new-grid .price .euros{ font-size: 1rem !important; }
-  .home-container .new-grid .price .cents{ font-size: .75rem !important; top: -.35em !important; }
-
-  /* Ancien prix (si promo) sous le prix, discret */
-  .home-container .new-grid .price-old{
-    font-size: .85rem !important;
-    opacity: .9;
-    margin: 0 !important;
-  }
-}
-
-/* Option "ultra-serré" si ça passe encore à 2 lignes sur certains mobiles étroits */
-@media (max-width: 400px){
-  .home-container .new-grid .card-stock{
-    padding: 3px 7px !important;
-    font-size: .78rem !important;
-    letter-spacing: .1px;
-  }
-  .home-container .new-grid .price .euros{ font-size: .95rem !important; }
-  .home-container .new-grid .price .cents{ font-size: .72rem !important; }
-}
-
-
-
-
-/* ===== Fix "Bientôt en rupture" qui pousse le prix — ≤480px ===== */
-@media (max-width: 480px){
-  /* La ligne devient une grille : colonne gauche compressible, prix à droite */
-  .home-container .new-grid .new-price-row{
-    display: grid !important;
-    grid-template-columns: minmax(0, 1fr) auto;  /* ← clé : la 1ʳᵉ colonne PEUT rétrécir */
-    align-items: center;
-    column-gap: 6px;
-    overflow: hidden; /* sécurité */
-  }
-
-  /* Le chip accepte de se compresser et coupe proprement avec ellipsis */
-  .home-container .new-grid .card-stock{
-    min-width: 0;            /* ← autorise le shrink */
-    max-width: 100%;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;  /* … si trop long */
-    padding: 3px 7px !important;
-    font-size: .78rem !important;
-    line-height: 1 !important;
-  }
-  .home-container .new-grid .card-stock-dot{
-    width: 7px; height: 7px;
-  }
-
-  /* Colonne prix compacte, collée à droite */
-  .home-container .new-grid .new-price-row > div{
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: flex-end !important;
-    line-height: 1.05 !important;
-    gap: 2px !important;
-  }
-  .home-container .new-grid .price .euros{ font-size: .98rem !important; }
-  .home-container .new-grid .price .cents{ font-size: .70rem !important; top: -.30em !important; }
-
-  /* Sécurité anti-débordement général */
-  .home-container .new-grid .product-card{
-    overflow: hidden;  /* évite tout dépassement visuel */
-  }
-}
-
-/* Fallback de mise en page si certains très petits appareils posent encore souci */
-@media (max-width: 400px){
-  /* On passe chip sur 1ʳᵉ ligne, prix sur 2ᵉ ligne à droite */
-  .home-container .new-grid .new-price-row{
-    grid-template-columns: 1fr;
-    row-gap: 4px;
-  }
-  .home-container .new-grid .new-price-row .card-stock{ justify-self: start; }
-  .home-container .new-grid .new-price-row > div{ justify-self: end; }
-}
-
-
-
-/* Le layout "stock + prix" tient la largeur, même si le chip fait 2 lignes */
-@media (max-width: 480px){
-  .home-container .new-grid .new-price-row{
-    display: grid !important;
-    grid-template-columns: minmax(0, 1fr) auto; /* chip compressible + prix */
-    align-items: start;
-    column-gap: 8px;
-  }
-
-  /* Par défaut, les chips restent sur 1 ligne */
-  .home-container .new-grid .card-stock{
-    white-space: nowrap;
-    min-width: 0;
-    max-width: 100%;
-  }
-
-  /* Seulement "Bientôt en rupture" peut passer sur 2 lignes */
-  .home-container .new-grid .card-stock--long{
-    white-space: normal !important;
-    line-height: 1.15;
-    padding-block: 6px;        /* un peu plus haut si 2 lignes */
-  }
-
-  /* Colonne prix compact, à droite, sans déborder */
-  .home-container .new-grid .new-price-row > div{
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    line-height: 1.05;
-    gap: 2px;
-  }
-}
-
-
-/* Aspect "muted" et 2 lignes max */
-.product-desc {
-  margin-top: 0;
-  font-size: .9rem;
-  font-weight: 600;
-  line-height: 1.3;
-  opacity: .75;              /* effet muted si tu n'utilises pas Bootstrap */
-  display: -webkit-box;      /* clamp 2 lignes */
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-.text-muted { opacity: .75; } /* optionnel si tu veux une classe générique */
-
-
-
-/* Titre du produit : colle-le un peu au paragraphe */
-.product-card .product-name {
-  margin-top: .25rem;     /* ou 4px */
-  margin-bottom: .15rem;  /* réduit l’espace sous le h3 */
-  line-height: 1.2;
-}
-
-/* Description muted : aucune marge au-dessus */
-.product-card .product-desc {
-  margin-top: 0;          /* clé pour supprimer le “trou” */
-  margin-bottom: .35rem;  /* laisse un tout petit espace avant le bloc suivant */
-  font-size: .95rem;
-  opacity: .70;           /* effet muted si besoin */
-  display: -webkit-box;   /* clamp éventuel */
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-
-/* ===== Nouveautés — image blanche + overlay au hover ===== */
-.home-container .new-grid .product-thumb{
-  position: relative;
-  width: 100%;
-  height: 160px;                 /* tu peux garder ton ratio si tu préfères */
-  background: #fff;              /* BLANC par défaut */
-  border-radius: 12px;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 8px;
-  transition: background-color .2s ease;
-}
-
 .home-container .new-grid .product-thumb .thumb-link,
 .home-container .new-grid .product-thumb img{
-  width: 100%;
-  height: 100%;
-  object-fit: contain !important;
-  display: block;
-  background: transparent;
-  border: 0;
-  outline: 0;
-  box-shadow: none;
+  width:100%; height:100%; object-fit:contain !important; display:block;
+  background:transparent; border:0; outline:0; box-shadow:none;
 }
-
-/* overlay transparent au repos */
+/* Overlay au hover */
 .home-container .new-grid .thumb-overlay{
-  position: absolute;
-  inset: 0;
-  border-radius: 12px;
-  background: rgba(0,0,0,0);     /* invisible */
-  opacity: 0;
-  transition: background .18s ease, opacity .18s ease;
-  pointer-events: none;
+  position:absolute; inset:0; border-radius:12px;
+  background:rgba(0,0,0,0); opacity:0; transition:background .18s ease, opacity .18s ease;
+  pointer-events:none;
 }
-/* overlay sombre au hover de la carte */
-.home-container .new-grid .product-card:hover .thumb-overlay{
-  background: rgba(0,0,0,.18);
-  opacity: 1;
+.home-container .new-grid .product-card:hover .thumb-overlay{ background:rgba(0,0,0,.18); opacity:1; }
+.home-container .new-grid .product-card:hover .thumb-add-btn{ opacity:1; transform:translateY(0); }
+
+/* Images : sécurité globale Home */
+.home-container .product-card .product-thumb{
+  aspect-ratio:4/3; width:100%; border-radius:16px; overflow:hidden; background:#fff; display:block;
+}
+.home-container .product-card .product-thumb .thumb-link,
+.home-container .product-card .product-thumb img{
+  width:100%; height:100%; object-fit:contain !important;
+}
+@media (max-width:480px){
+  .home-container .product-card .product-thumb{ aspect-ratio:1/1; } /* carré en très petit */
+}
+.home-container .product-card .product-thumb img{ max-height:none !important; }
+
+/* Textes compacts */
+.home-container .new-grid .product-name{
+  font-size:1rem !important; line-height:1.3 !important; margin-top:2px !important;
+}
+.home-container .new-grid .price .euros{ font-size:1.05rem !important; }
+.home-container .new-grid .price .cents{ font-size:.8rem !important; top:-.35em !important; }
+.home-container .new-grid .card-stock{ padding:4px 8px !important; font-size:.85rem !important; }
+
+@media (max-width:640px){
+  .home-container .new-grid{ display:flex !important; gap:10px !important; overflow-x:auto !important; padding:8px 8px 2px !important; scroll-snap-type:x mandatory; }
+  .home-container .new-grid .product-card{ flex:0 0 48% !important; max-width:48% !important; }
+  .home-container .new-grid .product-thumb{ height:140px !important; }
 }
 
-/* bouton panier : apparition au hover (inchangé) */
-.home-container .new-grid .product-card:hover .thumb-add-btn{
-  opacity: 1; transform: translateY(0);
+/* ===========================
+   6) LIGNE STATUT + PRIX
+   (alignée sur Category)
+=========================== */
+
+/* Rangée : statut compressible à gauche, prix à droite */
+.home-container .new-grid .new-price-row{
+  display:grid; grid-template-columns:minmax(0,1fr) auto;
+  align-items:center; column-gap:8px; overflow:visible;
 }
 
+/* Chip statut (conteneur) */
+.home-container .card-stock{
+  display:inline-flex; align-items:center; gap:6px;
+  padding:4px 8px; line-height:1.05; font-weight:700; font-size:.9rem;
+  min-width:0; max-width:100%;
+  background:#fff; color:#374151; border-radius:999px;
+}
+/* Le point */
+.home-container .card-stock-dot{
+  width:8px; height:8px; border-radius:50%; flex:0 0 auto;
+}
+/* Texte interne (clamp sur le texte seulement) */
+.home-container .card-stock .card-stock-txt{ min-width:0; max-width:100%; }
+
+/* EN STOCK : 1 ligne */
+.home-container .card-stock.in .card-stock-txt{
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+/* EN RUPTURE + BIENTÔT EN RUPTURE : 2 lignes max */
+.home-container .card-stock.out,
+.home-container .card-stock.warn{ align-items:flex-start; }
+.home-container .card-stock.out .card-stock-txt,
+.home-container .card-stock.warn .card-stock-txt{
+  white-space:normal; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+  overflow:hidden; text-overflow:ellipsis; word-break:keep-all; overflow-wrap:break-word;
+}
+.home-container .card-stock.out .card-stock-dot,
+.home-container .card-stock.warn .card-stock-dot{ margin-top:.15em; }
+
+/* Pile prix (droite) */
+.home-container .price-stack{
+  display:flex; flex-direction:column; align-items:flex-end; gap:2px; line-height:1.05; overflow:visible;
+}
+.home-container .price-stack.has-promo .price,
+.home-container .price--promo{ color:#ef4444; }
+.home-container .price .euros{ line-height:1; display:inline-block; }
+.home-container .price .cents{
+  position:relative; top:-.35em; font-size:.8rem; vertical-align:baseline;
+  display:inline-block; margin-left:2px;
+}
+
+/* — Mobile statuts/prix — */
+@media (max-width:520px){
+  .home-container .new-grid .new-price-row{ grid-template-columns:minmax(0,1fr) auto; column-gap:8px; }
+  .home-container .card-stock{ font-size:.82rem; padding:4px 8px; line-height:1.05; }
+  .home-container .card-stock-dot{ width:7px; height:7px; }
+  .home-container .price .euros{ font-size:1rem; }
+  .home-container .price .cents{ font-size:.75rem; top:-.35em; }
+  .home-container .price-old{ font-size:.85rem; margin:0; }
+}
+
+/* Ultra-étroit : on empile si nécessaire, sans couper le prix */
+@media (max-width:400px){
+  .home-container .new-grid .new-price-row{ grid-template-columns:1fr; row-gap:4px; }
+  .home-container .card-stock{ justify-self:start; padding:3px 7px; font-size:.78rem; }
+  .home-container .price-stack{ justify-self:end; }
+}
+
+/* ===========================
+   7) Divers utilitaires
+=========================== */
+.product-desc{
+  margin-top:0; margin-bottom:.35rem;
+  font-size:.95rem; font-weight:600; line-height:1.3; opacity:.75;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+}
+.text-muted{ opacity:.75; }
+.product-card .product-name{ margin-top:.25rem; margin-bottom:.15rem; line-height:1.2; }
 
 
 
-/* === FIX FEATURES — MOBILE (≤820px) : pile verticale, texte centré === */
+
+/* === FIX: centrer le bouton "En savoir plus" dans la section Features === */
+.features-cta{
+  width: 100%;
+  max-width: 1200px;        /* même largeur que les cartes features */
+  margin: 16px auto 2rem;   /* centre le conteneur */
+  padding: 0 2rem;          /* même gouttière que le reste */
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 16px;
+  text-align: center;       /* fallback si un style display se fait override */
+  clear: both;              /* au cas où un float traîne */
+}
+
+.features-cta .btn-pill{
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;           /* ceinture et bretelles */
+}
+
+/* Mobile: centre + largeur confortable */
 @media (max-width: 820px){
-  /* la carte reste blanche avec son ombre, mais le contenu passe en colonne */
-  .feature{
-    flex-direction: column !important;   /* ← force la pile */
-    align-items: center;
-    text-align: center;
-    gap: 1rem;
-    padding: 1.25rem 1rem;
+  .features-cta{
+    padding: 0 1rem;
+    flex-direction: column;
   }
-  /* annule l'alternance sur mobile */
-  .feature.reverse{ 
-    flex-direction: column !important; 
-  }
-
-  .feature-text{
-    max-width: none;
-    margin: 0 auto;
-  }
-  .feature-text h2{
-    font-size: clamp(1.25rem, 5.2vw, 1.6rem);
-    margin: 0 0 .4rem;
-  }
-  .feature-text p{
-    font-size: clamp(.95rem, 4vw, 1.05rem);
-    color: #555;
-    margin: 0 auto 1rem;
-    max-width: 38ch;                 /* confort de lecture */
-  }
-
-  /* image sans ombre, dans un “cadre” blanc, centrée */
-  .feature img{
-    display: block;
-    width: 100%;
-    max-width: 560px;
-    border-radius: 16px;
-    background: #fff;                /* fond derrière l’image */
-    padding: 10px;
-    box-shadow: none !important;     /* ⛔ pas d’ombre sur l’image */
-    margin: 0 auto;
-    object-fit: contain;
+  .features-cta .btn-pill,
+  .features-cta .btn-primary{
+    min-width: 280px;
   }
 }
-
-
-/* === HOME — Aligner "Catégories" comme "Nouveautés" === */
-.home-container .categories-section{
-  padding-left: 0 !important;
-  padding-right: 0 !important;   /* on enlève le padding de la section */
-}
-
-.home-container .categories-section .new-header{
-  padding-left: 2rem !important;
-  padding-right: 2rem !important; /* même gouttière que le reste */
-}
-
-/* garder la même gouttière pour la grille qui suit */
-.home-container .categories-section .categories-grid{
-  padding-left: 2rem;
-  padding-right: 2rem;
-}
-
-
-/* === HOME — Espacement harmonisé entre les sections === */
-
-/* Réduit l’espace sous la section Features */
-.home-container .features-section {
-  margin-bottom: 3rem !important; /* avant c’était souvent 5rem à cause du padding */
-  padding-bottom: 2rem !important;
-}
-
-/* Réduit un peu le padding haut de la section Catégories */
-.home-container .categories-section {
-  padding-top: 2rem !important;  /* au lieu de 5rem */
-}
-
-/* Ajuste aussi la section Nouveautés si besoin */
-.home-container .new-section {
-  padding-top: 2rem !important;
-}
-
-
-
-/* === HOME — Features : texte aligné à gauche sur mobile === */
-@media (max-width: 820px){
-  .feature-text{
-    text-align: left !important;
-    width: 100%;
-    max-width: 560px; /* garde une largeur agréable */
-    margin: 0 auto;   /* reste centré dans la carte, mais texte à gauche */
-  }
-}
-
-
-
-
-
 

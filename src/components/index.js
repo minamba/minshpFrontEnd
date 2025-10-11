@@ -1588,38 +1588,24 @@ export const ProductSpecs = (productId, productProp = null) => {
   }, [productProp, products, productId]);
 
   /* ---------- Features from store ---------- */
-  const rawFC = useSelector((s) => s.featureCategories?.featuresCategoryByProduct) ?? [];
 
-  // ⚠️ Booléen STABLE -> évite la boucle (ne dépend pas d'un array recréé)
-  const hasLoaded = useSelector((s) => {
-    const raw = s.featureCategories?.featuresCategoryByProduct;
-    if (Array.isArray(raw)) return raw.length > 0; // array direct pour ce produit
-    if (raw && typeof raw === "object") {
-      const arr = raw[String(productId)];
-      return Array.isArray(arr) && arr.length > 0; // map par productId
-    }
-    return false;
-  });
+const fcForProduct = useSelector((s) => {
+  const map = s.featureCategories?.featuresCategoryByProduct;
+  if (map && typeof map === "object" && !Array.isArray(map)) {
+    const arr = map[String(productId)];
+    return Array.isArray(arr) ? arr : [];
+  }
+  return [];
+});
 
-  // Normalisation d'affichage: récupère l'array des catégories pour CE produit
-  const fcForProduct = useMemo(() => {
-    if (Array.isArray(rawFC)) return rawFC;
-    if (rawFC && typeof rawFC === "object") {
-      const arr = rawFC[String(productId)];
-      return Array.isArray(arr) ? arr : [];
-    }
-    return [];
-  }, [rawFC, productId]);
-
+  const hasLoaded = fcForProduct.length > 0;
   /* ---------- Anti-boucle: fetch au plus une fois par productId ---------- */
-  const requestedRef = useRef(null);
   useEffect(() => {
     if (!productId) return;
-    if (hasLoaded) return; // déjà chargé
-    if (requestedRef.current === String(productId)) return; // déjà demandé durant ce mount
-    requestedRef.current = String(productId);
-    dispatch(getFeaturesCategoryByProductRequest(productId));
-  }, [dispatch, productId, hasLoaded]); // <- pas de dépendance sur l'array
+    if (!hasLoaded) {
+      dispatch(getFeaturesCategoryByProductRequest(productId));
+    }
+  }, [dispatch, productId, hasLoaded]);
 
   /* ---------- Helpers pour “Informations générales” ---------- */
   const pick = (...vals) => {

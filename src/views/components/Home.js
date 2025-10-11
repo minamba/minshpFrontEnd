@@ -160,16 +160,16 @@ export const Home = () => {
           <img
             className="hero-image"
             src={heroImageSrc}                    // image position 99 (ou fallback)
-            alt={heroImage99?.title || 'Hero'}
+            alt={heroImage99?.title}
           />
         )}
 
         <div className="hero-content text-center">
           <h1 className="hero-title">
-            {heroVideo?.title || heroImage99?.title || 'Titre manquant'}
+            {heroVideo?.title || heroImage99?.title}
           </h1>
           <p className="hero-subtitle">
-            {heroVideo?.description || heroImage99?.description || 'Description manquante'}
+            {heroVideo?.description || heroImage99?.description}
           </p>
           <a href="#features" className="hero-button">Découvrir</a>
         </div>
@@ -192,7 +192,7 @@ export const Home = () => {
                   <p>{image.description || 'Description manquante'}</p>
                 </div>
                 <img
-                  src={toMediaUrl(image.url) || '/Images/placeholder.jpg'}
+                  src={toMediaUrl(image.url)}
                   alt={image.title || `Image ${image.position}`}
                 />
               </div>
@@ -384,24 +384,24 @@ export const Home = () => {
             </p>
           )}
 
-          <div className="new-price-row">
-            <span className={`card-stock ${stockCls} ${isSoon ? 'card-stock--long' : ''}`}>
-              <span className={`card-stock-dot ${stockCls}`} />
-              {stockLabel}
-            </span>
+            <div className="new-price-row">
+              <span className={`card-stock ${stockCls}`} title={stockLabel}>
+                <span className={`card-stock-dot ${stockCls}`} />
+                <span className="card-stock-txt">{stockLabel}</span>
+              </span>
 
-            <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', lineHeight:1.1 }}>
-              {hasAnyPromo && (
-                <span className="price-old">
-                  {priceRef.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
-                </span>
-              )}
-              <div className={`price price-big ${hasAnyPromo ? 'price--promo price--big' : ''}`}>
-                <span className="euros">{euros}€</span>
-                <sup className="cents">{cents}</sup>
+              <div className={`price-stack ${hasAnyPromo ? 'has-promo' : ''}`}>
+                {hasAnyPromo && (
+                  <span className="price-old">
+                    {priceRef.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+                  </span>
+                )}
+                <div className={`price ${hasAnyPromo ? 'price--promo' : ''}`}>
+                  <span className="euros">{euros}€</span>
+                  <sup className="cents">{cents}</sup>
+                </div>
               </div>
             </div>
-          </div>
         </article>
       );
     })}

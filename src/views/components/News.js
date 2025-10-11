@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect } from "react";
 import "../../styles/pages/category.css";
+import "../../styles/components/product-card.css";
 import { useSelector, useDispatch } from "react-redux";
 import { Link, useNavigate } from "react-router-dom";
 import { addToCartRequest, saveCartRequest } from "../../lib/actions/CartActions";
@@ -26,7 +27,6 @@ export const News = () => {
   const navigate = useNavigate();
 
   /* Store */
-  // idem Category : on lit soit 'products' (plein), soit 'items' (paginé)
   const prodState    = useSelector((s) => s.products) || {};
   const fullProducts = Array.isArray(prodState.products) ? prodState.products : [];
   const pagedItems   = Array.isArray(prodState.items)    ? prodState.items    : [];
@@ -34,35 +34,23 @@ export const News = () => {
   let productsAll  = fullProducts.length ? fullProducts : pagedItems;
   productsAll = productsAll.filter((p) => p.display === true);
 
-
-  productsAll.forEach((p) => {
-    if (p.subCategoryVm?.display === false) {
-      p.display = false;
-    }
-  });
-
-
-  productsAll.forEach((p) => {
-    if (p.categoryVm?.display === false) {
-      p.display = false;
-    }
-  });
-
+  // respect des flags d’affichage des catégories/sous-catégories
+  productsAll.forEach((p) => { if (p.subCategoryVm?.display === false) p.display = false; });
+  productsAll.forEach((p) => { if (p.categoryVm?.display === false)    p.display = false; });
 
   const images = useSelector((s) => s.images?.images) || [];
   const items  = useSelector((s) => s.items?.items) || [];
 
-  /* Chargement initial paginé (même logique que Category, sans filtre de catégorie) */
+  /* Chargement initial (tri date desc) */
   useEffect(() => {
     dispatch(getProductsPagedUserRequest({
       page: 1,
       pageSize: 24,
       sort: "CreationDate:desc",
-      // pas de filter => nouveautés globales
     }));
   }, [dispatch]);
 
-  /* Remonter en haut à l’ouverture (comme sur Category au changement d’ID) */
+  /* Remonter en haut */
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
   }, []);
@@ -151,7 +139,7 @@ export const News = () => {
         creationTs
       };
     });
-  }, [productsAll]);
+  }, [productsAll, promotionCodes]);
 
   const filteredSorted = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -193,12 +181,12 @@ export const News = () => {
         list.sort((a, b) => (b.discountRate - a.discountRate) || (b.creationTs - a.creationTs));
         break;
       default:
-        break; // laisse l'ordre backend (CreationDate:desc) tel quel
+        break; // laisse l'ordre backend
     }
     return list;
   }, [augmented, search, sortKey]);
 
-  /* ---------- Héros (bannière = image du produit le plus récent dispo) ---------- */
+  /* ---------- Héros : image du produit le plus récent dispo ---------- */
   const heroUrl = useMemo(() => {
     const top = filteredSorted[0]?.product || productsAll[0];
     return top ? getProductImage(top.id) : "/Images/placeholder.jpg";
@@ -210,7 +198,7 @@ export const News = () => {
   const closeAdded = () => setShowAdded(false);
   const goToCart  = () => { setShowAdded(false); navigate("/cart"); };
 
-  /* ---------- Mobile sheet (sans portal, comme Category) ---------- */
+  /* ---------- Mobile sheet (sans portal) ---------- */
   const [sheetOpen, setSheetOpen] = useState(false);
   useEffect(() => {
     if (sheetOpen) document.body.classList.add("has-sheet-open");
@@ -311,22 +299,44 @@ export const News = () => {
                   )}
                 </div>
 
-                <h3 className="product-name">{[product.brand, product.model].filter(Boolean).join(" ") || name}</h3>
+                <h3 className="product-name">
+                  {[product.brand, product.model].filter(Boolean).join(" ") || name}
+                </h3>
 
                 {product.previewDescription && (
                   <p className="product-preview text-muted" title={product.previewDescription}>
                     {product.previewDescription}
                   </p>
                 )}
-                <div className="new-price-row">
-                  <span className={`card-stock ${stockCls}`}>
+
+                {/* === Bloc identique à Category : statut compressible + prix à droite === */}
+                <div
+                  className="new-price-row"
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "minmax(0, 1fr) auto",
+                    alignItems: "center",
+                    columnGap: 8,
+                    overflow: "hidden",
+                  }}
+                >
+                  <span className={`card-stock ${stockCls}`} title={stockLabel}>
                     <span className={`card-stock-dot ${stockCls}`} />
-                    {stockLabel}
+                    <span className="card-stock-txt">{stockLabel}</span>
                   </span>
 
-                  <div className={`price-stack ${hasAnyPromo ? "has-promo" : ""}`}>
+                  <div
+                    className={`price-stack ${hasAnyPromo ? "has-promo" : ""}`}
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "flex-end",
+                      gap: 2,
+                      lineHeight: 1.15,
+                    }}
+                  >
                     {hasAnyPromo && (
-                      <span className="price-old">
+                      <span className="price-old" style={{ margin: 0, fontSize: ".95rem" }}>
                         {priceRef.toLocaleString("fr-FR", { style: "currency", currency: "EUR" })}
                       </span>
                     )}

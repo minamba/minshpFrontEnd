@@ -1,7 +1,7 @@
 // src/views/pages/Promotion.jsx
 import React, { useMemo, useState, useEffect } from "react";
-import "../../App.css";
 import "../../styles/pages/category.css";
+import "../../styles/components/product-card.css";
 import { useSelector, useDispatch } from "react-redux";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -36,34 +36,25 @@ export const Promotion = () => {
   const prodState    = useSelector((s) => s.products) || {};
   const fullProducts = Array.isArray(prodState.products) ? prodState.products : [];
   const pagedItems   = Array.isArray(prodState.items)    ? prodState.items    : [];
-  const promotionCodes = useSelector((s) => s.promotions?.promotionCodes) || [];
-  let productsAll  = fullProducts.length ? fullProducts : pagedItems;
+  let productsAll    = fullProducts.length ? fullProducts : pagedItems;
   productsAll = productsAll.filter((p) => p.display === true);
 
+  // Respect des flags d’affichage des catégories/sous-catégories
   productsAll.forEach((p) => {
-
-    if (p.categoryVm?.display === false) {
-      p.display = false;
-    }
-
-    if (p.subCategoryVm?.display === false) {
-      p.display = false;
-    }
+    if (p.categoryVm?.display === false) p.display = false;
+    if (p.subCategoryVm?.display === false) p.display = false;
   });
-
-
 
   const images = useSelector((s) => s.images?.images) || [];
   const items  = useSelector((s) => s.items?.items) || [];
 
-  // Chargement initial (paginé, sans filtre de catégorie)
+  // Chargement initial (paginé)
   useEffect(() => {
     dispatch(getProductsPagedUserRequest({
       page: 1,
       pageSize: 24,
       sort: "CreationDate:desc",
-      // si tu as un flag côté API pour ne renvoyer que les promos, tu peux ajouter:
-      // filter: { HasPromotion: true }
+      // filter: { HasPromotion: true } // ← si dispo côté API
     }));
   }, [dispatch]);
 
@@ -72,7 +63,7 @@ export const Promotion = () => {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
   }, []);
 
-  // Sauvegarde panier Redux -> LS à chaque changement
+  // Sauvegarde panier Redux -> LS
   useEffect(() => { dispatch(saveCartRequest(items)); }, [items, dispatch]);
 
   // Image principale du produit
@@ -81,7 +72,7 @@ export const Promotion = () => {
     return productImages.length > 0 ? productImages[0].url : "/Images/placeholder.jpg";
   };
 
-  // ==== Calcul du prix affiché (identique mais sans dépendre de calculPrice externe) ====
+  // ==== Calcul du prix affiché (cohérent avec Category/News) ====
   const computeDisplayPrice = (product) => {
     if (!product) return 0;
 
@@ -98,7 +89,7 @@ export const Promotion = () => {
       const start = parseDate(p0.startDate);
       const end   = parseDate(p0.endDate);
       const now   = new Date();
-      const endOfDay = end ? new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59, 999) : null;
+      const endOfDay = end ? new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23,59,59,999) : null;
       if (start && start > now) return false;
       if (endOfDay && endOfDay < now) return false;
       return true;
@@ -178,28 +169,25 @@ export const Promotion = () => {
 
   /* ---------- Recherche + tri ---------- */
   const [search, setSearch]   = useState("");
-  const [sortKey, setSortKey] = useState(""); // placeholder “Trier les produits”
+  const [sortKey, setSortKey] = useState("");
 
-  // Pré-calculs (prix/promo) puis filtre: on ne garde QUE les produits en promo
+  // Pré-calculs puis filtre: on ne garde QUE les produits en promo
   const augmented = useMemo(() => {
     return (productsAll || [])
       .map((product, index) => {
-        const name  =
-          product.brand + ' - ' + product.model ||
-          product.title ||
-          `${product.brand || ""} ${product.model || ""}`.trim() ||
-          `Produit ${index + 1}`;
-        const brand = (product.brand || "").toString();
+        const title  = [product.brand, product.model].filter(Boolean).join(" ").trim();
+        const name   = title || product.title || `Produit ${index + 1}`;
+        const brand  = (product.brand || "").toString();
 
         const priceRef = toNumOrNull(
           typeof product.priceTtc === "number" ? product.priceTtc : parseFloat(product.priceTtc)
         ) ?? 0;
 
         const displayPrice = computeDisplayPrice(product);
-        const hasAnyPromo = displayPrice < priceRef - 1e-6;
+        const hasAnyPromo  = displayPrice < priceRef - 1e-6;
 
         const discountRate = priceRef > 0 ? (priceRef - displayPrice) / priceRef : 0;
-        const creationTs = parseDate(product?.creationDate)?.getTime() ?? 0;
+        const creationTs   = parseDate(product?.creationDate)?.getTime() ?? 0;
 
         return { product, name, brand, priceRef, displayPrice, hasAnyPromo, discountRate, creationTs };
       })
@@ -223,7 +211,7 @@ export const Promotion = () => {
       case "promo-first":
       case "discount-desc":
         list.sort((a, b) => (b.discountRate - a.discountRate) || (b.creationTs - a.creationTs)); break;
-      default: break; // on garde l'ordre backend (CreationDate:desc)
+      default: break;
     }
     return list;
   }, [augmented, search, sortKey]);
@@ -240,7 +228,7 @@ export const Promotion = () => {
   const closeAdded = () => setShowAdded(false);
   const goToCart   = () => { setShowAdded(false); navigate("/cart"); };
 
-  /* ---------- Barre filtre mobile (inline, pas de portal) ---------- */
+  /* ---------- Barre filtre mobile ---------- */
   const [sheetOpen, setSheetOpen] = useState(false);
   useEffect(() => {
     if (sheetOpen) document.body.classList.add("has-sheet-open");
@@ -254,18 +242,18 @@ export const Promotion = () => {
     <div className="category-page">
       {/* BANNIÈRE */}
       <section
-          className="category-hero"
-          style={{ "--hero-url": `url("${toMediaUrl(bannerUrl)}")` }}
-        >
-          <div className="category-hero__content">
-            <h1 className="category-hero__title">Promotions</h1>
-            <div className="category-hero__count">
-              {filteredSorted.length} produit{filteredSorted.length > 1 ? "s" : ""}
-            </div>
+        className="category-hero"
+        style={{ "--hero-url": `url("${toMediaUrl(bannerUrl)}")` }}
+      >
+        <div className="category-hero__content">
+          <h1 className="category-hero__title">Promotions</h1>
+          <div className="category-hero__count">
+            {filteredSorted.length} produit{filteredSorted.length > 1 ? "s" : ""}
           </div>
-        </section>
+        </div>
+      </section>
 
-      {/* Toolbar desktop (cachée en mobile via CSS) */}
+      {/* Toolbar desktop */}
       <div className="category-toolbar">
         <input
           className="form-control category-search"
@@ -312,6 +300,8 @@ export const Promotion = () => {
             const stockLabel =
               lower.includes("plus que") ? "Bientôt en rupture" : raw || "Disponibilité limitée";
 
+            const hasAnyPromo = displayPrice < (toNumOrNull(product.priceTtc) ?? 0) - 1e-6;
+
             return (
               <article key={product.id} className="product-card" data-aos="zoom-in">
                 <div className="product-thumb">
@@ -349,24 +339,26 @@ export const Promotion = () => {
                   )}
                 </div>
 
-                <h3 className="product-name">{(product.brand || "") + " " + (product.model || name)}</h3>
+                <h3 className="product-name">{[product.brand, product.model].filter(Boolean).join(" ") || name}</h3>
 
                 {product.previewDescription && (
                   <p className="product-preview text-muted" title={product.previewDescription}>
                     {product.previewDescription}
                   </p>
                 )}
+
+                {/* === Statut + Prix : EXACTEMENT comme Category/News === */}
                 <div className="new-price-row">
-                  <span className={`card-stock ${stockCls}`}>
+                  <span className={`card-stock ${stockCls}`} title={stockLabel}>
                     <span className={`card-stock-dot ${stockCls}`} />
-                    {stockLabel}
+                    <span className="card-stock-txt">{stockLabel}</span> {/* ← important */}
                   </span>
 
-                  <div className="price-stack has-promo">
+                  <div className="price-stack has-promo"> {/* ← has-promo comme sur Category */}
                     <span className="price-old">
                       {priceRef.toLocaleString("fr-FR", { style: "currency", currency: "EUR" })}
                     </span>
-                    <div className="price product-price--promo">
+                    <div className="price price--promo">  {/* ← pas 'product-price--promo' */}
                       <span className="euros">{euros}€</span>
                       <sup className="cents">{cents}</sup>
                     </div>
@@ -441,7 +433,6 @@ export const Promotion = () => {
           </button>
         </div>
       </div>
-      {/* ===== Fin barre mobile ===== */}
 
       {/* MODALE ajout panier */}
       <GenericModal
