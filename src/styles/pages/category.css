@@ -349,5 +349,14 @@ section#promo-products > .new-grid {
 }
 
 
+.category-page .product-card{ background:#fff !important; }
+.category-page .product-thumb{ background:#fff !important; }
 
-
+.category-hero__content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center; /* centre verticalement le bloc */
+  height: 100%;            /* occupe toute la hauteur du hero */
+  text-align: center;
+}

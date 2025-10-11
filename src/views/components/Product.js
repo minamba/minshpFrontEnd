@@ -429,7 +429,7 @@ const discountedPriceProduct = useMemo(() => {
         </div>
 
         {/* Image principale */}
-        <div className="product-main-image-wrap" onClick={() => openLightbox(currentIndex)} role="button" tabIndex={0}>
+        <div className="product-main-image-wrap bg-white" onClick={() => openLightbox(currentIndex)} role="button" tabIndex={0}>
           {!mainLoaded && <div className="img-skeleton" aria-hidden="true" />}
           <img
             className={`product-main-image ${mainLoaded ? 'is-loaded' : ''}`}
@@ -540,13 +540,14 @@ const discountedPriceProduct = useMemo(() => {
       )}
 
       {/* Description */}
-      <hr className="section-divider" aria-hidden="true" />
+      {/* <hr className="section-divider" aria-hidden="true" /> */}
 
-      <section className="product-desc">
-          <h2 className="specs-title">Description</h2>
+
+      <section className='mt-5'>
+      <h2 className="specs-title">Description</h2>
 
           <div
-            className="product-description-html mb-3 bg-description"
+            className="product-desc product-description-html mb-3 bg-description"
             // ⬇️ injection contrôlée (sanitized)
             dangerouslySetInnerHTML={{ __html: cleanDescriptionHtml }}
           />
@@ -570,7 +571,7 @@ const discountedPriceProduct = useMemo(() => {
         </section>
       )}
 
-<hr className="section-divider " aria-hidden="true" />
+{/* <hr className="section-divider " aria-hidden="true" /> */}
       {/* Caractéristiques */}
       <section className="specs-wrap">
         <h2 className="specs-title">Caractéristiques techniques</h2>

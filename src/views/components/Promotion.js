@@ -253,12 +253,17 @@ export const Promotion = () => {
   return (
     <div className="category-page">
       {/* BANNIÈRE */}
-      <section className="category-hero" style={{ "--hero-url": `url("${toMediaUrl(bannerUrl)}")` }}>
-        <h1 className="category-hero__title">Promotions</h1>
-        <div className="category-hero__count">
-          {filteredSorted.length} produit{filteredSorted.length > 1 ? "s" : ""}
-        </div>
-      </section>
+      <section
+          className="category-hero"
+          style={{ "--hero-url": `url("${toMediaUrl(bannerUrl)}")` }}
+        >
+          <div className="category-hero__content">
+            <h1 className="category-hero__title">Promotions</h1>
+            <div className="category-hero__count">
+              {filteredSorted.length} produit{filteredSorted.length > 1 ? "s" : ""}
+            </div>
+          </div>
+        </section>
 
       {/* Toolbar desktop (cachée en mobile via CSS) */}
       <div className="category-toolbar">

@@ -210,7 +210,7 @@ export const Home = () => {
 
       {/* ===================== CATEGORIES ===================== */}
       {categoriesFromStore.length > 0 && (
-        <section className="categories-section section-alt bg-light" id="categories">
+        <section className="categories-section section-alt" id="categories">
           <div className="new-header">
             <h2 className="new-title">Catégories</h2>
           </div>
@@ -241,183 +241,184 @@ export const Home = () => {
         </section>
       )}
 
-      {/* ===================== NOUVEAUTÉS ===================== */}
-      <section className="new-section" id="nouveautes">
-        <div className="new-header">
-          <h2 className="new-title">Nouveautés</h2>
-          <div className="new-actions">
-            <button
-              type="button"
-              className="icon-btn bg-primary text-white fw-bold"
-              aria-label="Voir plus"
-              onClick={() => navigate('/news')}
-            >
-              +
-            </button>
-          </div>
-        </div>
+{/* ===================== NOUVEAUTÉS ===================== */}
+<section className="new-section" id="nouveautes">
+  <div className="new-header">
+    <h2 className="new-title">Nouveautés</h2>
+    <div className="new-actions">
+      <button
+        type="button"
+        className="icon-btn bg-primary text-white fw-bold"
+        aria-label="Voir plus"
+        onClick={() => navigate('/news')}
+      >
+        +
+      </button>
+    </div>
+  </div>
 
-        <div
-          className="new-grid"
-          {...(isMobile ? { 'data-aos': 'fade-up', 'data-aos-once': 'true' } : {})}
+  <div
+    className="new-grid"
+    {...(isMobile ? { 'data-aos': 'fade-up', 'data-aos-once': 'true' } : {})}
+  >
+    {newestProducts.map((product, index) => {
+      const img = getProductImage(product.id);
+      const name =
+        (product.brand ? `${product.brand} ` : '') +
+        (product.model || product.title || `Produit ${index + 1}`);
+
+      const priceRef =
+        Number(
+          typeof product.priceTtc === 'number'
+            ? product.priceTtc
+            : parseFloat(product.priceTtc)
+        ) || 0;
+
+      // ==== PROMO PRODUIT (dates inclusives) ====
+      const p0 = product?.promotions?.[0];
+      const hasProductPromo = (() => {
+        if (!p0) return false;
+        const pct = Number(p0.purcentage) || 0;
+        if (pct <= 0) return false;
+        const start = parseDate(p0.startDate);
+        const end = parseDate(p0.endDate);
+        const now = new Date();
+        const endOfDay = end
+          ? new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59, 999)
+          : null;
+        if (start && start > now) return false;
+        if (endOfDay && endOfDay < now) return false;
+        return true;
+      })();
+
+      const discountPct = hasProductPromo ? Number(p0.purcentage) : 0;
+      const computedPromo = +(priceRef * (1 - discountPct / 100)).toFixed(2);
+      const promotedVal = Number(
+        typeof product.priceHtPromoted === 'number'
+          ? product.priceHtPromoted
+          : parseFloat(product.priceHtPromoted)
+      );
+
+      const productPromoPrice = hasProductPromo
+        ? (Number.isFinite(promotedVal) ? promotedVal : computedPromo)
+        : null;
+
+      // ==== PROMO PAR CODES ====
+      const subCatCodeVal = Number(
+        typeof product.priceHtSubCategoryCodePromoted === 'number'
+          ? product.priceHtSubCategoryCodePromoted
+          : parseFloat(product.priceHtSubCategoryCodePromoted)
+      );
+      const catCodeVal = Number(
+        typeof product.priceHtCategoryCodePromoted === 'number'
+          ? product.priceHtCategoryCodePromoted
+          : parseFloat(product.priceHtCategoryCodePromoted)
+      );
+      const codePrice =
+        Number.isFinite(subCatCodeVal)
+          ? subCatCodeVal
+          : (Number.isFinite(catCodeVal) ? catCodeVal : null);
+
+      const displayPrice = calculPrice(product, promotionCodes);
+      const hasAnyPromo = (codePrice != null) || (productPromoPrice != null);
+      const [euros, cents] = displayPrice.toFixed(2).split('.');
+
+      // Stock
+      const raw = (product?.stockStatus ?? '').trim();
+      const lower = raw.toLowerCase();
+      const isIn = lower === 'en stock';
+      const isOut = lower === 'en rupture';
+      const stockCls = isIn ? 'in' : isOut ? 'out' : 'warn';
+      const stockLabel =
+        lower.includes('plus que') ? 'Bientôt en rupture' :
+        raw || 'Disponibilité limitée';
+
+      const cardAosProps = isMobile ? {} : { 'data-aos': 'zoom-in' };
+      const isSoon = /bient[oô]t/i.test(stockLabel);
+
+      return (
+        <article
+          key={product.id}
+          className="product-card"
+          {...cardAosProps}
         >
-          {newestProducts.map((product, index) => {
-            const img = getProductImage(product.id);
-            const name =
-              (product.brand ? `${product.brand} ` : '') +
-              (product.model || product.title || `Produit ${index + 1}`);
+          {/* === ICI: fond blanc derrière l'image === */}
+          <div className="product-thumb" style={{ background:'#fff', borderRadius:12, padding:8 }}>
+            <Link to={`/product/${product.id}`} className="thumb-link">
+              <img src={toMediaUrl(img)} alt={name} />
+            </Link>
 
-            const priceRef =
-              Number(
-                typeof product.priceTtc === 'number'
-                  ? product.priceTtc
-                  : parseFloat(product.priceTtc)
-              ) || 0;
-
-            // ==== PROMO PRODUIT (dates inclusives) ====
-            const p0 = product?.promotions?.[0];
-            const hasProductPromo = (() => {
-              if (!p0) return false;
-              const pct = Number(p0.purcentage) || 0;
-              if (pct <= 0) return false;
-              const start = parseDate(p0.startDate);
-              const end = parseDate(p0.endDate);
-              const now = new Date();
-              const endOfDay = end
-                ? new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59, 999)
-                : null;
-              if (start && start > now) return false;
-              if (endOfDay && endOfDay < now) return false;
-              return true;
-            })();
-
-            const discountPct = hasProductPromo ? Number(p0.purcentage) : 0;
-            const computedPromo = +(priceRef * (1 - discountPct / 100)).toFixed(2);
-            const promotedVal = Number(
-              typeof product.priceHtPromoted === 'number'
-                ? product.priceHtPromoted
-                : parseFloat(product.priceHtPromoted)
-            );
-
-            const productPromoPrice = hasProductPromo
-              ? (Number.isFinite(promotedVal) ? promotedVal : computedPromo)
-              : null;
-
-            // ==== PROMO PAR CODES ====
-            const subCatCodeVal = Number(
-              typeof product.priceHtSubCategoryCodePromoted === 'number'
-                ? product.priceHtSubCategoryCodePromoted
-                : parseFloat(product.priceHtSubCategoryCodePromoted)
-            );
-            const catCodeVal = Number(
-              typeof product.priceHtCategoryCodePromoted === 'number'
-                ? product.priceHtCategoryCodePromoted
-                : parseFloat(product.priceHtCategoryCodePromoted)
-            );
-            const codePrice =
-              Number.isFinite(subCatCodeVal)
-                ? subCatCodeVal
-                : (Number.isFinite(catCodeVal) ? catCodeVal : null);
-
-            const displayPrice = calculPrice(product, promotionCodes);
-            const hasAnyPromo = (codePrice != null) || (productPromoPrice != null);
-            const [euros, cents] = displayPrice.toFixed(2).split('.');
-
-            // Stock
-            const raw = (product?.stockStatus ?? '').trim();
-            const lower = raw.toLowerCase();
-            const isIn = lower === 'en stock';
-            const isOut = lower === 'en rupture';
-            const stockCls = isIn ? 'in' : isOut ? 'out' : 'warn';
-            const stockLabel =
-              lower.includes('plus que') ? 'Bientôt en rupture' :
-              raw || 'Disponibilité limitée';
-
-            const cardAosProps = isMobile ? {} : { 'data-aos': 'zoom-in' };
-            const isSoon = /bient[oô]t/i.test(stockLabel);
-
-            return (
-              <article
-                key={product.id}
-                className="product-card"
-                {...cardAosProps}
+            {hasAnyPromo && <span className="promo-pill">Promotion</span>}
+            <div className="thumb-overlay" aria-hidden="true" />
+            {!isOut && (
+              <button
+                type="button"
+                className="thumb-add-btn"
+                title="Ajouter au panier"
+                aria-label="Ajouter au panier"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const payloadItem = {
+                    id: product.id,
+                    name,
+                    price: displayPrice,
+                    image: img,
+                    packageProfil: product.packageProfil,
+                    containedCode: product.containedCode
+                  };
+                  dispatch(addToCartRequest(payloadItem, 1));
+                  setLastAdded({ id: product.id, name });
+                  setShowAdded(true);
+                }}
               >
-                <div className="product-thumb">
-                  <Link to={`/product/${product.id}`} className="thumb-link">
-                    <img src={toMediaUrl(img)} alt={name} />
-                  </Link>
+                <i className="bi bi-cart-plus" aria-hidden="true"></i>
+              </button>
+            )}
+          </div>
 
-                  {hasAnyPromo && <span className="promo-pill">Promotion</span>}
-                  <div className="thumb-overlay" aria-hidden="true" />
-                  {!isOut && (
-                    <button
-                      type="button"
-                      className="thumb-add-btn"
-                      title="Ajouter au panier"
-                      aria-label="Ajouter au panier"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        const payloadItem = {
-                          id: product.id,
-                          name,
-                          price: displayPrice,
-                          image: img,
-                          packageProfil: product.packageProfil,
-                          containedCode: product.containedCode
-                        };
-                        dispatch(addToCartRequest(payloadItem, 1));
-                        setLastAdded({ id: product.id, name });
-                        setShowAdded(true);
-                      }}
-                    >
-                      <i className="bi bi-cart-plus" aria-hidden="true"></i>
-                    </button>
-                  )}
-                </div>
+          <h3 className="product-name">{name}</h3>
+          {product.previewDescription && (
+            <p className="product-preview text-muted" title={product.previewDescription}>
+              {product.previewDescription}
+            </p>
+          )}
 
-                <h3 className="product-name">{name}</h3>
-                {product.previewDescription && (
-                  <p className="product-preview text-muted" title={product.previewDescription}>
-                    {product.previewDescription}
-                  </p>
-                )}
+          <div className="new-price-row">
+            <span className={`card-stock ${stockCls} ${isSoon ? 'card-stock--long' : ''}`}>
+              <span className={`card-stock-dot ${stockCls}`} />
+              {stockLabel}
+            </span>
 
-                <div className="new-price-row">
-                  <span className={`card-stock ${stockCls} ${isSoon ? 'card-stock--long' : ''}`}>
-                    <span className={`card-stock-dot ${stockCls}`} />
-                    {stockLabel}
-                  </span>
+            <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', lineHeight:1.1 }}>
+              {hasAnyPromo && (
+                <span className="price-old">
+                  {priceRef.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+                </span>
+              )}
+              <div className={`price price-big ${hasAnyPromo ? 'price--promo price--big' : ''}`}>
+                <span className="euros">{euros}€</span>
+                <sup className="cents">{cents}</sup>
+              </div>
+            </div>
+          </div>
+        </article>
+      );
+    })}
+  </div>
 
-                  <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', lineHeight:1.1 }}>
-                    {hasAnyPromo && (
-                      <span className="price-old">
-                        {priceRef.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
-                      </span>
-                    )}
-                    <div className={`price price-big ${hasAnyPromo ? 'price--promo price--big' : ''}`}>
-                      <span className="euros">{euros}€</span>
-                      <sup className="cents">{cents}</sup>
-                    </div>
-                  </div>
-                </div>
-              </article>
-            );
-          })}
-        </div>
-
-        {/* Bouton “+” en bas sur mobile */}
-        <div className="new-actions new-actions--mobile">
-          <button
-            type="button"
-            className="icon-btn bg-primary text-white fw-bold"
-            aria-label="Voir plus"
-            onClick={() => navigate('/news')}
-          >
-            +
-          </button>
-        </div>
-      </section>
+  {/* Bouton “+” en bas sur mobile */}
+  <div className="new-actions new-actions--mobile">
+    <button
+      type="button"
+      className="icon-btn bg-primary text-white fw-bold"
+      aria-label="Voir plus"
+      onClick={() => navigate('/news')}
+    >
+      +
+    </button>
+  </div>
+</section>
 
       {/* ===================== MODALE ajout panier ===================== */}
       <GenericModal
