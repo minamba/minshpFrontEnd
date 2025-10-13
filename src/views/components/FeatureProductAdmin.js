@@ -202,7 +202,7 @@ export const FeatureProductAdmin = () => {
     } else {
       await dispatch(addFeatureProductRequest({
         idProduct: formData.idProduct,
-        id_feature: formData.idFeature // backend snake_case à la création
+        idFeature: formData.idFeature // backend snake_case à la création
       }));
     }
     await dispatch(getFeatureProductRequest());
