@@ -452,6 +452,11 @@ export const Navbar = () => {
 
       {/* ===== BANDEAU PROMO défilant ===== */}
       <PromoTicker messages={promoMessages} />
+   
+
+      {/* Spacers fixes */}
+    <div className="nav-spacer" />
+    {promoMessages?.length > 0 && <div className="promo-ticker-spacer" />}
 
       {/* ===== Overlay + Drawer mobile (GAUCHE) ===== */}
       <div

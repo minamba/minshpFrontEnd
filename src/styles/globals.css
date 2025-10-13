@@ -23,7 +23,6 @@
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     color: var(--text);
     background: var(--bg);
-    padding-top: var(--navbar-h-desktop); /* espace sous la navbar (desktop) */
   }
   img{max-width:100%;display:block}
   a{color:inherit;text-decoration:none}
@@ -356,6 +355,42 @@
 /* filet de sécurité contre toute règle externe qui met une hauteur fixe */
 .product-card .product-thumb img{ height: auto !important; }
 .product-card .product-thumb img{ height: 100% !important; } /* puis on remet 100% pour le conteneur flex */
+
+
+
+:root{
+  --nav-h: 72px;        /* haut de navbar (desktop) */
+  --ticker-h: 36px;     /* haut du bandeau */
+  /* 🆕 marge de confort sous le bandeau (responsive) */
+  --content-gap-top: clamp(24px, 4vw, 56px);
+}
+
+@media (max-width: 900px){
+  :root{
+    --nav-h: 64px; 
+    --ticker-h: 32px;
+    --content-gap-top: clamp(16px, 6vw, 36px);
+  }
+}
+
+/* Spacers (tu les as déjà peut-être) */
+.nav-spacer{
+  height: calc(var(--nav-h) + env(safe-area-inset-top, 0px));
+}
+.promo-ticker-spacer{
+  height: var(--ticker-h);
+}
+
+/* 🆕 espace supplémentaire pour respirer */
+.content-gap-top{
+  height: var(--content-gap-top);
+}
+
+/* bonus: les ancres #id ne passent plus sous le header */
+*[id]{
+  scroll-margin-top: calc(var(--nav-h) + var(--ticker-h) + var(--content-gap-top));
+}
+
 
 
 

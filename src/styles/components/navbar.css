@@ -419,6 +419,32 @@
   }
 }
 
+/* Hauteurs “source de vérité” */
+:root{
+  --nav-h: 72px;     /* desktop */
+  --ticker-h: 36px;  /* hauteur du bandeau promo */
+}
+@media (max-width: 900px){
+  :root{
+    --nav-h: 64px;   /* mobile */
+    --ticker-h: 32px;
+  }
+}
+
+/* Navbar et Ticker restent fixes (tu as déjà) */
+
+/* Spacers qui poussent le contenu */
+.nav-spacer{
+  height: calc(var(--nav-h) + env(safe-area-inset-top, 0px));
+}
+.promo-ticker-spacer{
+  height: var(--ticker-h);
+}
+
+/* Bonus: quand on scrolle vers des ancres (#id), on ne les cache pas sous le header */
+*[id]{
+  scroll-margin-top: calc(var(--nav-h) + var(--ticker-h));
+}
 
 
 
