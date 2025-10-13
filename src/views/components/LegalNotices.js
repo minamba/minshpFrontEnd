@@ -84,7 +84,7 @@ export function LegalNotices(){
               <ul className="legal-list">
                 <li>Forme : Entreprise (MINS CORP)</li>
                 <li>SIRET : 924 291 800 00010</li>
-                <li>Siège social : 2 rue Jules Vallès, 91000 Évry-Courcouronnes, France</li>
+                <li>Siège social : 8 rue André Lalande, 91000 Évry-Courcouronnes, France</li>
                 <li>Directeur de la publication : le représentant légal de MINS CORP</li>
               </ul>
             </article>
@@ -115,7 +115,7 @@ export function LegalNotices(){
               <h2 id="h-ml-5" className="legal-h2">5. Responsabilités</h2>
               <p className="legal-p">MINS CORP ne saurait être tenue responsable des dommages indirects résultant de l’utilisation du site ou de l’accès à des sites tiers via des liens hypertextes. L’utilisateur est seul responsable de la compatibilité de son équipement et de la protection de ses données.</p>
               <div className="legal-divider" />
-              <p className="legal-footer">MINS CORP – 8 rue Adnré Lalande, 91000 Évry-Courcouronnes – SIRET 924 291 800 00010</p>
+              <p className="legal-footer">MINS CORP – 8 rue André Lalande, 91000 Évry-Courcouronnes – SIRET 924 291 800 00010</p>
             </article>
           </section>
         </div>
@@ -158,7 +158,7 @@ export function PrivacyPolicy(){
           <section>
             <article id="pc-1" className="legal-section" aria-labelledby="h-pc-1">
               <h2 id="h-pc-1" className="legal-h2">1. Responsable de traitement</h2>
-              <p className="legal-p"><span className="legal-strong">MINS CORP</span> – 2 rue Jules Vallès, 91000 Évry-Courcouronnes – est responsable du traitement des données collectées via minshp.com. Contact : <a className="legal-accent" href="mailto:contact@minshp.com">contact@minshp.com</a>.</p>
+              <p className="legal-p"><span className="legal-strong">MINS CORP</span> – 8 rue André Lalande, 91000 Évry-Courcouronnes – est responsable du traitement des données collectées via minshp.com. Contact : <a className="legal-accent" href="mailto:contact@minshp.com">contact@minshp.com</a>.</p>
             </article>
 
             <article id="pc-2" className="legal-section" aria-labelledby="h-pc-2">
@@ -227,7 +227,7 @@ export function PrivacyPolicy(){
               <h2 id="h-pc-10" className="legal-h2">10. Contact données personnelles</h2>
               <p className="legal-p">Pour toute question relative à cette politique ou à vos données, contactez‑nous à <a className="legal-accent" href="mailto:contact@minshp.com">contact@minshp.com</a>.</p>
               <div className="legal-divider" />
-              <p className="legal-footer">MINS CORP – 8 rue Adnré Lalande, 91000 Évry-Courcouronnes – SIRET 924 291 800 00010</p>
+              <p className="legal-footer">MINS CORP – 8 rue André Lalande, 91000 Évry-Courcouronnes – SIRET 924 291 800 00010</p>
             </article>
           </section>
         </div>
