@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import '../../App.css';
 import { useSelector, useDispatch } from 'react-redux';
 import {
@@ -19,7 +19,11 @@ export const FeatureAdmin = () => {
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [currentId, setCurrentId] = useState(null);
-  const [searchQuery, setSearchQuery] = useState('');
+
+  // ✅ Nouveaux filtres
+  const [selectedCategoryId, setSelectedCategoryId] = useState('');
+  const [searchDescription, setSearchDescription] = useState('');
+
   const [formData, setFormData] = useState({
     description: '',
     idCategory: '',
@@ -97,40 +101,87 @@ export const FeatureAdmin = () => {
   };
 
   const getCategoryName = (id) => {
-    const category = categoriesFromStore.find((c) => c.id === id);
+    const category = categoriesFromStore.find((c) => String(c.id) === String(id));
     return category ? category.name : 'Catégorie inconnue';
   };
 
   const getFeatureCategoryName = (id) => {
-    const featureCategory = featureCategoriesFromStore.find((fc) => fc.id === id);
+    const featureCategory = featureCategoriesFromStore.find((fc) => String(fc.id) === String(id));
     return featureCategory ? featureCategory.name : 'Catégorie de caractéristiques inconnue';
   };
 
-  const sortedAndFilteredFeatures = [...featuresFromStore]
-    .map((feature) => ({
-      ...feature,
-      categoryName: getCategoryName(feature.idCategory)
-    }))
-    .filter((feature) =>
-      feature.categoryName.toLowerCase().includes(searchQuery.toLowerCase())
-    )
-    .sort((a, b) => a.categoryName.localeCompare(b.categoryName));
+  // Normalisation pour recherche (sans accents / insensible à la casse)
+  const normalize = (s) =>
+    (s ?? '')
+      .toString()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
+
+  // ✅ Liste calculée avec filtres + tri
+  const sortedAndFilteredFeatures = useMemo(() => {
+    const q = normalize(searchDescription);
+
+    return [...featuresFromStore]
+      .map((feature) => ({
+        ...feature,
+        categoryName: getCategoryName(feature.idCategory)
+      }))
+      .filter((feature) => {
+        // Filtre catégorie (select)
+        if (selectedCategoryId) {
+          if (String(feature.idCategory) !== String(selectedCategoryId)) return false;
+        }
+        // Filtre description (saisie)
+        if (q && !normalize(feature.description).includes(q)) return false;
+
+        return true;
+      })
+      // Tri principal : Catégorie puis Description
+      .sort((a, b) => {
+        const catCmp = (a.categoryName || '').localeCompare(b.categoryName || '');
+        if (catCmp !== 0) return catCmp;
+        return (a.description || '').localeCompare(b.description || '');
+      });
+  }, [featuresFromStore, selectedCategoryId, searchDescription]);
 
   return (
     <div className='container py-5'>
       <h1 className="text-center mb-4">Gestion des caractéristiques</h1>
 
-      <div className="d-flex justify-content-between align-items-center mb-3">
-        <input
-          type="text"
-          className="form-control w-50"
-          placeholder="Rechercher par catégorie..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
-        <button className='btn btn-success' onClick={handleAddClick}>
-          Ajouter une caractéristique
-        </button>
+      {/* ✅ Barre de filtres (remplace l'ancien champ de recherche) */}
+      <div className="d-flex justify-content-between align-items-end flex-wrap gap-2 mb-3">
+        <div className="flex-grow-1" style={{ minWidth: 240 }}>
+          <label className="form-label">Filtrer par catégorie</label>
+          <select
+            className="form-select"
+            value={selectedCategoryId}
+            onChange={(e) => setSelectedCategoryId(e.target.value)}
+          >
+            <option value="">Toutes les catégories</option>
+            {categoriesFromStore.map((cat) => (
+              <option key={cat.id} value={cat.id}>{cat.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex-grow-1" style={{ minWidth: 260 }}>
+          <label className="form-label">Rechercher une caractéristique</label>
+          <input
+            type="text"
+            className="form-control"
+            placeholder="Ex : Résolution, Mémoire, Connectivité…"
+            value={searchDescription}
+            onChange={(e) => setSearchDescription(e.target.value)}
+          />
+        </div>
+
+        <div className="ms-auto">
+          <button className='btn btn-success' onClick={handleAddClick}>
+            Ajouter une caractéristique
+          </button>
+        </div>
       </div>
 
       <div className='table-responsive'>
