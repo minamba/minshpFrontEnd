@@ -26,9 +26,12 @@ export const FeatureProductAdmin = () => {
   const [currentId, setCurrentId]   = useState(null);
   const [formData, setFormData]     = useState({ idProduct: '', idFeature: '' });
 
-  // Nouveaux filtres
+  // Filtres existants
   const [selectedCategoryId, setSelectedCategoryId] = useState(''); // Catégorie (produit)
   const [selectedProductId, setSelectedProductId]   = useState(''); // Produit
+
+  // ✅ Nouveau : recherche par "feature" (caractéristique)
+  const [searchFeature, setSearchFeature] = useState('');
 
   useEffect(() => {
     dispatch(getFeatureProductRequest());
@@ -57,14 +60,12 @@ export const FeatureProductAdmin = () => {
   const getProductName = (id) => {
     const p = getProductById(id);
     return p ? `${p.brand ?? ''} - ${p.model ?? ''}`.trim() : 'Produit inconnu';
-    // (si brand/model nullish, on évite " - ")
   };
 
   // Catégorie du produit (pour affichage + tri + filtres)
   const getProductCategoryId = (productId) => {
     const p = getProductById(productId);
     if (!p) return null;
-    // p.idCategory prioritaire ; sinon on tente le name
     const byId = p.idCategory != null ? getCategoryById(p.idCategory) : null;
     if (byId) return byId.id;
     const byName = categoriesFromStore.find(c => c.name === p.category);
@@ -91,6 +92,15 @@ export const FeatureProductAdmin = () => {
     return fc ? fc.name : 'inconnue';
   };
 
+  // Petite utilitaire pour rendre la recherche insensible aux accents/casse
+  const normalize = (str) =>
+    (str ?? '')
+      .toString()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
+
   // ------- Filtres des listes en haut -------
   // Produits filtrés par catégorie sélectionnée
   const filteredProductsOptions = useMemo(() => {
@@ -116,8 +126,14 @@ export const FeatureProductAdmin = () => {
       rows = rows.filter(fp => String(fp.idProduct) === String(selectedProductId));
     }
 
+    // ✅ Appliquer la recherche sur la colonne "Caractéristique"
+    if (searchFeature.trim() !== '') {
+      const q = normalize(searchFeature);
+      rows = rows.filter(fp => normalize(getFeatureDescription(fp.idFeature)).includes(q));
+    }
+
     return rows;
-  }, [featureProductsFromStore, selectedCategoryId, selectedProductId]);
+  }, [featureProductsFromStore, selectedCategoryId, selectedProductId, searchFeature]);
 
   // ------- Tri (Catégorie produit -> Produit -> Caractéristique) -------
   const sortedRows = useMemo(() => {
@@ -207,7 +223,6 @@ export const FeatureProductAdmin = () => {
             onChange={(e) => {
               const newCatId = e.target.value;
               setSelectedCategoryId(newCatId);
-              // Si le produit sélectionné ne correspond plus à la catégorie, on le réinitialise
               if (newCatId && selectedProductId) {
                 const prodCatId = getProductCategoryId(selectedProductId);
                 if (String(prodCatId) !== String(newCatId)) {
@@ -235,6 +250,18 @@ export const FeatureProductAdmin = () => {
               <option key={p.id} value={p.id}>{getProductName(p.id)}</option>
             ))}
           </select>
+        </div>
+
+        {/* ✅ Nouveau champ de recherche par "feature" */}
+        <div className="flex-grow-1" style={{ minWidth: 260 }}>
+          <label className="form-label">Rechercher une caractéristique</label>
+          <input
+            type="text"
+            className="form-control"
+            placeholder="Ex: Résolution, Mémoire, Connectivité…"
+            value={searchFeature}
+            onChange={(e) => setSearchFeature(e.target.value)}
+          />
         </div>
 
         <div className="ms-auto">
@@ -318,7 +345,6 @@ export const FeatureProductAdmin = () => {
                   className="form-select"
                   value={formData.idProduct}
                   onChange={(e) => {
-                    // reset la feature si on change de produit
                     setFormData(prev => ({ ...prev, idProduct: e.target.value, idFeature: '' }));
                   }}
                   required
