@@ -84,12 +84,6 @@ export const Product = () => {
     });
   }, [product?.description]);
 
-  // Promo liée à la catégorie (optionnel)
-  const promotion = useMemo(
-    () => promotionCodes.find((p) => String(p.id) === String(product?.idPromotionCode)) || null,
-    [promotionCodes, product]
-  );
-
   // ===== Images du produit (tri + sélections spéciales) =====
   const productImagesRaw = useMemo(() => {
     if (!product) return [];
@@ -135,24 +129,29 @@ export const Product = () => {
     [heroVideo]
   );
 
-  // ===== Galerie (état conservé) =====
-  const [currentIndex, setCurrentIndex] = useState(0);
-  useEffect(() => { setCurrentIndex(firstPos1Index); }, [firstPos1Index]);
-  const currentImage = productImagesSorted[currentIndex]?.url || '/Images/placeholder.jpg';
+  // ===== Indices décorrélés =====
+  // - mainIndex : CE QUI S'AFFICHE avec le prix (ne doit pas bouger pendant LB mobile)
+  // - galleryIndex : l'index "courant" manipulé par la galerie
+  // - lightboxIndex : l'index dans la lightbox
+  const [mainIndex, setMainIndex] = useState(0);
+  const [galleryIndex, setGalleryIndex] = useState(0);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+
+  // initialisation/realignement sur la position 1
+  useEffect(() => {
+    setMainIndex(firstPos1Index);
+    setGalleryIndex(firstPos1Index);
+    setLightboxIndex(firstPos1Index);
+  }, [firstPos1Index]);
+
+  const currentMainUrl = productImagesSorted[mainIndex]?.url || '/Images/placeholder.jpg';
 
   // ===== Lightbox =====
   const [isLightboxOpen, setLightboxOpen] = useState(false);
-  const [lightboxIndex, setLightboxIndex] = useState(0);
   const openLightbox  = (idx) => { setLightboxIndex(idx); setLightboxOpen(true); };
   const closeLightbox = () => setLightboxOpen(false);
   const prev = () => setLightboxIndex((i) => (i - 1 + productImagesSorted.length) % productImagesSorted.length);
   const next = () => setLightboxIndex((i) => (i + 1) % productImagesSorted.length);
-
-  // Swipe dans la LIGHTBOX (mobile uniquement)
-  const lbStartX = useRef(null);
-  const lbStartY = useRef(null);
-  const lbDeltaX = useRef(0);
-  const lbDeltaY = useRef(0);
 
   // Détection mobile
   const [isMobile, setIsMobile] = useState(() =>
@@ -171,6 +170,11 @@ export const Product = () => {
     };
   }, []);
 
+  // swipe LB (mobile)
+  const lbStartX = useRef(null);
+  const lbStartY = useRef(null);
+  const lbDeltaX = useRef(0);
+  const lbDeltaY = useRef(0);
   const lbTouchStart = (e) => {
     if (!isMobile || !isLightboxOpen) return;
     const t = e.touches[0];
@@ -290,9 +294,6 @@ export const Product = () => {
   }, [activePromo, product, priceRef, productPromoPct]);
 
   const hasPrice = Number.isFinite(displayPrice);
-  const [eurosStr, centsStr] = hasPrice ? displayPrice.toFixed(2).split('.') : ['0', '00'];
-  const euros = eurosStr;
-  const cents = centsStr;
 
   // ===== STOCK =====
   const stockStatusRaw = (product?.stockStatus ?? '').trim();
@@ -343,7 +344,7 @@ export const Product = () => {
       id: product.id,
       name: product.name || product.title,
       price: displayPrice,
-      image: currentImage,
+      image: currentMainUrl, // ← image "prix" reste fixe
       packageProfil: product.packageProfil,
       containedCode: product.containedCode,
     };
@@ -353,7 +354,7 @@ export const Product = () => {
   const closeAdded = () => setShowAdded(false);
   const goToCart = () => { setShowAdded(false); navigate('/cart'); };
 
-  // Specs (garde le même contrat pour éviter eslint)
+  // Specs
   const { specs } = ProductSpecs(pid, product) || { specs: {} };
 
   // ===== Vidéo autoplay (si présente) =====
@@ -376,15 +377,7 @@ export const Product = () => {
 
   const handleContextMenu = (e) => e.preventDefault();
 
-  // Construit les options de quantité en fonction du stock
-  const qtyOptions = useMemo(() => {
-    const max = Math.max(0, availableQty);
-    const cap = Math.min(max, 50);
-    return Array.from({ length: cap }, (_, i) => i + 1);
-  }, [availableQty]);
-
-  // ====== Image Parallax (fallback si pas de vidéo) ======
-  // Priorité : position 100 > position 1 > première valide > fallback
+  // ====== Parallax (si pas de vidéo) ======
   const pickImageByPos = (arr, pos) =>
     arr.find(x => Number(x?.position) === pos && typeof x?.url === 'string' && x.url.trim() !== '');
 
@@ -402,10 +395,9 @@ export const Product = () => {
 
   const parallaxUrl = toMediaUrl(parallaxImgObj?.url) || '/Images/parallax-default.jpg';
 
-  // ===== Parallax (piloté JS, aucun texte) =====
   const parallaxRef = useRef(null);
   useEffect(() => {
-    if (hasVideo) return; // activer seulement si pas de vidéo
+    if (hasVideo) return;
     const el = parallaxRef.current;
     if (!el) return;
 
@@ -416,7 +408,7 @@ export const Product = () => {
         rafId = 0;
         const rect = el.getBoundingClientRect();
         const vh = window.innerHeight || document.documentElement.clientHeight;
-        const progress = (vh - rect.top) / (vh + rect.height); // ~[0..1]
+        const progress = (vh - rect.top) / (vh + rect.height);
         const strength = 70;
         const offset = (progress - 0.5) * strength;
         el.style.setProperty('--parallax-y', `${offset.toFixed(1)}px`);
@@ -460,8 +452,14 @@ export const Product = () => {
       {/* Zone haute: galerie + infos achat via ProductMedia */}
       <ProductMedia
         images={imageUrls}
-        index={currentIndex}                  // ← toujours index sur pos 1 (via useEffect)
-        onIndexChange={setCurrentIndex}
+        index={mainIndex} // ← l'image affichée avec le prix
+        onIndexChange={(i) => {
+          setGalleryIndex(i);              // on suit la galerie
+          // MAIS on ne change pas l'image principale si la LB est ouverte sur mobile
+          if (!(isMobile && isLightboxOpen)) {
+            setMainIndex(i);
+          }
+        }}
         onImageClick={(idx) => openLightbox(idx)}
         isMobile={isMobile}
       >
@@ -519,13 +517,9 @@ export const Product = () => {
               aria-label="Quantité"
               disabled={isActuallyOut || availableQty <= 0}
             >
-              {qtyOptions.length === 0 ? (
-                <option value={1}>—</option>
-              ) : (
-                qtyOptions.map((n) => (
-                  <option key={n} value={n}>{n}</option>
-                ))
-              )}
+              {Array.from({ length: Math.min(Math.max(0, availableQty), 50) }, (_, i) => i + 1).map((n) => (
+                <option key={n} value={n}>{n}</option>
+              ))}
             </select>
 
             <button
@@ -546,7 +540,7 @@ export const Product = () => {
         </div>
       </ProductMedia>
 
-      {/* Lightbox avec SWIPE (mobile) */}
+      {/* Lightbox (mobile/desktop) */}
       {isLightboxOpen && (
         <div
           className="lightbox"
@@ -600,9 +594,8 @@ export const Product = () => {
           ref={parallaxRef}
           className="product-parallax"
           style={{
-            // IMPORTANT: on quote l’URL pour éviter les soucis CSS avec ?, & et espaces
             '--parallax-img': `url("${parallaxUrl}")`,
-            minHeight: isMobile ? '28vh' : '42vh',   // ← plus petit sur mobile
+            minHeight: isMobile ? '28vh' : '42vh',
           }}
           aria-hidden="true"
         />

@@ -390,3 +390,15 @@
   will-change: background-position; /* perfs */
 }
 
+
+
+@media (max-width: 768px) {
+  .product-page.no-touch-while-lb .product-main-image-wrap,
+  .product-page.no-touch-while-lb .thumbs-col {
+    pointer-events: none; /* pas de clic/drag sur la galerie */
+  }
+  .product-page.no-touch-while-lb {
+    touch-action: none;   /* évite les gestes derrière la lightbox */
+  }
+}
+
