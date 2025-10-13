@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
+import { ReactComponent as LogoSvg } from "../logoSVG/mins.svg";
 import "../styles/components/navbar.css";
 import { FaFacebookF, FaInstagram, FaTwitter, FaLinkedin, FaCheckCircle, FaTimesCircle, FaYoutube } from 'react-icons/fa';
 import {Link, NavLink, useParams} from 'react-router-dom';
+import { PromoTicker } from '../lib/utils/PromoTicker';
 import { useSelector } from 'react-redux';
 import { updateProductUserRequest } from '../lib/actions/ProductActions';
 import { updateStockRequest } from '../lib/actions/StockActions';
@@ -33,6 +35,7 @@ import { FaX } from 'react-icons/fa6';
 
 
 
+
 export const Navbar = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -46,22 +49,18 @@ export const Navbar = () => {
   // --- Données catalogue
   let categories    = useSelector((s) => s.categories?.categories) || [];
   let subCategories = useSelector((s) => s.subCategories?.subCategories) || [];
-
-  categories = categories.filter((c) => c.display === true);
+  categories    = categories.filter((c) => c.display === true);
   subCategories = subCategories.filter((c) => c.display === true);
 
   // --- Panier
   const cartItems = useSelector((s) => s.items?.items) || [];
   const cartCount = cartItems.reduce((acc, it) => acc + Number(it.qty ?? it.quantity ?? 1), 0);
 
-  // --- Application pour recuperer les messages promo
-  const applications = useSelector((s) => s.applications?.applications) || []; // tableau de string
-
-  // const promoMessages =
-  // useSelector((s) => s.app?.tickerMessages) || []; // tableau de string
-
-  const promoMessages = applications[0]?.promoMessages;
-<PromoTicker messages={promoMessages} />
+  // --- Application -> messages promo
+  const applications = useSelector((s) => s.applications?.applications) || [];
+  const promoMessages = Array.isArray(applications?.[0]?.promoMessages)
+    ? applications[0].promoMessages
+    : [];
 
   // --- Effet badge
   const [bump, setBump] = useState(false);
@@ -373,7 +372,6 @@ export const Navbar = () => {
                         <button
                           className="logout-btn"
                           onClick={() => {
-                            // ⚠️ Remplace par ton action réelle
                             if (typeof logout === "function") dispatch(logout());
                             setAOpen(false);
                             navigate("/login");
@@ -451,15 +449,16 @@ export const Navbar = () => {
           </div>
         </div>
       </nav>
-            {/* ===== BANDEAU PROMO défilant (affiché seulement si messages.length>0) ===== */}
-            <PromoTicker messages={promoMessages} />
+
+      {/* ===== BANDEAU PROMO défilant ===== */}
+      <PromoTicker messages={promoMessages} />
 
       {/* ===== Overlay + Drawer mobile (GAUCHE) ===== */}
       <div
         className={`mm-overlay ${isOpen ? "show" : ""}`}
         onClick={() => setIsOpen(false)}
         onWheel={(e) => e.preventDefault()}
-        onTouchMove={(e) => e.preventDefault()}  // bloque le scroll de fond
+        onTouchMove={(e) => e.preventDefault()}
       />
 
       <aside
@@ -467,14 +466,14 @@ export const Navbar = () => {
         role="dialog"
         aria-modal="true"
         aria-label="Menu"
-        onTouchMove={(e) => e.stopPropagation()} // le panneau peut scroller sans propager
+        onTouchMove={(e) => e.stopPropagation()}
       >
         <div className="mm-head" style={{ paddingTop: "calc(14px + env(safe-area-inset-top,0px))" }}>
           <div className="mm-title">Menu</div>
           <button
             className="btn-light"
-            onClick={() => setIsOpen(false)}                           // souris
-            onTouchEnd={(e) => { e.preventDefault(); setIsOpen(false); }} // tactile
+            onClick={() => setIsOpen(false)}
+            onTouchEnd={(e) => { e.preventDefault(); setIsOpen(false); }}
             aria-label="Fermer"
           >
             ✕
@@ -612,7 +611,7 @@ export const Navbar = () => {
                 <Link className="mm-item" to="/admin/stocks" onClick={onNavLink}>Stocks <span>›</span></Link>
                 <Link className="mm-item" to="/admin/promotions" onClick={onNavLink}>Promotions <span>›</span></Link>
                 <Link className="mm-item" to="/admin/taxes" onClick={onNavLink}>Taxes <span>›</span></Link>
-                <Link className="mm-item" to="/admin/packageProfil" onClick={onNavLink}>Profils de colis<span>›</span></Link>
+                <Link className="mm-item" to="/admin/packageProfil" onClick={onNavLink}>Profils de colis <span>›</span></Link>
                 <Link className="mm-item" to="/admin/newsletter" onClick={onNavLink}>Newsletter <span>›</span></Link>
               </div>
             </div>
@@ -814,7 +813,7 @@ const stripHtml = (s = "") => s.replace(/<[^>]+>/g, "");
 
 // //////////////////////// Product Table ////////////////////////
 export const ProductTable = () => {
-  // -------------------- UI local state --------------------
+  /* -------------------- UI local state -------------------- */
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
   const [searchTerm, setSearchTerm] = useState("");
@@ -822,8 +821,8 @@ export const ProductTable = () => {
   const [categoryFilter, setCategoryFilter] = useState("");
   const [stockFilter, setStockFilter] = useState("");
 
-  const [selectedProduct, setSelectedProduct] = useState(null);
-  const [showModal, setShowModal] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null); // modal “caractéristiques”
+  const [showModal, setShowModal] = useState(false);            // modal add/edit
   const [isEditing, setIsEditing] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -843,7 +842,7 @@ export const ProductTable = () => {
     subCategoryId: "",
   });
 
-  // -------------------- Store --------------------
+  /* -------------------- Store -------------------- */
   const dispatch = useDispatch();
 
   const categoriesFromStore = useSelector((s) => s.categories?.categories) || [];
@@ -880,7 +879,12 @@ export const ProductTable = () => {
   const totalPagesFromStore = prodSlice.totalPages ?? prodSlice.pageCount ?? null;
   const loading = !!prodSlice.loading;
 
-  // -------------------- Maps helpers --------------------
+  // ✅ Flags SUCCESS pour refetch après écriture
+  const addProductSuccess = useSelector((s) => s.products?.addProductSuccess);
+  const updateProductSuccess = useSelector((s) => s.products?.updateProductSuccess);
+  const deleteProductSuccess = useSelector((s) => s.products?.deleteProductSuccess);
+
+  /* -------------------- Maps helpers -------------------- */
   const packageProfilsById = useMemo(() => {
     const m = new Map();
     for (const pp of packageProfils) {
@@ -917,7 +921,7 @@ export const ProductTable = () => {
     return sc?.name ?? sc?.Name ?? `#${sid}`;
   };
 
-  // -------------------- Debounce search --------------------
+  /* -------------------- Debounce search -------------------- */
   useEffect(() => {
     const id = setTimeout(() => {
       setDebouncedSearch(searchTerm.trim());
@@ -926,7 +930,7 @@ export const ProductTable = () => {
     return () => clearTimeout(id);
   }, [searchTerm]);
 
-  // -------------------- Fetch serveur (paged) --------------------
+  /* -------------------- Fetch serveur (paged) -------------------- */
   const lastQueryRef = useRef("");
 
   const buildQueryPayload = useCallback(() => {
@@ -958,10 +962,12 @@ export const ProductTable = () => {
   }, [categoriesFromStore, categoryFilter, stockFilter, debouncedSearch, page, pageSize]);
 
   const refreshPage = useCallback(() => {
+    // “force” un nouveau cycle (annule le cache local de la requête précédente)
     lastQueryRef.current = "";
     dispatch(getProductsPagedUserRequest(buildQueryPayload()));
   }, [dispatch, buildQueryPayload]);
 
+  // Chargement initial + quand les params changent
   useEffect(() => {
     const payload = buildQueryPayload();
     const sig = JSON.stringify(payload);
@@ -970,7 +976,16 @@ export const ProductTable = () => {
     dispatch(getProductsPagedUserRequest(payload));
   }, [dispatch, buildQueryPayload]);
 
-  // -------------------- Pagination (sécurisée) --------------------
+  // ✅ Refetch APRÈS succès d’ajout / modif / suppression
+  useEffect(() => {
+    if (addProductSuccess || updateProductSuccess || deleteProductSuccess) {
+      refreshPage();
+      if (showModal) setShowModal(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [addProductSuccess, updateProductSuccess, deleteProductSuccess]);
+
+  /* -------------------- Pagination (sécurisée) -------------------- */
   const totalPages = (() => {
     if (totalPagesFromStore) return Math.max(1, Number(totalPagesFromStore));
     if (Number(totalCountFromStore) > 0)
@@ -982,13 +997,13 @@ export const ProductTable = () => {
     if (page > totalPages) setPage(totalPages);
   }, [totalPages, page]);
 
-  // -------------------- Fallback client pour filtre stock --------------------
+  /* -------------------- Fallback client pour filtre stock -------------------- */
   const visibleProducts = useMemo(() => {
     if (!stockFilter) return products;
     return products.filter((p) => stockMatches(p, stockFilter));
   }, [products, stockFilter]);
 
-  // -------------------- Modal UX --------------------
+  /* -------------------- Modal UX -------------------- */
   useEffect(() => {
     const anyOpen = showModal || !!selectedProduct;
     document.body.classList.toggle("no-scroll", anyOpen);
@@ -1005,7 +1020,7 @@ export const ProductTable = () => {
     };
   }, [showModal, selectedProduct]);
 
-  // -------------------- Form handlers --------------------
+  /* -------------------- Form handlers -------------------- */
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData((prev) => {
@@ -1062,10 +1077,10 @@ export const ProductTable = () => {
     setShowModal(true);
   };
 
-  const handleDeleteClick = async (id) => {
+  const handleDeleteClick = (id) => {
     if (!window.confirm("Supprimer ce produit ?")) return;
-    await dispatch(deleteProductUserRequest(id));
-    refreshPage();
+    // ❌ pas d'attente ni de refresh ici
+    dispatch(deleteProductUserRequest(id));
   };
 
   const idCategory = categoriesFromStore.find((cat) => cat.name === formData.category)?.id;
@@ -1077,14 +1092,14 @@ export const ProductTable = () => {
     );
   }, [subCategoriesFromStore, idCategory]);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
 
     const pkgId = formData.packageProfilId ? Number(formData.packageProfilId) : null;
     const subCatId = formData.subCategoryId ? Number(formData.subCategoryId) : null;
 
     if (isEditing) {
-      await dispatch(
+      dispatch(
         updateProductUserRequest({
           Id: formData.id,
           PreviewDescription: formData.previewDescription,
@@ -1101,7 +1116,7 @@ export const ProductTable = () => {
         })
       );
     } else {
-      await dispatch(
+      dispatch(
         addProductUserRequest({
           PreviewDescription: formData.previewDescription,
           Brand: formData.brand,
@@ -1117,12 +1132,10 @@ export const ProductTable = () => {
         })
       );
     }
-
-    setShowModal(false);
-    refreshPage();
+    // ❌ On ne ferme pas ici : l’useEffect SUCCESS le fera, ainsi que refreshPage()
   };
 
-  // -------------------- Rendu --------------------
+  /* -------------------- Rendu -------------------- */
   const totalCount = Number(totalCountFromStore) || 0;
   const startIdx = totalCount === 0 ? 0 : (page - 1) * pageSize + 1;
   const endIdx = Math.min(totalCount, page * pageSize);
@@ -1318,7 +1331,7 @@ export const ProductTable = () => {
         </button>
 
         <span className="ms-auto">
-          {startIdx}–{endIdx} sur {totalCount}
+          {startIdx}–{endIdx} sur {totalCountFromStore}
         </span>
 
         <select
@@ -1433,7 +1446,7 @@ export const ProductTable = () => {
                 />
               </div>
 
-              {/* ===== Description : éditeur HTML TipTap ===== */}
+              {/* ===== Description : éditeur HTML ===== */}
               <div className="mb-3">
                 <label>Description (HTML)</label>
                 <HtmlEditor
@@ -1849,74 +1862,166 @@ export const ScrollHint = () => {
 };
 
 
-/////////////////////////// Bandeau de promotion ///////////////////////////////////
+/////////////////////////// swipe pour tablette  images de la page product ////////////
 
-export const PromoTicker = memo(function PromoTicker({ messages = [] }) {
-  if (!messages || messages.length === 0) return null;
+export const ProductMedia = ({
+  images = [],
+  index = 0,
+  onIndexChange = () => {},
+  onImageClick,
+  isMobile = false,
+  children,
+}) => {
+  const [mainLoaded, setMainLoaded] = useState(false);
+  useEffect(() => setMainLoaded(false), [images, index]);
+
+  // Centrer la vignette active (scrollIntoView)
+  const thumbRefs = useRef([]);
+  useEffect(() => {
+    const el = thumbRefs.current[index];
+    if (el?.scrollIntoView) {
+      el.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+    }
+  }, [index]);
+
+  if (!images.length) {
+    return (
+      <div className="product-main">
+        <div className="thumbs-col" />
+        <div className="product-main-image-wrap">
+          <div className="img-skeleton" aria-hidden="true" />
+        </div>
+        <div className="product-details">{children}</div>
+      </div>
+    );
+  }
 
   return (
-    <>
-      <div className="promo-ticker" role="region" aria-label="Bandeau d'annonces">
-        <div className="promo-track">
-          {/* lot visible */}
-          <div className="promo-items">
-            {messages.map((m, i) => (
-              <span className="promo-item" key={`t1-${i}`}>{m}</span>
-            ))}
-          </div>
-          {/* lot dupliqué pour boucle continue */}
-          <div className="promo-items" aria-hidden="true">
-            {messages.map((m, i) => (
-              <span className="promo-item" key={`t2-${i}`}>{m}</span>
-            ))}
-          </div>
-        </div>
+    <div className="product-main">
+      {/* Vignettes (tap = change d’image sur desktop, ouvre la lightbox sur mobile si fourni) */}
+      <div className="thumbs-col">
+        {images.map((src, i) => (
+          <button
+            key={i}
+            ref={(r) => (thumbRefs.current[i] = r)}
+            className={`thumb ${i === index ? "thumb--active" : ""}`}
+              onClick={() => {
+                if (isMobile && typeof onImageClick === "function") {
+                  onIndexChange(i);
+                  onImageClick(i);
+                } else {
+                  onIndexChange(i);
+                }
+              }}
+            aria-label={`Voir image ${i + 1}`}
+            type="button"
+          >
+            <img src={src} alt={`Miniature ${i + 1}`} loading="lazy" />
+          </button>
+        ))}
       </div>
-      {/* Espace pour ne pas recouvrir le contenu (barre fixed) */}
-      <div className="promo-ticker-spacer" />
-    </>
-  );
-});
 
+      {/* Image principale — AUCUN SWIPE ICI */}
+      <div
+        className="product-main-image-wrap bg-white"
+        onClick={() => typeof onImageClick === "function" && onImageClick(index)}
+        role="button"
+        tabIndex={0}
+      >
+        {!mainLoaded && <div className="img-skeleton" aria-hidden="true" />}
+        <img
+          className={`product-main-image ${mainLoaded ? "is-loaded" : ""}`}
+          src={images[index]}
+          alt={`Image produit ${index + 1}/${images.length}`}
+          onLoad={() => setMainLoaded(true)}
+        />
+      </div>
+
+      {/* Colonne détails (prix, stock, CTA) */}
+      <div className="product-details">{children}</div>
+    </div>
+  );
+};
 
 /////////////////////////// Loader ///////////////////////////////////////////////////
 /** Petit loader réutilisable (taille et texte optionnels) */
-export const Loader = ({ size = 56, label }) => {
+
+
+export const Loader = ({
+  size = 200,
+  splitXPercent = 0.73,
+  colorMin = "#FFFFFF",
+  colorS = "#1E63FF",
+  strokeWidth = 2,
+}) => {
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const root = ref.current;
+    if (!root) return;
+    const svg = root.querySelector("svg");
+    if (!svg) return;
+
+    const vb = svg.viewBox.baseVal;
+    const splitX = (vb?.x ?? 0) + (vb?.width ?? 100) * splitXPercent;
+
+    const elems = Array.from(
+      svg.querySelectorAll("path, line, polyline, polygon, circle, ellipse, rect")
+    );
+
+    elems.forEach((el) => {
+      try {
+        const b = el.getBBox();
+        const cx = b.x + b.width / 2;
+        const isRight = cx >= splitX;
+        const fillColor = isRight ? colorS : colorMin;
+
+        el.style.fill = fillColor;
+        el.style.stroke = fillColor;
+        el.style.strokeWidth = strokeWidth;
+        el.style.strokeLinecap = "round";
+        el.style.strokeLinejoin = "round";
+        el.style.filter = "drop-shadow(0 0 10px rgba(0,0,0,.3))";
+
+        if (typeof el.getTotalLength === "function") {
+          const L = el.getTotalLength();
+          el.style.strokeDasharray = `${L}`;
+          el.style.strokeDashoffset = `${L}`;
+          el.classList.add("logo-trace-loop");
+          el.style.setProperty("--len", `${L}`);
+        }
+      } catch {}
+    });
+  }, [splitXPercent, colorMin, colorS, strokeWidth]);
+
   return (
-    <div className="lds-wrap" role="status" aria-live="polite">
-      <svg
-        className="lds-ring"
-        viewBox="0 0 44 44"
-        width={size}
-        height={size}
-        aria-hidden="true"
-      >
-        <g fill="none" strokeWidth="4">
-          <circle className="ring-bg" cx="22" cy="22" r="18" />
-          <path className="ring-fg" d="M22 4 a18 18 0 0 1 0 36 a18 18 0 0 1 0-36" />
-        </g>
-      </svg>
-      {label ? <div className="lds-label">{label}</div> : null}
+    <div className="logo-only-wrap">
+      {/* ✅ Halo externe */}
+      <div className="logo-halo" />
+      <div className="logo-svg-wrap" ref={ref}>
+        <LogoSvg className="logo-stroke-root" aria-hidden="true" />
+      </div>
     </div>
   );
 };
 
 
+
 export const LoadingOverlay = ({
   show,
-  text,
   fullscreen = false,
   blur = false,
-  spinnerSize = 64,
-  children, // optionnel : tu peux wrap du contenu si tu veux
+  spinnerSize = 180,
+  children,
 }) => {
   if (!show) return children || null;
 
   const content = (
     <div className={`loading-overlay ${fullscreen ? "is-fullscreen" : "is-local"}`}>
       <div className={`loading-scrim ${blur ? "with-blur" : ""}`} />
-      <div className="loading-box">
-        <Loader size={spinnerSize} label={text} />
+      {/* ✅ Logo seul, sans carte ni fond */}
+      <div className="logo-float-wrap">
+        <Loader size={spinnerSize} />
       </div>
     </div>
   );
@@ -1924,8 +2029,7 @@ export const LoadingOverlay = ({
   return fullscreen
     ? createPortal(content, document.body)
     : <div className="loading-local-wrap">{content}{children}</div>;
-}
-
+};
 
 
 //////////////////////// Footer ////////////////////////

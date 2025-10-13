@@ -377,6 +377,50 @@
   }
   
 
-  
+  .promo-track{ will-change: transform; backface-visibility: hidden; transform: translateZ(0); }
+@media (prefers-reduced-motion: reduce){
+  .promo-track{ animation: none !important; transform: none !important; }
+}
+
+
+
+/* Perf et compositing propre */
+.promo-track{
+  will-change: transform;
+  backface-visibility: hidden;
+  transform: translate3d(0,0,0);
+  contain: content;            /* limite le repaint au rail */
+}
+
+.promo-track.is-animating{
+  animation: promo-marquee 22s linear infinite;
+}
+
+.promo-track.is-resting{
+  animation: none !important;
+  transform: translate3d(0,0,0) !important;
+}
+
+/* Réduire les animations si demandé */
+@media (prefers-reduced-motion: reduce){
+  .promo-track{ animation: none !important; transform: none !important; }
+}
+
+/* iOS: évite les coûts de blur au-dessus du ticker */
+@supports (-webkit-overflow-scrolling: touch){
+  .promo-ticker{ -webkit-transform: translateZ(0); }
+}
+
+  @media (max-width:900px){
+  .navbar-container{
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: rgba(17,17,17,.96); /* un peu plus opaque pour compenser */
+  }
+}
+
+
+
+
   
   

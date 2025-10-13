@@ -304,12 +304,12 @@ export default function LoginPage() {
           </div>
         </div>
       )}
-        <LoadingOverlay
+      
+      <LoadingOverlay
         show={!!loading}
-        text="Connexion en cours..."
+        text="Chargement..."
         fullscreen
         blur
-        spinnerSize={72}
       />
     </div>
   );

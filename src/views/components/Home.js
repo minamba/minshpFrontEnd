@@ -103,7 +103,7 @@ export const Home = () => {
   // Image "hero" fallback (position 99)
   const heroImage99 = mainProductImages.find((img) => Number(img.position) === 99);
 
-  const IMAGE_FALLBACK = "/Images//background_fallback.png";
+  const IMAGE_FALLBACK = "/Imgs/background_fallback.png";
 
   // Affiche la vidéo si elle existe — y compris en mobile.
   // `poster` affichera l’image 99 pendant le chargement.

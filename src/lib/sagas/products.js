@@ -43,46 +43,42 @@ function* getProducts() {
     }
 }
 
-function* addProduct(action) {
-    try {
-        const response = yield call (api.addProduct, action.payload);
-        console.log("Product added :",response.data);
-        yield put (actions.addProductUserSuccess({product : response.data}));
 
-        const stocks = yield call (apiStocks.getStocks);
-        yield put (actionsStocks.getStockSuccess({stocks : stocks.data}));
-    }
-    catch (error) {
-        yield put (actions.addProductUserFailure({error : error.response?.data || error.message}));
-    }
+function* addProduct(action) {
+  try {
+    const response = yield call(api.addProduct, action.payload);
+    yield put(actions.addProductUserSuccess({ product: response.data }));
+
+    // (optionnel) rafraîchir les stocks
+    const stocks = yield call(apiStocks.getStocks);
+    yield put(actionsStocks.getStockSuccess({ stocks: stocks.data }));
+  } catch (error) {
+    yield put(actions.addProductUserFailure({ error: error.response?.data || error.message }));
+  }
 }
 
 function* updateProduct(action) {
-    try {
-        const response = yield call (api.updateProduct, action.payload);
-        console.log("Product updated :",response.data);
-        const products = yield call (api.getProducts);
-        yield put (actions.getProductUserSuccess({products : products.data}));
+  try {
+    const response = yield call(api.updateProduct, action.payload);
+    // ✅ on émet bien le SUCCESS d’update
+    yield put(actions.updateProductUserSuccess({ product: response.data }));
 
-        const stocks = yield call (apiStocks.getStocks);
-        yield put (actionsStocks.getStockSuccess({stocks : stocks.data}));
-    }
-    catch (error) {
-        yield put (actions.updateProductUserFailure({error : error.response?.data || error.message}));
-    }
+    // (optionnel) rafraîchir les stocks
+    const stocks = yield call(apiStocks.getStocks);
+    yield put(actionsStocks.getStockSuccess({ stocks: stocks.data }));
+  } catch (error) {
+    yield put(actions.updateProductUserFailure({ error: error.response?.data || error.message }));
+  }
 }
 
 function* deleteProduct(action) {
-    try {
-            yield call(api.deleteProduct, action.payload);
-            console.log("Product deleted :",action.payload);
-            const response = yield call(api.getProducts);
-
-            yield put (actions.getProductUserSuccess({products : response.data}));
-    }
-    catch (error) {
-        yield put (actions.deleteProductUserFailure({error : error.response?.data || error.message}));
-    }
+  try {
+    yield call(api.deleteProduct, action.payload);
+    // ✅ on émet bien le SUCCESS de delete
+    yield put(actions.deleteProductUserSuccess(action.payload));
+  } catch (error) {
+    yield put(actions.deleteProductUserFailure({ error: error.response?.data || error.message }));
+  }
 }
 
 

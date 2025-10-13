@@ -307,3 +307,86 @@
   -webkit-line-clamp:unset;
   -webkit-box-orient:unset;
 }
+
+
+
+/* ===== Parallax fallback quand pas de vidéo ===== */
+.product-parallax {
+  position: relative;
+  width: 100%;
+  min-height: 42vh;           /* ajuste si tu veux plus grand */
+  margin: 2rem 0;
+  border-radius: 16px;
+  overflow: hidden;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+
+  /* Parallax “simple” (supporté quasi partout) */
+  background-attachment: fixed;
+}
+
+/* Fallback iOS (background-attachment: fixed est limité sur iOS) */
+@supports (-webkit-overflow-scrolling: touch) {
+  .product-parallax {
+    background-attachment: scroll;
+    transform: translateZ(0);   /* améliore le scroll sur iOS */
+  }
+}
+
+.product-parallax__overlay {
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(0,0,0,.35), rgba(0,0,0,.55));
+}
+
+.product-parallax__content {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 2rem;
+  color: #fff;
+}
+
+.product-parallax__title {
+  font-size: clamp(1.25rem, 2.5vw, 2rem);
+  font-weight: 800;
+  letter-spacing: .3px;
+  margin: 0 0 .5rem 0;
+}
+
+/* Bleu signature + contraste fort, colle avec ta charte */
+.product-parallax__price {
+  display: inline-block;
+  margin-top: .5rem;
+  padding: .35rem .75rem;
+  font-weight: 700;
+  border-radius: 999px;
+  background: rgba(16, 110, 255, .95); /* bleu “MIN’S” */
+  color: #fff;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 6px 18px rgba(16,110,255,.28);
+}
+
+
+
+.product-parallax {
+  position: relative;
+  width: 100%;
+  min-height: 42vh;             /* ajuste la hauteur */
+  margin: 2rem 0;
+  border-radius: 16px;
+  overflow: hidden;
+
+  /* image injectée via variable CSS */
+  background-image: var(--parallax-img);
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center calc(50% + var(--parallax-y, 0px));
+  will-change: background-position; /* perfs */
+}
+

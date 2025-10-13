@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import '../../App.css';
 import { useSelector, useDispatch } from 'react-redux';
 import {
@@ -11,21 +11,24 @@ import { getProductUserRequest } from '../../lib/actions/ProductActions';
 import { getFeatureRequest } from '../../lib/actions/FeatureActions';
 
 export const FeatureProductAdmin = () => {
-  const featureProductsFromStore = useSelector((state) => state.featureProducts.featureProducts) || [];
-  const productsFromStore        = useSelector((state) => state.products.products) || [];
-  const featuresFromStore        = useSelector((state) => state.features.features) || [];
-  const categoriesFromStore      = useSelector((state) => state.categories.categories) || [];
-  const featureCategoriesFromStore = useSelector((state) => state.featureCategories.featureCategories) || [];
-  const [searchQuery, setSearchQuery] = useState('');
+  // ------- Stores -------
+  const featureProductsFromStore   = useSelector((s) => s.featureProducts?.featureProducts) || [];
+  const productsFromStore          = useSelector((s) => s.products?.products) || [];
+  const featuresFromStore          = useSelector((s) => s.features?.features) || [];
+  const categoriesFromStore        = useSelector((s) => s.categories?.categories) || [];
+  const featureCategoriesFromStore = useSelector((s) => s.featureCategories?.featureCategories) || [];
+
   const dispatch = useDispatch();
 
+  // ------- UI State -------
   const [showModal, setShowModal]   = useState(false);
   const [isEditing, setIsEditing]   = useState(false);
   const [currentId, setCurrentId]   = useState(null);
-  const [formData, setFormData]     = useState({
-    idProduct: '',
-    idFeature: ''
-  });
+  const [formData, setFormData]     = useState({ idProduct: '', idFeature: '' });
+
+  // Nouveaux filtres
+  const [selectedCategoryId, setSelectedCategoryId] = useState(''); // Catégorie (produit)
+  const [selectedProductId, setSelectedProductId]   = useState(''); // Produit
 
   useEffect(() => {
     dispatch(getFeatureProductRequest());
@@ -33,14 +36,12 @@ export const FeatureProductAdmin = () => {
     dispatch(getFeatureRequest());
   }, [dispatch]);
 
-  // Fermer sur ESC + bloquer le scroll quand la modale est ouverte
+  // Gestion scroll + ESC sur la modale
   useEffect(() => {
     if (showModal) document.body.classList.add('no-scroll');
     else document.body.classList.remove('no-scroll');
 
-    const onKey = (e) => {
-      if (e.key === 'Escape') setShowModal(false);
-    };
+    const onKey = (e) => e.key === 'Escape' && setShowModal(false);
     window.addEventListener('keydown', onKey);
     return () => {
       window.removeEventListener('keydown', onKey);
@@ -48,12 +49,106 @@ export const FeatureProductAdmin = () => {
     };
   }, [showModal]);
 
+  // ------- Helpers -------
+  const getProductById = (id) => productsFromStore.find(p => String(p.id) === String(id));
+  const getCategoryById = (id) => categoriesFromStore.find(c => String(c.id) === String(id));
+  const getFeatureById  = (id) => featuresFromStore.find(f => String(f.id) === String(id));
+
+  const getProductName = (id) => {
+    const p = getProductById(id);
+    return p ? `${p.brand ?? ''} - ${p.model ?? ''}`.trim() : 'Produit inconnu';
+    // (si brand/model nullish, on évite " - ")
+  };
+
+  // Catégorie du produit (pour affichage + tri + filtres)
+  const getProductCategoryId = (productId) => {
+    const p = getProductById(productId);
+    if (!p) return null;
+    // p.idCategory prioritaire ; sinon on tente le name
+    const byId = p.idCategory != null ? getCategoryById(p.idCategory) : null;
+    if (byId) return byId.id;
+    const byName = categoriesFromStore.find(c => c.name === p.category);
+    return byName ? byName.id : null;
+  };
+
+  const getProductCategoryName = (productId) => {
+    const catId = getProductCategoryId(productId);
+    const cat   = catId ? getCategoryById(catId) : null;
+    return cat ? cat.name : 'Catégorie inconnue';
+  };
+
+  // Infos de la caractéristique
+  const getFeatureDescription = (featureId) => {
+    const f = getFeatureById(featureId);
+    return f ? f.description : 'Caractéristique inconnue';
+  };
+
+  // Catégorie de caractéristique (colonne dédiée)
+  const getFeatureCategoryName = (featureId) => {
+    const f  = getFeatureById(featureId);
+    if (!f) return 'inconnue';
+    const fc = featureCategoriesFromStore.find(x => String(x.id) === String(f.idFeatureCategory));
+    return fc ? fc.name : 'inconnue';
+  };
+
+  // ------- Filtres des listes en haut -------
+  // Produits filtrés par catégorie sélectionnée
+  const filteredProductsOptions = useMemo(() => {
+    if (!selectedCategoryId) return productsFromStore;
+    return productsFromStore.filter(p => {
+      const catId = getProductCategoryId(p.id);
+      return String(catId) === String(selectedCategoryId);
+    });
+  }, [productsFromStore, selectedCategoryId]);
+
+  // ------- Filtrage du tableau -------
+  const filteredFeatureProducts = useMemo(() => {
+    let rows = featureProductsFromStore;
+
+    if (selectedCategoryId) {
+      rows = rows.filter(fp => {
+        const catId = getProductCategoryId(fp.idProduct);
+        return String(catId) === String(selectedCategoryId);
+      });
+    }
+
+    if (selectedProductId) {
+      rows = rows.filter(fp => String(fp.idProduct) === String(selectedProductId));
+    }
+
+    return rows;
+  }, [featureProductsFromStore, selectedCategoryId, selectedProductId]);
+
+  // ------- Tri (Catégorie produit -> Produit -> Caractéristique) -------
+  const sortedRows = useMemo(() => {
+    const toKey = (v) => (v ?? '').toString().toLowerCase();
+    return [...filteredFeatureProducts].sort((a, b) => {
+      const catA = toKey(getProductCategoryName(a.idProduct));
+      const catB = toKey(getProductCategoryName(b.idProduct));
+      if (catA !== catB) return catA.localeCompare(catB);
+
+      const prodA = toKey(getProductName(a.idProduct));
+      const prodB = toKey(getProductName(b.idProduct));
+      if (prodA !== prodB) return prodA.localeCompare(prodB);
+
+      const featA = toKey(getFeatureDescription(a.idFeature));
+      const featB = toKey(getFeatureDescription(b.idFeature));
+      return featA.localeCompare(featB);
+    });
+  }, [filteredFeatureProducts]);
+
+  // ------- Modale: filtrage des caractéristiques selon la catégorie du produit choisi -------
+  const featuresForSelectedProduct = useMemo(() => {
+    if (!formData.idProduct) return [];
+    const catId = getProductCategoryId(formData.idProduct);
+    if (!catId) return [];
+    return featuresFromStore.filter(f => String(f.idCategory) === String(catId));
+  }, [formData.idProduct, featuresFromStore]);
+
+  // ------- Handlers -------
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value
-    }));
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleAddClick = () => {
@@ -89,137 +184,109 @@ export const FeatureProductAdmin = () => {
         idFeature: formData.idFeature
       }));
     } else {
-      // backend snake_case attendu côté création (tu l’avais déjà ainsi)
       await dispatch(addFeatureProductRequest({
         idProduct: formData.idProduct,
-        id_feature: formData.idFeature
+        id_feature: formData.idFeature // backend snake_case à la création
       }));
     }
     await dispatch(getFeatureProductRequest());
     setShowModal(false);
   };
 
-  const getProductName = (id) => {
-    const product = productsFromStore.find((p) => p.id === id);
-    return product ? product.brand + ' - ' + product.model : 'Produit inconnu';
-  };
-
-  const getFeatureDescription = (id) => {
-    const feature = featuresFromStore.find((f) => f.id === id);
-    return feature ? feature.description : 'Feature inconnue';
-  };
-
-  const getCategoryName = (id) => {
-    const feature = featuresFromStore.find((f) => f.id === id);
-    if (!feature) return 'Feature inconnue';
-    const category = categoriesFromStore.find((c) => c.id === feature.idCategory);
-    return category ? category.name : 'Catégorie inconnue';
-  };
-
-  const getSelectedProductCategoryId = () => {
-    const selectedProduct = productsFromStore.find(p => String(p.id) === String(formData.idProduct));
-    if (!selectedProduct) return null;
-    const category = categoriesFromStore?.find(
-      c => c.name === selectedProduct.category || c.id === selectedProduct.idCategory
-    );
-    return category ? category.id : null;
-  };
-
-  const getFeatureCategoryName = (id) => {
-    const feature = featuresFromStore.find((f) => f.id === id);
-    if (!feature) return 'Feature inconnue';
-    const featureCategory = featureCategoriesFromStore.find((fc) => fc.id === feature.idFeatureCategory);
-    return featureCategory ? featureCategory.name : 'inconnue';
-  };
-
-  // Filtre dynamique des features selon la catégorie du produit sélectionné
-  const filteredFeatures = () => {
-    const selectedCategoryId = getSelectedProductCategoryId();
-    if (!selectedCategoryId) return [];
-    return featuresFromStore.filter(f => f.idCategory === selectedCategoryId);
-  };
-
-  const sortedFeatureProducts = [...featureProductsFromStore].sort((a, b) => {
-    const nameA = getProductName(a.idProduct).toLowerCase();
-    const nameB = getProductName(b.idProduct).toLowerCase();
-    return nameA.localeCompare(nameB);
-  });
-
-  const filteredAndSortedFeatureProducts = sortedFeatureProducts.filter((fp) => {
-    const productName = getProductName(fp.idProduct).toLowerCase();
-    const featureDesc = getFeatureDescription(fp.idFeature).toLowerCase();
-    const categoryName = getCategoryName(fp.idFeature).toLowerCase();
-    const query = searchQuery.toLowerCase();
-    return (
-      productName.includes(query) ||
-      featureDesc.includes(query) ||
-      categoryName.includes(query)
-    );
-  });
-
+  // ------- Render -------
   return (
-    <div className='container py-5'>
+    <div className="container py-5">
       <h1 className="text-center mb-4">Gestion des caractéristiques produits</h1>
 
-      <div className="d-flex justify-content-end mb-3">
-        <button className='btn btn-success' onClick={handleAddClick}>
-          Ajouter une association
-        </button>
+      <div className="d-flex justify-content-between align-items-end flex-wrap gap-2 mb-3">
+        <div className="flex-grow-1" style={{ minWidth: 240 }}>
+          <label className="form-label">Catégorie (produit)</label>
+          <select
+            className="form-select"
+            value={selectedCategoryId}
+            onChange={(e) => {
+              const newCatId = e.target.value;
+              setSelectedCategoryId(newCatId);
+              // Si le produit sélectionné ne correspond plus à la catégorie, on le réinitialise
+              if (newCatId && selectedProductId) {
+                const prodCatId = getProductCategoryId(selectedProductId);
+                if (String(prodCatId) !== String(newCatId)) {
+                  setSelectedProductId('');
+                }
+              }
+            }}
+          >
+            <option value="">Toutes les catégories</option>
+            {categoriesFromStore.map(cat => (
+              <option key={cat.id} value={cat.id}>{cat.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex-grow-1" style={{ minWidth: 240 }}>
+          <label className="form-label">Produit</label>
+          <select
+            className="form-select"
+            value={selectedProductId}
+            onChange={(e) => setSelectedProductId(e.target.value)}
+          >
+            <option value="">Tous les produits</option>
+            {filteredProductsOptions.map(p => (
+              <option key={p.id} value={p.id}>{getProductName(p.id)}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="ms-auto">
+          <button className="btn btn-success" onClick={handleAddClick}>
+            Ajouter une association
+          </button>
+        </div>
       </div>
 
-      <div className="mb-3">
-        <input
-          type="text"
-          className="form-control"
-          placeholder="Rechercher par produit, catégorie ou caractéristique..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
-      </div>
-
-      <div className='table-responsive'>
-        <table className='table table-striped table-hover shadow-sm'>
-          <thead className='table-dark'>
+      <div className="table-responsive">
+        <table className="table table-striped table-hover shadow-sm">
+          <thead className="table-dark">
             <tr>
+              <th>Catégorie (produit)</th>
               <th>Produit</th>
               <th>Caractéristique</th>
-              <th>Catégorie</th>
               <th>Catégorie de caractéristique</th>
-              <th>Actions</th>
+              <th style={{ width: 140 }}>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {filteredAndSortedFeatureProducts.map((fp) => (
-              <tr key={fp.id} onClick={() => handleEditClick(fp)} style={{ cursor: 'pointer' }}>
+            {sortedRows.map(fp => (
+              <tr
+                key={fp.id}
+                onClick={() => handleEditClick(fp)}
+                style={{ cursor: 'pointer' }}
+              >
+                <td>{getProductCategoryName(fp.idProduct)}</td>
                 <td>{getProductName(fp.idProduct)}</td>
                 <td>{getFeatureDescription(fp.idFeature)}</td>
-                <td>{getCategoryName(fp.idFeature)}</td>
                 <td>{getFeatureCategoryName(fp.idFeature)}</td>
                 <td>
                   <button
-                    className='btn btn-sm btn-warning me-2'
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleEditClick(fp);
-                    }}
+                    className="btn btn-sm btn-warning me-2"
+                    onClick={(e) => { e.stopPropagation(); handleEditClick(fp); }}
                   >
-                    <i className="bi bi-pencil"></i>
+                    <i className="bi bi-pencil" />
                   </button>
                   <button
-                    className='btn btn-sm btn-danger'
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteClick(fp.id);
-                    }}
+                    className="btn btn-sm btn-danger"
+                    onClick={(e) => { e.stopPropagation(); handleDeleteClick(fp.id); }}
                   >
-                    <i className="bi bi-trash"></i>
+                    <i className="bi bi-trash" />
                   </button>
                 </td>
               </tr>
             ))}
-            {filteredAndSortedFeatureProducts.length === 0 && (
+            {sortedRows.length === 0 && (
               <tr>
-                <td colSpan={5} className="text-center text-muted">Aucune association trouvée.</td>
+                <td colSpan={5} className="text-center text-muted">
+                  Aucune association trouvée.
+                </td>
               </tr>
             )}
           </tbody>
@@ -245,7 +312,7 @@ export const FeatureProductAdmin = () => {
 
             <form onSubmit={handleSubmit}>
               <div className="mb-3">
-                <label>Produit</label>
+                <label className="form-label">Produit</label>
                 <select
                   name="idProduct"
                   className="form-select"
@@ -260,14 +327,14 @@ export const FeatureProductAdmin = () => {
                   <option value="">Sélectionnez un produit</option>
                   {productsFromStore.map((product) => (
                     <option key={product.id} value={product.id}>
-                      {product.brand + ' - ' + product.model}
+                      {getProductName(product.id)}
                     </option>
                   ))}
                 </select>
               </div>
 
               <div className="mb-3">
-                <label>Caractéristique</label>
+                <label className="form-label">Caractéristique</label>
                 <select
                   name="idFeature"
                   className="form-select"
@@ -279,7 +346,7 @@ export const FeatureProductAdmin = () => {
                   <option value="">
                     {formData.idProduct ? 'Sélectionnez une caractéristique' : 'Choisissez d’abord un produit'}
                   </option>
-                  {filteredFeatures().map((feature) => (
+                  {featuresForSelectedProduct.map((feature) => (
                     <option key={feature.id} value={feature.id}>
                       {feature.description}
                     </option>
