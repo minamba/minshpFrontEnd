@@ -377,12 +377,14 @@ export const Home = () => {
             )}
           </div>
 
-          <h3 className="product-name">{name}</h3>
-          {product.previewDescription && (
-            <p className="product-preview text-muted" title={product.previewDescription}>
-              {product.previewDescription}
-            </p>
-          )}
+          <div className="product-meta">
+            <h3 className="product-name">{name}</h3>
+            {product.previewDescription && (
+              <p className="product-preview text-muted" title={product.previewDescription}>
+                {product.previewDescription}
+              </p>
+            )}
+          </div>
 
             <div className="new-price-row">
               <span className={`card-stock ${stockCls}`} title={stockLabel}>

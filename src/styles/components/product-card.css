@@ -306,3 +306,25 @@
     justify-self:end !important;
   }
 }
+
+
+
+/* === Footer (statut + prix) collé en bas sans changer la taille des cards === */
+.product-card{
+  display:flex;
+  flex-direction:column;
+}
+
+.product-card .product-meta{
+  flex:1 1 auto;      /* prend l'espace restant */
+  min-height:0;       /* évite les débordements avec les clamps */
+}
+
+/* clé : pousse la rangée prix en bas de la card */
+.product-card > .new-price-row{
+  margin-top:auto !important;   /* override le margin-top:2px défini plus haut */
+}
+
+
+
+
