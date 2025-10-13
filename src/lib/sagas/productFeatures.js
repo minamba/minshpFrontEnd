@@ -19,8 +19,7 @@ function* addProductFeature(action) {
     try {
         const response = yield call (api.addProductFeature, action.payload);
         console.log("Feature product added :",response.data);
-        const features = yield call (api.getProductFeatures);
-        yield put (actions.getFeatureProductSuccess({featureProduct : features.data}));
+        yield put(actions.getFeatureProductRequest());
     }
     catch (error) {
         yield put (actions.addFeatureProductFailure({error : error.response?.data || error.message}));
@@ -32,8 +31,7 @@ function* updateProductFeature(action) {
     try {
         const response = yield call (api.updateProductFeature, action.payload);
         console.log("Feature product updated :",response.data);
-        const features = yield call (api.getProductFeatures);
-        yield put (actions.getFeatureProductSuccess({featureProduct : features.data}));
+        yield put(actions.getFeatureProductRequest());
     }
     catch (error) {
         yield put (actions.updateFeatureProductFailure({error : error.response?.data || error.message}));
@@ -43,9 +41,7 @@ function* updateProductFeature(action) {
 function* deleteProductFeature(action) {
     try {
             yield call(api.deleteProductFeature, action.payload);
-            const response = yield call(api.getProductFeatures);
-
-            yield put (actions.getFeatureProductSuccess({featureProducts : response.data}));
+            yield put (actions.getFeatureProductRequest());
     }
     catch (error) {
         yield put (actions.deleteFeatureProductFailure({error : error.response?.data || error.message}));
