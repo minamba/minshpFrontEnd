@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import '../../App.css';
 import { useSelector, useDispatch } from 'react-redux';
 import {
   getImageRequest,
-  addImageRequest,      // (pas utilisé ici mais gardé si besoin)
-  updateImageRequest,   // (idem)
+  addImageRequest,      // (non utilisé ici)
+  updateImageRequest,   // (non utilisé ici)
   deleteImageRequest
 } from '../../lib/actions/ImageActions';
 import { getProductUserRequest } from '../../lib/actions/ProductActions';
@@ -12,14 +12,18 @@ import { postUploadRequest } from '../../lib/actions/UploadActions';
 import { toMediaUrl } from '../../lib/utils/mediaUrl';
 
 export const ImageAdmin = () => {
-  const imagesFromStore   = useSelector((state) => state.images.images) || [];
-  const productsFromStore = useSelector((state) => state.products.products) || [];
+  const imagesFromStore    = useSelector((s) => s.images.images) || [];
+  const productsFromStore  = useSelector((s) => s.products.products) || [];
+  const categoriesFromStore= useSelector((s) => s.categories?.categories) || []; // ✅ catégories du store
   const dispatch = useDispatch();
 
   const [showModal, setShowModal]     = useState(false);
   const [isEditing, setIsEditing]     = useState(false);
   const [currentId, setCurrentId]     = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategoryId, setSelectedCategoryId] = useState(''); // ✅ filtre catégorie
+  const [selectedProductId, setSelectedProductId]   = useState(''); // ✅ filtre produit
+
   const [formData, setFormData] = useState({
     file: null,
     description: '',
@@ -30,19 +34,19 @@ export const ImageAdmin = () => {
   });
   const [previewUrl, setPreviewUrl] = useState('');
 
+  const collator = useMemo(() => new Intl.Collator('fr', { sensitivity: 'base' }), []);
+
   useEffect(() => {
     dispatch(getImageRequest());
     dispatch(getProductUserRequest());
+    // Les catégories sont supposées déjà chargées ailleurs ; on les lit depuis le store.
   }, [dispatch]);
 
-  // ESC pour fermer + bloquer le scroll quand ouvert
+  // ESC pour fermer + bloquer le scroll
   useEffect(() => {
     if (showModal) document.body.classList.add('no-scroll');
     else document.body.classList.remove('no-scroll');
-
-    const onKey = (e) => {
-      if (e.key === 'Escape') setShowModal(false);
-    };
+    const onKey = (e) => e.key === 'Escape' && setShowModal(false);
     window.addEventListener('keydown', onKey);
     return () => {
       window.removeEventListener('keydown', onKey);
@@ -50,28 +54,84 @@ export const ImageAdmin = () => {
     };
   }, [showModal]);
 
-  // évite fuites mémoire si on génère des objectURL
+  // cleanup objectURL
   useEffect(() => {
     return () => {
       if (previewUrl?.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
     };
   }, [previewUrl]);
 
+  // ------- Helpers -------
+  const getProductById = (id) => productsFromStore.find(p => String(p.id) === String(id));
+
+  const getProductLabel = (p) => {
+    if (!p) return 'Produit inconnu';
+    const brand = p.brand ?? '';
+    const model = p.model ?? '';
+    return `${brand}${brand && model ? ' - ' : ''}${model}`.trim() || 'Produit';
+  };
+
+  const getProductName = (id) => getProductLabel(getProductById(id));
+
+  const getCategoryById = (id) => categoriesFromStore.find(c => String(c.id) === String(id));
+
+  // Récupère l'id de catégorie du produit (prend idCategory si présent, sinon essaie par nom)
+  const getCategoryIdForProduct = (p) => {
+    if (!p) return null;
+    if (p.idCategory != null) return p.idCategory;
+    if (p.category) {
+      const byName = categoriesFromStore.find(c => c.name === p.category);
+      return byName?.id ?? null;
+    }
+    return null;
+  };
+
+  const getCategoryIdForProductId = (productId) => {
+    const p = getProductById(productId);
+    return getCategoryIdForProduct(p);
+  };
+
+  const getCategoryNameForProductId = (productId) => {
+    const catId = getCategoryIdForProductId(productId);
+    const cat   = catId ? getCategoryById(catId) : null;
+    return cat ? cat.name : 'Catégorie inconnue';
+  };
+
+  // Produits triés
+  const sortedProducts = useMemo(() => {
+    return [...productsFromStore].sort((a, b) =>
+      collator.compare(getProductLabel(a), getProductLabel(b))
+    );
+  }, [productsFromStore, collator]);
+
+  // Produits filtrés par catégorie (pour le sélecteur Produit)
+  const productsForProductFilter = useMemo(() => {
+    const pool = selectedCategoryId
+      ? sortedProducts.filter(p => String(getCategoryIdForProduct(p)) === String(selectedCategoryId))
+      : sortedProducts;
+    return pool;
+  }, [sortedProducts, selectedCategoryId]);
+
+  // Si on change la catégorie et que le produit choisi n'appartient plus à cette catégorie -> reset
+  useEffect(() => {
+    if (!selectedProductId) return;
+    if (!selectedCategoryId) return;
+    const prod = getProductById(selectedProductId);
+    const prodCatId = getCategoryIdForProduct(prod);
+    if (String(prodCatId) !== String(selectedCategoryId)) {
+      setSelectedProductId('');
+    }
+  }, [selectedCategoryId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value,
-    }));
+    setFormData((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
 
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    // release ancien blob si nécessaire
     if (previewUrl?.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
-
     setFormData((prev) => ({ ...prev, file }));
     setPreviewUrl(URL.createObjectURL(file));
   };
@@ -89,7 +149,7 @@ export const ImageAdmin = () => {
     setIsEditing(true);
     setCurrentId(image.id);
     setFormData({
-      file: null, // on laissera l'utilisateur remplacer s'il veut
+      file: null,
       description: image.description ?? '',
       idProduct: image.idProduct ?? '',
       title: image.title ?? '',
@@ -110,72 +170,113 @@ export const ImageAdmin = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     if (isEditing) {
-      await dispatch(
-        postUploadRequest({
-          Id: currentId,
-          File: formData.file,
-          Type: 'IMAGE',
-          Description: formData.description,
-          IdProduct: formData.idProduct,
-          Title: formData.title,
-          Position: formData.position,
-          Display: formData.display,
-          TypeUpload: 'UPLOAD',
-        })
-      );
+      await dispatch(postUploadRequest({
+        Id: currentId,
+        File: formData.file,
+        Type: 'IMAGE',
+        Description: formData.description,
+        IdProduct: formData.idProduct,
+        Title: formData.title,
+        Position: formData.position,
+        Display: formData.display,
+        TypeUpload: 'UPLOAD',
+      }));
     } else {
-      await dispatch(
-        postUploadRequest({
-          File: formData.file,
-          Type: 'IMAGE',
-          IdProduct: formData.idProduct,
-          Description: formData.description,
-          Title: formData.title,
-          Position: formData.position,
-          Display: formData.display,
-          TypeUpload: 'ADD',
-        })
-      );
+      await dispatch(postUploadRequest({
+        File: formData.file,
+        Type: 'IMAGE',
+        IdProduct: formData.idProduct,
+        Description: formData.description,
+        Title: formData.title,
+        Position: formData.position,
+        Display: formData.display,
+        TypeUpload: 'ADD',
+      }));
     }
-
     await dispatch(getImageRequest());
     setShowModal(false);
   };
 
-  const getProductName = (id) => {
-    const product = productsFromStore.find((p) => p.id === id);
-    return product ? product.brand + ' - ' + product.model : 'Produit inconnu';
-  };
+  // ------- Tri + filtres des images -------
+  const sortedImages = useMemo(() => {
+    // Tri principal par nom de produit (FR)
+    return [...imagesFromStore].sort((a, b) =>
+      collator.compare(getProductName(a.idProduct), getProductName(b.idProduct))
+    );
+  }, [imagesFromStore, collator, productsFromStore]);
 
-  const sortedImages = [...imagesFromStore].sort((a, b) => {
-    const nameA = getProductName(a.idProduct).toLowerCase();
-    const nameB = getProductName(b.idProduct).toLowerCase();
-    return nameA.localeCompare(nameB);
-  });
+  const filteredImages = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
 
-  const filteredImages = sortedImages.filter((img) => {
-    const url   = String(img.url || '').toLowerCase();
-    const desc  = String(img.description || '').toLowerCase();
-    const pname = String(getProductName(img.idProduct) || '').toLowerCase();
-    const q     = searchQuery.toLowerCase();
-    return url.includes(q) || desc.includes(q) || pname.includes(q);
-  });
+    return sortedImages.filter((img) => {
+      // Filtre catégorie
+      if (selectedCategoryId) {
+        const catId = getCategoryIdForProductId(img.idProduct);
+        if (String(catId) !== String(selectedCategoryId)) return false;
+      }
+      // Filtre produit
+      if (selectedProductId && String(img.idProduct) !== String(selectedProductId)) {
+        return false;
+      }
+      // Filtre texte
+      if (!q) return true;
+      const url   = String(img.url || '').toLowerCase();
+      const desc  = String(img.description || '').toLowerCase();
+      const title = String(img.title || '').toLowerCase();
+      const pname = String(getProductName(img.idProduct) || '').toLowerCase();
+      return url.includes(q) || desc.includes(q) || title.includes(q) || pname.includes(q);
+    });
+  }, [sortedImages, selectedCategoryId, selectedProductId, searchQuery]);
+
+  // Catégories triées pour le filtre
+  const sortedCategories = useMemo(() => {
+    return [...categoriesFromStore].sort((a, b) => collator.compare(a?.name ?? '', b?.name ?? ''));
+  }, [categoriesFromStore, collator]);
 
   return (
     <div className='container py-5'>
       <h1 className="text-center mb-4">Gestion des images</h1>
 
-      <div className="d-flex justify-content-between mb-3">
-        <input
-          type="text"
-          placeholder="Rechercher par URL, description ou produit..."
-          className="form-control w-50"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
-        <button className='btn btn-success ms-2' onClick={handleAddClick}>
+      <div className="d-flex flex-wrap gap-2 justify-content-between mb-3">
+        <div className="d-flex gap-2 flex-grow-1">
+          {/* ✅ Filtre Catégorie */}
+          <select
+            className="form-select"
+            style={{ minWidth: 220 }}
+            value={selectedCategoryId}
+            onChange={(e) => setSelectedCategoryId(e.target.value)}
+          >
+            <option value="">Toutes les catégories</option>
+            {sortedCategories.map(cat => (
+              <option key={cat.id} value={cat.id}>{cat.name}</option>
+            ))}
+          </select>
+
+          {/* ✅ Filtre Produit (dépend de la catégorie choisie) */}
+          <select
+            className="form-select"
+            style={{ minWidth: 260 }}
+            value={selectedProductId}
+            onChange={(e) => setSelectedProductId(e.target.value)}
+          >
+            <option value="">Tous les produits</option>
+            {productsForProductFilter.map((p) => (
+              <option key={p.id} value={p.id}>{getProductLabel(p)}</option>
+            ))}
+          </select>
+
+          {/* Recherche texte */}
+          <input
+            type="text"
+            placeholder="Rechercher: URL, description, titre, produit…"
+            className="form-control"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+
+        <button className='btn btn-success' onClick={handleAddClick}>
           Ajouter une image
         </button>
       </div>
@@ -187,6 +288,7 @@ export const ImageAdmin = () => {
               <th>Image</th>
               <th>Description</th>
               <th>Produit</th>
+              <th>Catégorie</th>
               <th>Titre</th>
               <th>Position</th>
               <th>Afficher</th>
@@ -201,6 +303,7 @@ export const ImageAdmin = () => {
                 </td>
                 <td>{img.description}</td>
                 <td>{getProductName(img.idProduct)}</td>
+                <td>{getCategoryNameForProductId(img.idProduct)}</td>
                 <td>{img.title}</td>
                 <td>{img.position}</td>
                 <td>
@@ -213,19 +316,13 @@ export const ImageAdmin = () => {
                 <td>
                   <button
                     className='btn btn-sm btn-warning me-2'
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleEditClick(img);
-                    }}
+                    onClick={(e) => { e.stopPropagation(); handleEditClick(img); }}
                   >
                     <i className="bi bi-pencil"></i>
                   </button>
                   <button
                     className='btn btn-sm btn-danger'
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteClick(img.id);
-                    }}
+                    onClick={(e) => { e.stopPropagation(); handleDeleteClick(img.id); }}
                   >
                     <i className="bi bi-trash"></i>
                   </button>
@@ -234,7 +331,7 @@ export const ImageAdmin = () => {
             ))}
             {filteredImages.length === 0 && (
               <tr>
-                <td colSpan="7" className="text-center">Aucune image trouvée.</td>
+                <td colSpan="8" className="text-center">Aucune image trouvée.</td>
               </tr>
             )}
           </tbody>
@@ -242,18 +339,8 @@ export const ImageAdmin = () => {
       </div>
 
       {showModal && (
-        <div
-          className="admin-modal-backdrop"
-          role="presentation"
-          onClick={() => setShowModal(false)}
-        >
-          <div
-            className="admin-modal-panel"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="image-modal-title"
-            onClick={(e) => e.stopPropagation()}
-          >
+        <div className="admin-modal-backdrop" role="presentation" onClick={() => setShowModal(false)}>
+          <div className="admin-modal-panel" role="dialog" aria-modal="true" aria-labelledby="image-modal-title" onClick={(e) => e.stopPropagation()}>
             <h2 id="image-modal-title" className="mb-3">
               {isEditing ? "Modifier l'image" : "Ajouter une image"}
             </h2>
@@ -272,7 +359,7 @@ export const ImageAdmin = () => {
                 />
                 {previewUrl && (
                   <div className="mt-2">
-                    <img src={previewUrl} alt="preview" style={{ width: '120px', height: 'auto', borderRadius: 6 }} />
+                    <img src={toMediaUrl(previewUrl)} alt="preview" style={{ width: '120px', height: 'auto', borderRadius: 6 }} />
                   </div>
                 )}
               </div>
@@ -323,9 +410,9 @@ export const ImageAdmin = () => {
                   required
                 >
                   <option value="">Sélectionnez un produit</option>
-                  {productsFromStore.map((product) => (
+                  {productsForProductFilter.map((product) => (
                     <option key={product.id} value={product.id}>
-                      {product.brand + ' - ' + product.model}
+                      {getProductLabel(product)}
                     </option>
                   ))}
                 </select>
@@ -346,11 +433,7 @@ export const ImageAdmin = () => {
               </div>
 
               <div className="d-flex justify-content-end">
-                <button
-                  type="button"
-                  className="btn btn-secondary me-2"
-                  onClick={() => setShowModal(false)}
-                >
+                <button type="button" className="btn btn-secondary me-2" onClick={() => setShowModal(false)}>
                   Annuler
                 </button>
                 <button type="submit" className="btn btn-dark">

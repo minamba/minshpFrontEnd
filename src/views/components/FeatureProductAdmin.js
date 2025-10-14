@@ -26,11 +26,11 @@ export const FeatureProductAdmin = () => {
   const [currentId, setCurrentId]   = useState(null);
   const [formData, setFormData]     = useState({ idProduct: '', idFeature: '' });
 
-  // Filtres existants
-  const [selectedCategoryId, setSelectedCategoryId] = useState(''); // Catégorie (produit)
-  const [selectedProductId, setSelectedProductId]   = useState(''); // Produit
+  // Filtres
+  const [selectedCategoryId, setSelectedCategoryId] = useState('');
+  const [selectedProductId, setSelectedProductId]   = useState('');
 
-  // ✅ Nouveau : recherche par "feature" (caractéristique)
+  // Recherche par "feature"
   const [searchFeature, setSearchFeature] = useState('');
 
   useEffect(() => {
@@ -39,7 +39,7 @@ export const FeatureProductAdmin = () => {
     dispatch(getFeatureRequest());
   }, [dispatch]);
 
-  // Gestion scroll + ESC sur la modale
+  // Scroll + ESC modale
   useEffect(() => {
     if (showModal) document.body.classList.add('no-scroll');
     else document.body.classList.remove('no-scroll');
@@ -62,7 +62,6 @@ export const FeatureProductAdmin = () => {
     return p ? `${p.brand ?? ''} - ${p.model ?? ''}`.trim() : 'Produit inconnu';
   };
 
-  // Catégorie du produit (pour affichage + tri + filtres)
   const getProductCategoryId = (productId) => {
     const p = getProductById(productId);
     if (!p) return null;
@@ -78,13 +77,11 @@ export const FeatureProductAdmin = () => {
     return cat ? cat.name : 'Catégorie inconnue';
   };
 
-  // Infos de la caractéristique
   const getFeatureDescription = (featureId) => {
     const f = getFeatureById(featureId);
     return f ? f.description : 'Caractéristique inconnue';
   };
 
-  // Catégorie de caractéristique (colonne dédiée)
   const getFeatureCategoryName = (featureId) => {
     const f  = getFeatureById(featureId);
     if (!f) return 'inconnue';
@@ -92,7 +89,6 @@ export const FeatureProductAdmin = () => {
     return fc ? fc.name : 'inconnue';
   };
 
-  // Petite utilitaire pour rendre la recherche insensible aux accents/casse
   const normalize = (str) =>
     (str ?? '')
       .toString()
@@ -102,7 +98,6 @@ export const FeatureProductAdmin = () => {
       .trim();
 
   // ------- Filtres des listes en haut -------
-  // Produits filtrés par catégorie sélectionnée
   const filteredProductsOptions = useMemo(() => {
     if (!selectedCategoryId) return productsFromStore;
     return productsFromStore.filter(p => {
@@ -126,7 +121,6 @@ export const FeatureProductAdmin = () => {
       rows = rows.filter(fp => String(fp.idProduct) === String(selectedProductId));
     }
 
-    // ✅ Appliquer la recherche sur la colonne "Caractéristique"
     if (searchFeature.trim() !== '') {
       const q = normalize(searchFeature);
       rows = rows.filter(fp => normalize(getFeatureDescription(fp.idFeature)).includes(q));
@@ -135,31 +129,42 @@ export const FeatureProductAdmin = () => {
     return rows;
   }, [featureProductsFromStore, selectedCategoryId, selectedProductId, searchFeature]);
 
-  // ------- Tri (Catégorie produit -> Produit -> Caractéristique) -------
+  // ------- TRI DU TABLEAU : Catégorie (produit) -> Caractéristique (alpha FR) -> Produit (tiebreaker) -------
   const sortedRows = useMemo(() => {
-    const toKey = (v) => (v ?? '').toString().toLowerCase();
+    const collator = new Intl.Collator('fr', { sensitivity: 'base' });
     return [...filteredFeatureProducts].sort((a, b) => {
-      const catA = toKey(getProductCategoryName(a.idProduct));
-      const catB = toKey(getProductCategoryName(b.idProduct));
-      if (catA !== catB) return catA.localeCompare(catB);
+      const catA = getProductCategoryName(a.idProduct) ?? '';
+      const catB = getProductCategoryName(b.idProduct) ?? '';
+      const catCmp = collator.compare(catA, catB);
+      if (catCmp !== 0) return catCmp;
 
-      const prodA = toKey(getProductName(a.idProduct));
-      const prodB = toKey(getProductName(b.idProduct));
-      if (prodA !== prodB) return prodA.localeCompare(prodB);
+      const featA = getFeatureDescription(a.idFeature) ?? '';
+      const featB = getFeatureDescription(b.idFeature) ?? '';
+      const featCmp = collator.compare(featA, featB);
+      if (featCmp !== 0) return featCmp;
 
-      const featA = toKey(getFeatureDescription(a.idFeature));
-      const featB = toKey(getFeatureDescription(b.idFeature));
-      return featA.localeCompare(featB);
+      // Tiebreaker sur le nom du produit
+      const prodA = getProductName(a.idProduct) ?? '';
+      const prodB = getProductName(b.idProduct) ?? '';
+      return collator.compare(prodA, prodB);
     });
   }, [filteredFeatureProducts]);
 
-  // ------- Modale: filtrage des caractéristiques selon la catégorie du produit choisi -------
+  // ------- Caractéristiques proposées dans la modale (selon catégorie du produit) -------
   const featuresForSelectedProduct = useMemo(() => {
     if (!formData.idProduct) return [];
     const catId = getProductCategoryId(formData.idProduct);
     if (!catId) return [];
     return featuresFromStore.filter(f => String(f.idCategory) === String(catId));
   }, [formData.idProduct, featuresFromStore]);
+
+  // Tri alphabétique (FR) dans la modale
+  const sortedFeaturesForSelectedProduct = useMemo(() => {
+    const collator = new Intl.Collator('fr', { sensitivity: 'base' });
+    return [...featuresForSelectedProduct].sort((a, b) =>
+      collator.compare(a?.description ?? '', b?.description ?? '')
+    );
+  }, [featuresForSelectedProduct]);
 
   // ------- Handlers -------
   const handleInputChange = (e) => {
@@ -202,7 +207,7 @@ export const FeatureProductAdmin = () => {
     } else {
       await dispatch(addFeatureProductRequest({
         idProduct: formData.idProduct,
-        idFeature: formData.idFeature // backend snake_case à la création
+        idFeature: formData.idFeature
       }));
     }
     await dispatch(getFeatureProductRequest());
@@ -252,7 +257,6 @@ export const FeatureProductAdmin = () => {
           </select>
         </div>
 
-        {/* ✅ Nouveau champ de recherche par "feature" */}
         <div className="flex-grow-1" style={{ minWidth: 260 }}>
           <label className="form-label">Rechercher une caractéristique</label>
           <input
@@ -372,7 +376,8 @@ export const FeatureProductAdmin = () => {
                   <option value="">
                     {formData.idProduct ? 'Sélectionnez une caractéristique' : 'Choisissez d’abord un produit'}
                   </option>
-                  {featuresForSelectedProduct.map((feature) => (
+
+                  {sortedFeaturesForSelectedProduct.map((feature) => (
                     <option key={feature.id} value={feature.id}>
                       {feature.description}
                     </option>

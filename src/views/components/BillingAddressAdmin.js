@@ -34,7 +34,7 @@ const nameToCode = (name) =>
 export const BillingAddressAdmin = () => {
   const dispatch = useDispatch();
 
-  // Selectors (un hook par slice, jamais conditionnel)
+  // Selectors
   const billingAddressesSlice = useSelector((s) => s?.billingAddresses);
   const customersSlice = useSelector((s) => s?.customers);
 
@@ -100,7 +100,10 @@ export const BillingAddressAdmin = () => {
     customerId: null,
   });
 
-  // Recherche client (email / tel)
+  // ✅ Nouveau : recherche pour filtrer le tableau par client (email)
+  const [tableCustomerQuery, setTableCustomerQuery] = useState("");
+
+  // Recherche client (email / tel) — pour la modale uniquement
   const [customerQuery, setCustomerQuery] = useState("");
   const filteredCustomers = useMemo(() => {
     const q = customerQuery.trim().toLowerCase();
@@ -156,7 +159,6 @@ export const BillingAddressAdmin = () => {
   const onSubmit = async (e) => {
     e.preventDefault();
 
-    // On envoie le code ISO + le libellé FR (pratique si l'API veut le texte)
     const countryName = codeToName(form.countryCode) || "";
 
     const payload = {
@@ -196,10 +198,37 @@ export const BillingAddressAdmin = () => {
     };
   };
 
+  // ✅ Filtrage du tableau par email client (hors modale)
+  const displayedAddresses = useMemo(() => {
+    const q = tableCustomerQuery.trim().toLowerCase();
+    if (!q) return addresses;
+    return addresses.filter((a) => {
+      const email = (findCustomerEmail(
+        a?.idCustomer ?? a?.customerId ?? a?.customer?.id ?? a?.customerIdCustomer
+      ) || "").toLowerCase();
+      return email.includes(q);
+    });
+  }, [addresses, tableCustomerQuery, customers]);
+
   return (
     <div className="container py-3">
-      <div className="d-flex justify-content-between align-items-center mb-3">
-        <h2>Adresses de facturation</h2>
+      <div className="d-flex justify-content-between align-items-end mb-3">
+        <div>
+          <h2 className="mb-2">Adresses de facturation</h2>
+          {/* ✅ Champ de recherche par email client (filtre tableau) */}
+          <div className="d-flex align-items-center gap-2">
+            <label className="form-label m-0 me-2">Filtrer par client (email)</label>
+            <input
+              type="text"
+              className="form-control"
+              style={{ minWidth: 280 }}
+              placeholder="ex : client@domaine.com"
+              value={tableCustomerQuery}
+              onChange={(e) => setTableCustomerQuery(e.target.value)}
+            />
+          </div>
+        </div>
+
         <button className="btn btn-success mt-5" onClick={openAdd}>
           Ajouter une adresse
         </button>
@@ -220,14 +249,14 @@ export const BillingAddressAdmin = () => {
             </tr>
           </thead>
           <tbody>
-            {addresses.length === 0 ? (
+            {displayedAddresses.length === 0 ? (
               <tr>
                 <td colSpan={8} className="text-center">
                   Aucune adresse.
                 </td>
               </tr>
             ) : (
-              addresses.map((a) => {
+              displayedAddresses.map((a) => {
                 const row = fmtRow(a);
                 return (
                   <tr key={row.id}>
@@ -289,7 +318,7 @@ export const BillingAddressAdmin = () => {
 
             <form onSubmit={onSubmit}>
               <div className="row g-3">
-                {/* Recherche client */}
+                {/* Recherche client (modale) */}
                 <div className="col-12">
                   <label className="form-label">Client (recherche)</label>
                   <input

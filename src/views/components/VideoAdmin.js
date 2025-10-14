@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import '../../App.css';
 import { useSelector, useDispatch } from 'react-redux';
 import {
@@ -10,14 +10,19 @@ import { postUploadRequest } from '../../lib/actions/UploadActions';
 import { toMediaUrl } from '../../lib/utils/mediaUrl';
 
 export const VideoAdmin = () => {
-  const videosFromStore = useSelector((state) => state.videos.videos) || [];
-  const productsFromStore = useSelector((state) => state.products.products) || [];
+  const videosFromStore      = useSelector((s) => s.videos.videos) || [];
+  const productsFromStore    = useSelector((s) => s.products.products) || [];
+  const categoriesFromStore  = useSelector((s) => s.categories?.categories) || [];
   const dispatch = useDispatch();
 
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [currentId, setCurrentId] = useState(null);
+
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategoryId, setSelectedCategoryId] = useState(''); // ✅ filtre Catégorie
+  const [selectedProductId, setSelectedProductId]   = useState(''); // ✅ filtre Produit
+
   const [formData, setFormData] = useState({
     file: null,
     description: '',
@@ -28,22 +33,21 @@ export const VideoAdmin = () => {
   });
   const [previewUrl, setPreviewUrl] = useState('');
 
+  const collator = useMemo(() => new Intl.Collator('fr', { sensitivity: 'base' }), []);
+
   useEffect(() => {
     dispatch(getVideoRequest());
     dispatch(getProductUserRequest());
   }, [dispatch]);
 
-  // fermer avec ESC + bloquer le scroll du body quand la modale est ouverte
+  // fermer avec ESC + bloquer le scroll
   useEffect(() => {
     if (!showModal) {
       document.body.classList.remove('no-scroll');
       return;
     }
     document.body.classList.add('no-scroll');
-
-    const onKey = (e) => {
-      if (e.key === 'Escape') setShowModal(false);
-    };
+    const onKey = (e) => e.key === 'Escape' && setShowModal(false);
     window.addEventListener('keydown', onKey);
     return () => {
       window.removeEventListener('keydown', onKey);
@@ -51,26 +55,88 @@ export const VideoAdmin = () => {
     };
   }, [showModal]);
 
+  // cleanup objectURL
+  useEffect(() => {
+    return () => {
+      if (previewUrl?.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
+
+  // ------- Helpers -------
+  const getProductById = (id) => productsFromStore.find(p => String(p.id) === String(id));
+  const getCategoryById = (id) => categoriesFromStore.find(c => String(c.id) === String(id));
+
+  const getProductLabel = (p) => {
+    if (!p) return 'Produit inconnu';
+    const brand = p.brand ?? '';
+    const model = p.model ?? '';
+    return `${brand}${brand && model ? ' - ' : ''}${model}`.trim() || 'Produit';
+  };
+
+  const getProductName = (id) => getProductLabel(getProductById(id));
+
+  // id catégorie pour un produit (prend idCategory si dispo, sinon match par nom)
+  const getCategoryIdForProduct = (p) => {
+    if (!p) return null;
+    if (p.idCategory != null) return p.idCategory;
+    if (p.category) {
+      const byName = categoriesFromStore.find(c => c.name === p.category);
+      return byName?.id ?? null;
+    }
+    return null;
+  };
+
+  const getCategoryIdForProductId   = (productId) => getCategoryIdForProduct(getProductById(productId));
+  const getCategoryNameForProductId = (productId) => {
+    const cid = getCategoryIdForProductId(productId);
+    const c   = cid ? getCategoryById(cid) : null;
+    return c ? c.name : 'Catégorie inconnue';
+  };
+
+  // Produits triés (pour filtres et modale)
+  const sortedProducts = useMemo(() => {
+    return [...productsFromStore].sort((a, b) =>
+      collator.compare(getProductLabel(a), getProductLabel(b))
+    );
+  }, [productsFromStore, collator]);
+
+  // Produits disponibles pour le filtre Produit (dépend du filtre Catégorie)
+  const productsForProductFilter = useMemo(() => {
+    const pool = selectedCategoryId
+      ? sortedProducts.filter(p => String(getCategoryIdForProduct(p)) === String(selectedCategoryId))
+      : sortedProducts;
+    return pool;
+  }, [sortedProducts, selectedCategoryId]);
+
+  // Reset produit si on change la catégorie et qu'il n'appartient plus
+  useEffect(() => {
+    if (!selectedProductId || !selectedCategoryId) return;
+    const prod = getProductById(selectedProductId);
+    const prodCatId = getCategoryIdForProduct(prod);
+    if (String(prodCatId) !== String(selectedCategoryId)) {
+      setSelectedProductId('');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCategoryId]);
+
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value,
-    }));
+    setFormData((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
 
   const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setFormData((prev) => ({ ...prev, file }));
-      setPreviewUrl(URL.createObjectURL(file));
-    }
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (previewUrl?.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
+    setFormData((prev) => ({ ...prev, file }));
+    setPreviewUrl(URL.createObjectURL(file));
   };
 
   const handleAddClick = () => {
     setIsEditing(false);
     setCurrentId(null);
     setFormData({ file: null, description: '', idProduct: '', title: '', position: '', display: false });
+    if (previewUrl?.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
     setPreviewUrl('');
     setShowModal(true);
   };
@@ -86,7 +152,8 @@ export const VideoAdmin = () => {
       position: video.position != null ? String(video.position) : '',
       display: Boolean(video.display),
     });
-    setPreviewUrl(video.url);
+    if (previewUrl?.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(toMediaUrl(video.url || ''));
     setShowModal(true);
   };
 
@@ -99,7 +166,6 @@ export const VideoAdmin = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     const payloadBase = {
       File: formData.file,
       Type: 'VIDEO',
@@ -109,58 +175,95 @@ export const VideoAdmin = () => {
       Title: formData.title,
       Display: formData.display,
     };
-
     if (isEditing) {
-      await dispatch(postUploadRequest({
-        ...payloadBase,
-        Id: currentId,
-        TypeUpload: 'UPLOAD',
-      }));
+      await dispatch(postUploadRequest({ ...payloadBase, Id: currentId, TypeUpload: 'UPLOAD' }));
     } else {
-      await dispatch(postUploadRequest({
-        ...payloadBase,
-        TypeUpload: 'ADD',
-      }));
+      await dispatch(postUploadRequest({ ...payloadBase, TypeUpload: 'ADD' }));
     }
-
     await dispatch(getVideoRequest());
     setShowModal(false);
   };
 
-  const getProductName = (id) => {
-    const product = productsFromStore.find(p => p.id === id);
-    return product ? product.brand + ' - ' + product.model : 'Produit inconnu';
-  };
-
-  const sortedVideos = [...videosFromStore].sort((a, b) => {
-    const nameA = getProductName(a.idProduct).toLowerCase();
-    const nameB = getProductName(b.idProduct).toLowerCase();
-    return nameA.localeCompare(nameB);
-  });
-
-  const filteredVideos = sortedVideos.filter((vid) => {
-    const productName = getProductName(vid.idProduct);
-    const safeProductName = productName ? productName.toLowerCase() : '';
-    return (
-      (vid.url || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (vid.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      safeProductName.includes(searchQuery.toLowerCase())
+  // ------- Tri + filtres des vidéos -------
+  const sortedVideos = useMemo(() => {
+    // Tri principal par nom de produit
+    return [...videosFromStore].sort((a, b) =>
+      collator.compare(getProductName(a.idProduct), getProductName(b.idProduct))
     );
-  });
+  }, [videosFromStore, collator, productsFromStore]);
+
+  const filteredVideos = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return sortedVideos.filter((vid) => {
+      // Filtre catégorie
+      if (selectedCategoryId) {
+        const catId = getCategoryIdForProductId(vid.idProduct);
+        if (String(catId) !== String(selectedCategoryId)) return false;
+      }
+      // Filtre produit
+      if (selectedProductId && String(vid.idProduct) !== String(selectedProductId)) {
+        return false;
+      }
+      // Filtre texte
+      if (!q) return true;
+      const url   = String(vid.url || '').toLowerCase();
+      const desc  = String(vid.description || '').toLowerCase();
+      const title = String(vid.title || '').toLowerCase();
+      const pname = String(getProductName(vid.idProduct) || '').toLowerCase();
+      return url.includes(q) || desc.includes(q) || title.includes(q) || pname.includes(q);
+    });
+  }, [sortedVideos, selectedCategoryId, selectedProductId, searchQuery]);
+
+  // Catégories triées pour le filtre
+  const sortedCategories = useMemo(() => {
+    return [...categoriesFromStore].sort((a, b) =>
+      collator.compare(a?.name ?? '', b?.name ?? '')
+    );
+  }, [categoriesFromStore, collator]);
 
   return (
     <div className='container py-5'>
       <h1 className="text-center mb-4">Gestion des vidéos</h1>
 
-      <div className="d-flex justify-content-between mb-3">
-        <input
-          type="text"
-          placeholder="Rechercher par URL, description ou produit..."
-          className="form-control w-50"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
-        <button className='btn btn-success ms-2' onClick={handleAddClick}>
+      <div className="d-flex flex-wrap gap-2 justify-content-between mb-3">
+        <div className="d-flex gap-2 flex-grow-1">
+          {/* ✅ Filtre Catégorie */}
+          <select
+            className="form-select"
+            style={{ minWidth: 220 }}
+            value={selectedCategoryId}
+            onChange={(e) => setSelectedCategoryId(e.target.value)}
+          >
+            <option value="">Toutes les catégories</option>
+            {sortedCategories.map(cat => (
+              <option key={cat.id} value={cat.id}>{cat.name}</option>
+            ))}
+          </select>
+
+          {/* ✅ Filtre Produit (dépend de la Catégorie) */}
+          <select
+            className="form-select"
+            style={{ minWidth: 260 }}
+            value={selectedProductId}
+            onChange={(e) => setSelectedProductId(e.target.value)}
+          >
+            <option value="">Tous les produits</option>
+            {productsForProductFilter.map((p) => (
+              <option key={p.id} value={p.id}>{getProductLabel(p)}</option>
+            ))}
+          </select>
+
+          {/* Recherche texte */}
+          <input
+            type="text"
+            placeholder="Rechercher: URL, description, titre, produit…"
+            className="form-control"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+
+        <button className='btn btn-success' onClick={handleAddClick}>
           Ajouter une vidéo
         </button>
       </div>
@@ -172,6 +275,7 @@ export const VideoAdmin = () => {
               <th>Vidéo</th>
               <th>Description</th>
               <th>Produit</th>
+              <th>Catégorie</th>
               <th>Titre</th>
               <th>Position</th>
               <th>Afficher</th>
@@ -189,6 +293,7 @@ export const VideoAdmin = () => {
                 </td>
                 <td>{vid.description}</td>
                 <td>{getProductName(vid.idProduct)}</td>
+                <td>{getCategoryNameForProductId(vid.idProduct)}</td>
                 <td>{vid.title}</td>
                 <td>{vid.position}</td>
                 <td>
@@ -201,19 +306,13 @@ export const VideoAdmin = () => {
                 <td>
                   <button
                     className='btn btn-sm btn-warning me-2'
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleEditClick(vid);
-                    }}
+                    onClick={(e) => { e.stopPropagation(); handleEditClick(vid); }}
                   >
                     <i className="bi bi-pencil"></i>
                   </button>
                   <button
                     className='btn btn-sm btn-danger'
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteClick(vid.id);
-                    }}
+                    onClick={(e) => { e.stopPropagation(); handleDeleteClick(vid.id); }}
                   >
                     <i className="bi bi-trash"></i>
                   </button>
@@ -222,7 +321,7 @@ export const VideoAdmin = () => {
             ))}
             {filteredVideos.length === 0 && (
               <tr>
-                <td colSpan="7" className="text-center">Aucune vidéo trouvée.</td>
+                <td colSpan="8" className="text-center">Aucune vidéo trouvée.</td>
               </tr>
             )}
           </tbody>
@@ -230,11 +329,7 @@ export const VideoAdmin = () => {
       </div>
 
       {showModal && (
-        <div
-          className="admin-modal-backdrop"
-          role="presentation"
-          onClick={() => setShowModal(false)}
-        >
+        <div className="admin-modal-backdrop" role="presentation" onClick={() => setShowModal(false)}>
           <div
             className="admin-modal-panel"
             role="dialog"
@@ -313,9 +408,9 @@ export const VideoAdmin = () => {
                   required
                 >
                   <option value="">Sélectionnez un produit</option>
-                  {productsFromStore.map((product) => (
+                  {productsForProductFilter.map((product) => (
                     <option key={product.id} value={product.id}>
-                      {product.brand + ' - ' + product.model}
+                      {getProductLabel(product)}
                     </option>
                   ))}
                 </select>
@@ -336,11 +431,7 @@ export const VideoAdmin = () => {
               </div>
 
               <div className="d-flex justify-content-end">
-                <button
-                  type="button"
-                  className="btn btn-secondary me-2"
-                  onClick={() => setShowModal(false)}
-                >
+                <button type="button" className="btn btn-secondary me-2" onClick={() => setShowModal(false)}>
                   Annuler
                 </button>
                 <button type="submit" className="btn btn-dark">
