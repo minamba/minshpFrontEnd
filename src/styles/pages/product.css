@@ -402,3 +402,168 @@
   }
 }
 
+
+
+/* ===========================
+   LIGHTBOX — Moderne & Épurée
+   =========================== */
+
+.lb-overlay{
+  position: fixed; inset: 0;
+  background: color-mix(in oklab, #0b1220 82%, transparent);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: grid;
+  place-items: center;
+  z-index: 9999;
+  animation: lbFade .18s ease-out;
+}
+@keyframes lbFade { from { opacity: 0 } to { opacity: 1 } }
+
+.lb-content{
+  width: min(96vw, 1400px);
+  height: min(92vh, 860px);
+  background: #0b1220;
+  border-radius: 18px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.35);
+  display: grid;
+  grid-template-rows: 56px 1fr 88px;
+  overflow: hidden;
+}
+
+.lb-topbar{
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 0 12px;
+  color: #e5e7eb;
+  background: linear-gradient(180deg, rgba(255,255,255,.06), transparent);
+}
+.lb-counter{
+  margin-right: auto;
+  font-weight: 700;
+  padding-left: 12px;
+  opacity: .9;
+}
+
+.lb-btn{
+  appearance: none; border: 0; background: transparent; color: #fff;
+  width: 40px; height: 40px; border-radius: 12px;
+  display: grid; place-items: center; cursor: pointer;
+  transition: transform .08s ease, background .18s ease, opacity .2s ease;
+}
+.lb-btn:hover{ background: rgba(255,255,255,.08); transform: translateY(-1px); }
+.lb-btn:active{ transform: translateY(0); }
+
+.lb-close{
+  font-size: 26px; line-height: 1; font-weight: 300;
+}
+
+.lb-stage{
+  position: relative;
+  width: 100%; height: 100%;
+  display: grid; place-items: center;
+  overflow: hidden;
+}
+
+.lb-image{
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+  animation: lbIn .2s ease-out;
+}
+@keyframes lbIn { from { opacity: 0; transform: scale(.985) } to { opacity: 1; transform: scale(1) } }
+
+.lb-arrow{
+  position: absolute;
+  top: 50%; transform: translateY(-50%);
+  font-size: 38px; line-height: 0;
+  width: 48px; height: 48px; border-radius: 14px;
+  background: rgba(255,255,255,.06);
+  box-shadow: var(--shadow-2);
+  backdrop-filter: blur(3px);
+}
+.lb-prev{ left: 14px; }
+.lb-next{ right: 14px; }
+
+.lb-thumbs{
+  display: flex; gap: 10px;
+  align-items: center; justify-content: center;
+  padding: 10px 14px 16px;
+  background: linear-gradient(0deg, rgba(255,255,255,.06), transparent);
+  overflow-x: auto;
+}
+.lb-thumb{
+  flex: 0 0 auto;
+  width: 68px; height: 68px;
+  border-radius: 10px; background: #0f172a; border: 1px solid #1f2937;
+  padding: 0; box-shadow: var(--shadow-1);
+  opacity: .85; transition: opacity .15s ease, transform .08s ease, border-color .2s ease;
+}
+.lb-thumb:hover{ opacity: 1; transform: translateY(-1px); }
+.lb-thumb.is-active{
+  border-color: #416bf5;
+  box-shadow: 0 8px 22px rgba(65,107,245,.28);
+  opacity: 1;
+}
+.lb-thumb img{
+  width: 100%; height: 100%; object-fit: cover; border-radius: 9px;
+}
+
+/* Responsive */
+@media (max-width: 992px){
+  .lb-content{
+    width: 100vw; height: 100dvh; border-radius: 0;
+    grid-template-rows: 56px 1fr 92px;
+  }
+  .lb-arrow{ width: 44px; height: 44px; }
+  .lb-thumb{ width: 64px; height: 64px; }
+}
+@media (max-width: 560px){
+  .lb-thumb{ width: 58px; height: 58px; }
+  .lb-arrow{ display:none; } /* on privilégie le swipe sur très petit écran */
+}
+
+/* ==== Lightbox: assurer l'image 100% visible sur desktop ==== */
+.lb-stage {
+  padding: 0;
+  overflow: hidden;
+}
+
+.lb-stage .lb-image{
+  /* neutralise les styles globaux type img{width:100%} */
+  width: auto !important;
+  height: auto !important;
+
+  /* contrainte au conteneur visible */
+  max-width: 100%;
+  max-height: 100%;
+
+  /* le “contain” fait le boulot une fois width/height libérés */
+  object-fit: contain;
+
+  display: block;
+  box-sizing: border-box;
+  /* pas de transform par défaut (zoom) */
+  transform: none;
+}
+
+/* Optionnel : sur très petits écrans, rien à changer */
+@media (max-width: 992px){
+  .lb-stage .lb-image{
+    max-width: 100%;
+    max-height: 100%;
+  }
+}
+
+
+.lb-content { box-sizing: border-box; }
+.lb-stage   { overflow: hidden; }
+
+
+
+
+

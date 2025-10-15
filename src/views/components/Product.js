@@ -4,13 +4,32 @@ import { useSelector, useDispatch } from 'react-redux';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ProductSpecs } from '../../components/index';
 import { addToCartRequest, saveCartRequest } from '../../lib/actions/CartActions';
-import { GenericModal, ProductMedia } from '../../components/index';
+import { GenericModal } from '../../components/index';
 import { toMediaUrl } from '../../lib/utils/mediaUrl';
 import { getProductsPagedUserRequest } from "../../lib/actions/ProductActions";
 import { getFeaturesCategoryByProductRequest, clearFeaturesForProduct } from "../../lib/actions/FeatureCategoryActions";
 import "../../styles/pages/product.css";
 import { calculPrice } from '../../lib/utils/Helpers';
 import DOMPurify from 'dompurify';
+
+/* ---------------- Swipe helpers (lightbox) ---------------- */
+const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+const useSwipe = ({ onSwipeLeft, onSwipeRight, threshold = 40 }) => {
+  const startX = useRef(0);
+  const lastX = useRef(0);
+  const isDown = useRef(false);
+
+  const onStart = (x) => { isDown.current = true; startX.current = x; lastX.current = x; };
+  const onMove  = (x) => { if (isDown.current) lastX.current = x; };
+  const onEnd   = () => {
+    if (!isDown.current) return;
+    const delta = lastX.current - startX.current;
+    if (delta <= -threshold) onSwipeLeft?.();
+    if (delta >=  threshold) onSwipeRight?.();
+    isDown.current = false;
+  };
+  return { onStart, onMove, onEnd };
+};
 
 export const Product = () => {
   const { id } = useParams();
@@ -78,17 +97,17 @@ export const Product = () => {
     return copy.length ? copy : [{ url: '/Images/placeholder.jpg', position: 1 }];
   }, [productImagesRaw]);
 
-  const firstPos1Index = useMemo(
-    () => Math.max(0, productImagesSorted.findIndex(x => Number(x.position) === 1)),
-    [productImagesSorted]
-  );
-
   const imageUrls = useMemo(
     () => (productImagesSorted || []).map(img => toMediaUrl(img.url)),
     [productImagesSorted]
   );
 
-  // Vidéo
+  const firstPos1Index = useMemo(
+    () => Math.max(0, productImagesSorted.findIndex(x => Number(x.position) === 1)),
+    [productImagesSorted]
+  );
+
+  // Vidéos
   const productVideos = useMemo(() => {
     if (!product) return [];
     return (videos || []).filter((v) => String(v.idProduct) === String(product.id) && v.position === 2);
@@ -97,21 +116,16 @@ export const Product = () => {
   const hasVideo = !!(heroVideo?.url && String(heroVideo.url).trim() !== '');
 
   // Index UI
-  // mainIndex = image vitrine (celle du haut) — DOIT rester fixe sur mobile
+  // mainIndex = image vitrine — DOIT rester fixe sur mobile
   const [mainIndex, setMainIndex] = useState(0);
-  const [galleryIndex, setGalleryIndex] = useState(0);
   const [lightboxIndex, setLightboxIndex] = useState(0);
 
   useEffect(() => {
     setMainIndex(firstPos1Index);
-    setGalleryIndex(firstPos1Index);
     setLightboxIndex(firstPos1Index);
   }, [firstPos1Index]);
 
-  const currentMainUrl = productImagesSorted[mainIndex]?.url || '/Images/placeholder.jpg';
-
-  // Lightbox
-  const [isLightboxOpen, setLightboxOpen] = useState(false);
+  const currentMainUrl = imageUrls[mainIndex] || '/Images/placeholder.jpg';
 
   // Détection mobile
   const [isMobile, setIsMobile] = useState(() =>
@@ -126,10 +140,48 @@ export const Product = () => {
     };
   }, []);
 
+  // Lightbox
+  const [isLightboxOpen, setLightboxOpen] = useState(false);
   const openLightbox  = (idx) => { setLightboxIndex(idx); setLightboxOpen(true); };
-  const closeLightbox = () => { setLightboxOpen(false); setGalleryIndex(mainIndex); };
-  const prev = () => setLightboxIndex((i) => (i - 1 + productImagesSorted.length) % productImagesSorted.length);
-  const next = () => setLightboxIndex((i) => (i + 1) % productImagesSorted.length);
+  const closeLightbox = () => { setLightboxOpen(false); };
+
+  const prev = () =>
+    setLightboxIndex((i) => (i - 1 + imageUrls.length) % imageUrls.length);
+  const next = () =>
+    setLightboxIndex((i) => (i + 1) % imageUrls.length);
+
+  // Bloque scroll & interactions derrière la LB
+  useEffect(() => {
+    const pageEl = document.querySelector('.product-page');
+    if (isLightboxOpen) {
+      const prevOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      pageEl?.classList?.add('no-touch-while-lb');
+      return () => {
+        document.body.style.overflow = prevOverflow;
+        pageEl?.classList?.remove('no-touch-while-lb');
+      };
+    }
+  }, [isLightboxOpen]);
+
+  // Clavier LB
+  useEffect(() => {
+    if (!isLightboxOpen) return;
+    const onKey = (e) => {
+      if (e.key === 'Escape') closeLightbox();
+      if (e.key === 'ArrowLeft') prev();
+      if (e.key === 'ArrowRight') next();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isLightboxOpen]);
+
+  // Swipe LB
+  const { onStart, onMove, onEnd } = useSwipe({
+    onSwipeLeft: next,
+    onSwipeRight: prev,
+    threshold: 40
+  });
 
   // Prix / promos (inchangé)
   const computeBadgeFromProduct = (product, promotionCodes = []) => {
@@ -304,92 +356,187 @@ export const Product = () => {
     );
   }
 
+  /* ------------------------------------------------------------
+     Rendu
+     - Thumbs: desktop => change la vitrine ; mobile => ouvre LB
+     - Vitrine: clic => ouvre LB
+     - Lightbox: swipe, flèches, esc, thumbs
+  ------------------------------------------------------------- */
   return (
     <div className="product-page" onContextMenu={handleContextMenu}>
-      {/* >>> ICI LE FIX CLEF <<< */}
-      <ProductMedia
-        images={imageUrls}
-        index={isMobile ? mainIndex : galleryIndex}          // <-- sur mobile, on force la vitrine à rester sur mainIndex
-        onIndexChange={(i) => {
-          setGalleryIndex(i);
-          if (isMobile) {                                    // <-- NE PAS TOUCHER la vitrine sur mobile
-            openLightbox(i);
-            return;
-          }
-          setMainIndex(i);                                   // desktop : vitrine suit la sélection
-        }}
-        onImageClick={(idx) => openLightbox(idx)}
-        isMobile={isMobile}
-      >
-        <p className="product-brand">{product?.brand || ''}</p>
-        <h1 className="product-title product-title--center specs-title">
-          {product?.brand + ' ' + product?.model || product?.title || 'Produit'}
-        </h1>
-
-        <div className="details-stack">
-          {Number.isFinite(displayPrice) && (
-            <>
-              {Number.isFinite(badgePct) && badgePct > 0 && (
-                <div className="refprice-wrap">
-                  <div className="refprice-label">Prix de référence</div>
-                  <div className="refprice-row">
-                    <span className="refprice-old">
-                      {priceRef.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
-                    </span>
-                    <span className="refprice-badge">-{badgePct}%</span>
-                  </div>
-                </div>
-              )}
-              <div className="price--big">
-                <span className="euros">{displayPrice.toFixed(2).split('.')[0]}€</span>
-                <sup className="cents">{displayPrice.toFixed(2).split('.')[1]}</sup>
-              </div>
-              {activePromo && promoUntil && (<div className="promo-until">Jusqu'au {promoUntil} inclus</div>)}
-              <p className="price-lead"><em>{product?.taxWithoutTva}</em></p>
-              <p className="product-description">Taxes incluses — Frais de livraison calculés lors du paiement.</p>
-            </>
-          )}
-
-          <div className={`stock-row ${stockRowClass}`}>
-            <span className={`stock-dot ${stockDotClass}`} /> <span>{stockStatusLabel}</span>
-          </div>
-
-          <div className="buy-row">
-            <select className="qty-select" value={qty} onChange={(e) => setQty(Number(e.target.value))}
-              aria-label="Quantité" disabled={isActuallyOut || availableQty <= 0}>
-              {Array.from({ length: Math.min(Math.max(0, availableQty), 50) }, (_, i) => i + 1).map((n) => (
-                <option key={n} value={n}>{n}</option>
-              ))}
-            </select>
-
-            <button className="buy-button buy-accent" onClick={addToCart}
-              disabled={isActuallyOut} aria-disabled={isActuallyOut}
-              title={isActuallyOut ? "Article en rupture" : "Ajouter au panier"}>
-              🛍️ Ajouter au panier
+      <div className="product-main">
+        {/* Vignettes */}
+        <div className="thumbs-col">
+          {imageUrls.map((src, i) => (
+            <button
+              key={i}
+              className="thumb"
+              onClick={() => {
+                if (isMobile) {
+                  // 🔒 Mobile : on ne change pas la vitrine, on ouvre la LB
+                  openLightbox(i);
+                } else {
+                  // 🖥️ Desktop : la vitrine suit la sélection
+                  setMainIndex(i);
+                }
+              }}
+              aria-label={`Sélectionner l'image ${i + 1}`}
+            >
+              <img src={src} alt={`Miniature ${i + 1}`} loading="lazy" />
             </button>
-          </div>
-
-          <ul className="trust-list">
-            <li><span className="trust-ico" aria-hidden="true">📦</span> Envoi sous 24h</li>
-            <li><span className="trust-ico" aria-hidden="true">🚚</span> Livraison rapide et sécurisée</li>
-          </ul>
+          ))}
         </div>
-      </ProductMedia>
 
-      {/* Lightbox */}
-      {isLightboxOpen && (
-        <div className="lightbox" role="dialog" aria-modal="true"
-          onClick={closeLightbox}
-          onTouchStart={(e)=>{ /* handlers si tu veux swipes */ }}
-        >
-          <button className="lb-close" type="button" aria-label="Fermer" onClick={closeLightbox}>×</button>
-          <button className="lb-prev"  type="button" aria-label="Précédent" onClick={(e) => { e.stopPropagation(); prev();  }}>‹</button>
-          <img className="lb-img"
-            src={toMediaUrl(productImagesSorted[lightboxIndex]?.url)}
-            alt={`Image ${lightboxIndex + 1} de ${product?.name || 'Produit'}`}
-            onClick={(e) => e.stopPropagation()}
+        {/* Image principale (vitrine) */}
+        <div className="product-main-image-wrap">
+          <img
+            className="product-main-image"
+            src={currentMainUrl}
+            alt={product?.name || product?.title || 'Image produit'}
+            onClick={() => openLightbox(mainIndex)}
+            role="button"
+            style={{ cursor: "zoom-in" }}
+            draggable={false}
           />
-          <button className="lb-next"  type="button" aria-label="Suivant" onClick={(e) => { e.stopPropagation(); next(); }}>›</button>
+        </div>
+
+        {/* Colonne détails */}
+        <div className="product-details">
+          <p className="product-brand">{product?.brand || ''}</p>
+          <h1 className="product-title product-title--center specs-title">
+            {product?.brand + ' ' + product?.model || product?.title || 'Produit'}
+          </h1>
+
+          <div className="details-stack">
+            {Number.isFinite(displayPrice) && (
+              <>
+                {Number.isFinite(badgePct) && badgePct > 0 && (
+                  <div className="refprice-wrap">
+                    <div className="refprice-label">Prix de référence</div>
+                    <div className="refprice-row">
+                      <span className="refprice-old">
+                        {priceRef.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+                      </span>
+                      <span className="refprice-badge">-{badgePct}%</span>
+                    </div>
+                  </div>
+                )}
+                <div className="price--big">
+                  <span className="euros">{displayPrice.toFixed(2).split('.')[0]}€</span>
+                  <sup className="cents">{displayPrice.toFixed(2).split('.')[1]}</sup>
+                </div>
+                {activePromo && promoUntil && (<div className="promo-until">Jusqu'au {promoUntil} inclus</div>)}
+                <p className="price-lead"><em>{product?.taxWithoutTva}</em></p>
+                <p className="product-description">Taxes incluses — Frais de livraison calculés lors du paiement.</p>
+              </>
+            )}
+
+            <div className={`stock-row ${stockRowClass}`}>
+              <span className={`stock-dot ${stockDotClass}`} /> <span>{stockStatusLabel}</span>
+            </div>
+
+            <div className="buy-row">
+              <select className="qty-select" value={qty} onChange={(e) => setQty(Number(e.target.value))}
+                aria-label="Quantité" disabled={isActuallyOut || availableQty <= 0}>
+                {Array.from({ length: Math.min(Math.max(0, availableQty), 50) }, (_, i) => i + 1).map((n) => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+
+              <button className="buy-button buy-accent" onClick={addToCart}
+                disabled={isActuallyOut} aria-disabled={isActuallyOut}
+                title={isActuallyOut ? "Article en rupture" : "Ajouter au panier"}>
+                🛍️ Ajouter au panier
+              </button>
+            </div>
+
+            <ul className="trust-list">
+              <li><span className="trust-ico" aria-hidden="true">📦</span> Envoi sous 24h</li>
+              <li><span className="trust-ico" aria-hidden="true">🚚</span> Livraison rapide et sécurisée</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      {/* Lightbox moderne : swipe + flèches + thumbs */}
+      {isLightboxOpen && (
+        <div
+          className="lb-overlay"
+          role="dialog"
+          aria-modal="true"
+          onClick={(e) => {
+            if (e.target.classList.contains('lb-overlay')) closeLightbox();
+          }}
+        >
+          <div
+            className="lb-content"
+            onMouseDown={(e) => onStart(e.clientX)}
+            onMouseMove={(e) => onMove(e.clientX)}
+            onMouseUp={onEnd}
+            onMouseLeave={onEnd}
+            onTouchStart={(e) => onStart(e.touches[0].clientX)}
+            onTouchMove={(e) => onMove(e.touches[0].clientX)}
+            onTouchEnd={onEnd}
+          >
+            <div className="lb-topbar">
+              <div className="lb-counter">{lightboxIndex + 1} / {imageUrls.length}</div>
+              <button className="lb-btn lb-close" onClick={closeLightbox} aria-label="Fermer">×</button>
+            </div>
+
+            <div className="lb-stage">
+              {imageUrls.length > 1 && (
+                <button className="lb-btn lb-arrow lb-prev" onClick={prev} aria-label="Précédent">‹</button>
+              )}
+
+<div
+  className="lb-fit"
+  onClick={(e) => e.stopPropagation()}
+  style={{
+    position: 'relative',
+    width: '100%',
+    height: '100%',
+  }}
+>
+  <div
+    className="lb-bgi"
+    style={{
+      position: 'absolute',
+      inset: 0,
+      margin: 'auto',
+      /* marge de sécurité pour éviter tout “bord collé” et défilement */
+      padding: 0,
+      /* image en background -> aucune règle <img> ne s’applique */
+      backgroundImage: `url(${imageUrls[lightboxIndex]})`,
+      backgroundRepeat: 'no-repeat',
+      backgroundPosition: 'center',
+      backgroundSize: 'contain',
+      /* empêche tout débordement vertical/horizontal */
+      maxWidth: '100%',
+      maxHeight: '100%',
+    }}
+  />
+</div>
+
+              {imageUrls.length > 1 && (
+                <button className="lb-btn lb-arrow lb-next" onClick={next} aria-label="Suivant">›</button>
+              )}
+            </div>
+
+            {imageUrls.length > 1 && (
+              <div className="lb-thumbs">
+                {imageUrls.map((src, i) => (
+                  <button
+                    key={i}
+                    className={`lb-thumb ${i === lightboxIndex ? 'is-active' : ''}`}
+                    onClick={() => setLightboxIndex(i)}
+                    aria-label={`Aller à l'image ${i + 1}`}
+                  >
+                    <img src={src} alt={`Miniature ${i + 1}`} />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -457,3 +604,5 @@ export const Product = () => {
     </div>
   );
 };
+
+export default Product;
