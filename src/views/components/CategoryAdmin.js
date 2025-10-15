@@ -281,10 +281,11 @@ export const CategoryAdmin = () => {
         IdPackageProfil: pkgIdNum,
         ContentCode: contentCodeId,
         Display: !!formData.display,
+        IdImage: Number(idImage)
       }));
-      if (idImage) {
-        await dispatch(updateImageRequest({ id: Number(idImage), idCategory: Number(currentId) }));
-      }
+      // if (idImage) {
+      //   await dispatch(updateImageRequest({ id: Number(idImage), idCategory: Number(currentId) }));
+      // }
     } else {
       const addPayload = {
         name: formData.name,
