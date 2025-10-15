@@ -265,6 +265,7 @@ export const SubCategoryAdmin = () => {
           ContentCode: contentCodeId,
           IdCategory: catIdNum,
           Display: !!formData.display,
+          IdImage: Number(idImage)
         })
       );
       if (idImage) {
@@ -287,17 +288,16 @@ export const SubCategoryAdmin = () => {
         })
       );
       await dispatch(getSubCategoryRequest());
-
       // 🔗 si une image a été choisie à la création, on la relie à la sous-catégorie nouvellement créée
-      const created = [...subcategoriesFromStore].reverse().find((sc) => sc.name === formData.name);
-      if (idImage && created?.id) {
-        await dispatch(
-          updateImageRequest({
-            id: Number(idImage),
-            IdSubCategory: Number(created.id),
-          })
-        );
-      }
+      // const created = [...subcategoriesFromStore].reverse().find((sc) => sc.name === formData.name);
+      // if (idImage && created?.id) {
+      //   await dispatch(
+      //     updateImageRequest({
+      //       id: Number(idImage),
+      //       IdSubCategory: Number(created.id),
+      //     })
+      //   );
+      // }
     }
 
     await dispatch(getImageRequest());
