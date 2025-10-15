@@ -11,7 +11,6 @@ import { calculPrice } from "../../lib/utils/Helpers";
 import { getProductsPagedUserRequest } from "../../lib/actions/ProductActions";
 import { ScrollHint } from "../../components";
 
-
 /* -------------------- Helpers (définis ici) -------------------- */
 const parseDate = (val) => {
   if (!val) return null;
@@ -79,23 +78,19 @@ export const Category = () => {
   const navigate = useNavigate();
 
   /* Store */
-  // ----- products can be in 'products' (full) or 'items' (paged)
   const prodState    = useSelector((s) => s.products) || {};
   const fullProducts = Array.isArray(prodState.products) ? prodState.products : [];
   const pagedItems   = Array.isArray(prodState.items)    ? prodState.items    : [];
-  let productsAll  = fullProducts.length ? fullProducts : pagedItems;
+  let productsAll    = fullProducts.length ? fullProducts : pagedItems;
   const promotionCodes = useSelector((s) => s.promotionCodes?.promotionCodes) || [];
   const loading      = !!prodState.loading;
 
   productsAll = productsAll.filter((p) => p.display === true);
-  
 
-  const images     = useSelector((s) => s.images?.images) || [];
-  const items      = useSelector((s) => s.items?.items) || [];
-  const categories = useSelector((s) => s.categories?.categories) || [];
-  const subcategories = useSelector((s) => s.subCategories?.subCategories) || [];
-
-
+  const images       = useSelector((s) => s.images?.images) || [];
+  const items        = useSelector((s) => s.items?.items) || [];
+  const categories   = useSelector((s) => s.categories?.categories) || [];
+  const subcategories= useSelector((s) => s.subCategories?.subCategories) || [];
 
   useEffect(() => {
     if (!routeCategoryId) return;
@@ -107,30 +102,42 @@ export const Category = () => {
     }));
   }, [dispatch, routeCategoryId]);
 
-
-
-    useEffect(() => {
-      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
-    }, [routeCategoryId]);
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, [routeCategoryId]);
 
   /* Sauvegarde panier */
   useEffect(() => { dispatch(saveCartRequest(items)); }, [items, dispatch]);
 
-  /* Catégorie courante + bannière */
+  /* Catégorie courante + bannière (image position 1 prioritaire) */
   const currentCategory = useMemo(
     () => (categories || []).find((c) => String(c.id) === String(routeCategoryId)) || null,
     [categories, routeCategoryId]
   );
 
   const categoryBannerUrl = useMemo(() => {
-    const byCat = images.find((i) => String(i.idCategory) === String(routeCategoryId));
-    return byCat?.url || "/Images/placeholder.jpg";
+    const catImgs = images.filter((i) => String(i.idCategory) === String(routeCategoryId));
+    if (catImgs.length === 0) return "/Images/placeholder.jpg";
+    const pos1 = catImgs.find((i) => Number(i.position) === 1 && i.url);
+    if (pos1?.url) return pos1.url;
+    const sorted = [...catImgs].sort(
+      (a, b) => Number(a.position ?? 9999) - Number(b.position ?? 9999)
+    );
+    const first = sorted.find((i) => !!i.url);
+    return first?.url || "/Images/placeholder.jpg";
   }, [images, routeCategoryId]);
 
-  /* Image principale produit */
-  const getProductImage = (productId) => {
+  /* ===== Image vitrine produit (position 1 prioritaire) ===== */
+  const getProductCoverImage = (productId) => {
     const productImages = images.filter((i) => String(i.idProduct) === String(productId));
-    return productImages.length > 0 ? productImages[0].url : "/Images/placeholder.jpg";
+    if (!productImages.length) return "/Images/placeholder.jpg";
+    const pos1 = productImages.find((i) => Number(i.position) === 1 && i.url);
+    if (pos1?.url) return pos1.url;
+    const sorted = [...productImages].sort(
+      (a, b) => Number(a.position ?? 9999) - Number(b.position ?? 9999)
+    );
+    const first = sorted.find((i) => !!i.url);
+    return first?.url || "/Images/placeholder.jpg";
   };
 
   /* Produits de la catégorie */
@@ -216,7 +223,7 @@ export const Category = () => {
         creationTs
       };
     });
-  }, [categoryProducts]);
+  }, [categoryProducts, promotionCodes]);
 
   const filteredSorted = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -422,7 +429,7 @@ export const Category = () => {
           )}
 
           {filteredSorted.map(({ product, name, priceRef, displayPrice, hasAnyPromo }) => {
-            const img = getProductImage(product.id);
+            const img = getProductCoverImage(product.id); // <<< position 1 prioritaire
             const [euros, cents] = displayPrice.toFixed(2).split(".");
 
             const raw = (product?.stockStatus ?? "").trim();
@@ -470,43 +477,44 @@ export const Category = () => {
                   )}
                 </div>
 
-                <h3 className="product-name">{product.brand + " " + product.model}</h3>
+                <h3 className="product-name">{[product.brand, product.model].filter(Boolean).join(" ") || name}</h3>
                 {product.previewDescription && (
                   <p className="product-preview text-muted" title={product.previewDescription}>
                     {product.previewDescription}
                   </p>
                 )}
-{/* Alignement identique à Home : statut compressible + prix à droite */}
-<div
-  className="new-price-row"
-  style={{
-    display: "grid",
-    gridTemplateColumns: "minmax(0, 1fr) auto",
-    alignItems: "center",
-    columnGap: 8,
-    overflow: "hidden",
-  }}
->
-  {/* Statut : 1 seule ligne + ellipsis, accepte de se compresser */}
-<span className={`card-stock ${stockCls}`} title={stockLabel}>
-  <span className={`card-stock-dot ${stockCls}`} />
-  <span className="card-stock-txt">{stockLabel}</span>
-</span>
+
+                {/* Alignement identique à Home : statut compressible + prix à droite */}
                 <div
-                  className={`price-stack ${hasAnyPromo ? "has-promo" : ""}`}
-                  style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2, lineHeight: 1.15 }}
+                  className="new-price-row"
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "minmax(0, 1fr) auto",
+                    alignItems: "center",
+                    columnGap: 8,
+                    overflow: "hidden",
+                  }}
                 >
-                  {hasAnyPromo && (
-                    <span className="price-old" style={{ margin: 0, fontSize: ".95rem" }}>
-                      {priceRef.toLocaleString("fr-FR", { style: "currency", currency: "EUR" })}
-                    </span>
-                  )}
-                  <div className={`price ${hasAnyPromo ? "price--promo" : ""}`}>
-                    <span className="euros">{euros}€</span>
-                    <sup className="cents">{cents}</sup>
+                  <span className={`card-stock ${stockCls}`} title={stockLabel}>
+                    <span className={`card-stock-dot ${stockCls}`} />
+                    <span className="card-stock-txt">{stockLabel}</span>
+                  </span>
+
+                  <div
+                    className={`price-stack ${hasAnyPromo ? "has-promo" : ""}`}
+                    style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2, lineHeight: 1.15 }}
+                  >
+                    {hasAnyPromo && (
+                      <span className="price-old" style={{ margin: 0, fontSize: ".95rem" }}>
+                        {priceRef.toLocaleString("fr-FR", { style: "currency", currency: "EUR" })}
+                      </span>
+                    )}
+                    <div className={`price ${hasAnyPromo ? "price--promo" : ""}`}>
+                      <span className="euros">{euros}€</span>
+                      <sup className="cents">{cents}</sup>
+                    </div>
                   </div>
                 </div>
-              </div>
               </article>
             );
           })}

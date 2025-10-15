@@ -113,9 +113,21 @@ export const Home = () => {
     ? toMediaUrl(heroImage99.url)
     : IMAGE_FALLBACK;
 
-  const getProductImage = (id) => {
+  // ====== COVER IMAGE POUR LES NOUVEAUTÉS (position 1 prioritaire) ======
+  const getProductCoverImage = (id) => {
     const productImages = images.filter((i) => String(i.idProduct) === String(id));
-    return productImages.length > 0 ? productImages[0].url : '/Images/placeholder.jpg';
+    if (!productImages.length) return '/Images/placeholder.jpg';
+
+    // 1) essaie de prendre la position 1
+    const pos1 = productImages.find((i) => Number(i.position) === 1 && i.url);
+    if (pos1?.url) return pos1.url;
+
+    // 2) sinon, la plus petite position existante
+    const sorted = [...productImages].sort(
+      (a, b) => Number(a.position ?? 9999) - Number(b.position ?? 9999)
+    );
+    const first = sorted.find((i) => !!i.url);
+    return first?.url || '/Images/placeholder.jpg';
   };
 
   const getCategoryImage = (idCategory) => {
@@ -241,186 +253,188 @@ export const Home = () => {
         </section>
       )}
 
-{/* ===================== NOUVEAUTÉS ===================== */}
-<section className="new-section" id="nouveautes">
-  <div className="new-header">
-    <h2 className="new-title">Nouveautés</h2>
-    <div className="new-actions">
-      <button
-        type="button"
-        className="icon-btn bg-primary text-white fw-bold"
-        aria-label="Voir plus"
-        onClick={() => navigate('/news')}
-      >
-        +
-      </button>
-    </div>
-  </div>
+      {/* ===================== NOUVEAUTÉS ===================== */}
+      <section className="new-section" id="nouveautes">
+        <div className="new-header">
+          <h2 className="new-title">Nouveautés</h2>
+          <div className="new-actions">
+            <button
+              type="button"
+              className="icon-btn bg-primary text-white fw-bold"
+              aria-label="Voir plus"
+              onClick={() => navigate('/news')}
+            >
+              +
+            </button>
+          </div>
+        </div>
 
-  <div
-    className="new-grid"
-    {...(isMobile ? { 'data-aos': 'fade-up', 'data-aos-once': 'true' } : {})}
-  >
-    {newestProducts.map((product, index) => {
-      const img = getProductImage(product.id);
-      const name =
-        (product.brand ? `${product.brand} ` : '') +
-        (product.model || product.title || `Produit ${index + 1}`);
-
-      const priceRef =
-        Number(
-          typeof product.priceTtc === 'number'
-            ? product.priceTtc
-            : parseFloat(product.priceTtc)
-        ) || 0;
-
-      // ==== PROMO PRODUIT (dates inclusives) ====
-      const p0 = product?.promotions?.[0];
-      const hasProductPromo = (() => {
-        if (!p0) return false;
-        const pct = Number(p0.purcentage) || 0;
-        if (pct <= 0) return false;
-        const start = parseDate(p0.startDate);
-        const end = parseDate(p0.endDate);
-        const now = new Date();
-        const endOfDay = end
-          ? new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59, 999)
-          : null;
-        if (start && start > now) return false;
-        if (endOfDay && endOfDay < now) return false;
-        return true;
-      })();
-
-      const discountPct = hasProductPromo ? Number(p0.purcentage) : 0;
-      const computedPromo = +(priceRef * (1 - discountPct / 100)).toFixed(2);
-      const promotedVal = Number(
-        typeof product.priceHtPromoted === 'number'
-          ? product.priceHtPromoted
-          : parseFloat(product.priceHtPromoted)
-      );
-
-      const productPromoPrice = hasProductPromo
-        ? (Number.isFinite(promotedVal) ? promotedVal : computedPromo)
-        : null;
-
-      // ==== PROMO PAR CODES ====
-      const subCatCodeVal = Number(
-        typeof product.priceHtSubCategoryCodePromoted === 'number'
-          ? product.priceHtSubCategoryCodePromoted
-          : parseFloat(product.priceHtSubCategoryCodePromoted)
-      );
-      const catCodeVal = Number(
-        typeof product.priceHtCategoryCodePromoted === 'number'
-          ? product.priceHtCategoryCodePromoted
-          : parseFloat(product.priceHtCategoryCodePromoted)
-      );
-      const codePrice =
-        Number.isFinite(subCatCodeVal)
-          ? subCatCodeVal
-          : (Number.isFinite(catCodeVal) ? catCodeVal : null);
-
-      const displayPrice = calculPrice(product, promotionCodes);
-      const hasAnyPromo = (codePrice != null) || (productPromoPrice != null);
-      const [euros, cents] = displayPrice.toFixed(2).split('.');
-
-      // Stock
-      const raw = (product?.stockStatus ?? '').trim();
-      const lower = raw.toLowerCase();
-      const isIn = lower === 'en stock';
-      const isOut = lower === 'en rupture';
-      const stockCls = isIn ? 'in' : isOut ? 'out' : 'warn';
-      const stockLabel =
-        lower.includes('plus que') ? 'Bientôt en rupture' :
-        raw || 'Disponibilité limitée';
-
-      const cardAosProps = isMobile ? {} : { 'data-aos': 'zoom-in' };
-      const isSoon = /bient[oô]t/i.test(stockLabel);
-
-      return (
-        <article
-          key={product.id}
-          className="product-card"
-          {...cardAosProps}
+        <div
+          className="new-grid"
+          {...(isMobile ? { 'data-aos': 'fade-up', 'data-aos-once': 'true' } : {})}
         >
-          {/* === ICI: fond blanc derrière l'image === */}
-          <div className="product-thumb" style={{ background:'#fff', borderRadius:12, padding:8 }}>
-            <Link to={`/product/${product.id}`} className="thumb-link">
-              <img src={toMediaUrl(img)} alt={name} />
-            </Link>
+          {newestProducts.map((product, index) => {
+            // >>>> COUVERTURE = image position 1 (fallback inclus)
+            const img = getProductCoverImage(product.id);
 
-            {hasAnyPromo && <span className="promo-pill">Promotion</span>}
-            <div className="thumb-overlay" aria-hidden="true" />
-            {!isOut && (
-              <button
-                type="button"
-                className="thumb-add-btn"
-                title="Ajouter au panier"
-                aria-label="Ajouter au panier"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  const payloadItem = {
-                    id: product.id,
-                    name,
-                    price: displayPrice,
-                    image: img,
-                    packageProfil: product.packageProfil,
-                    containedCode: product.containedCode
-                  };
-                  dispatch(addToCartRequest(payloadItem, 1));
-                  setLastAdded({ id: product.id, name });
-                  setShowAdded(true);
-                }}
+            const name =
+              (product.brand ? `${product.brand} ` : '') +
+              (product.model || product.title || `Produit ${index + 1}`);
+
+            const priceRef =
+              Number(
+                typeof product.priceTtc === 'number'
+                  ? product.priceTtc
+                  : parseFloat(product.priceTtc)
+              ) || 0;
+
+            // ==== PROMO PRODUIT (dates inclusives) ====
+            const p0 = product?.promotions?.[0];
+            const hasProductPromo = (() => {
+              if (!p0) return false;
+              const pct = Number(p0.purcentage) || 0;
+              if (pct <= 0) return false;
+              const start = parseDate(p0.startDate);
+              const end = parseDate(p0.endDate);
+              const now = new Date();
+              const endOfDay = end
+                ? new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59, 999)
+                : null;
+              if (start && start > now) return false;
+              if (endOfDay && endOfDay < now) return false;
+              return true;
+            })();
+
+            const discountPct = hasProductPromo ? Number(p0.purcentage) : 0;
+            const computedPromo = +(priceRef * (1 - discountPct / 100)).toFixed(2);
+            const promotedVal = Number(
+              typeof product.priceHtPromoted === 'number'
+                ? product.priceHtPromoted
+                : parseFloat(product.priceHtPromoted)
+            );
+
+            const productPromoPrice = hasProductPromo
+              ? (Number.isFinite(promotedVal) ? promotedVal : computedPromo)
+              : null;
+
+            // ==== PROMO PAR CODES ====
+            const subCatCodeVal = Number(
+              typeof product.priceHtSubCategoryCodePromoted === 'number'
+                ? product.priceHtSubCategoryCodePromoted
+                : parseFloat(product.priceHtSubCategoryCodePromoted)
+            );
+            const catCodeVal = Number(
+              typeof product.priceHtCategoryCodePromoted === 'number'
+                ? product.priceHtCategoryCodePromoted
+                : parseFloat(product.priceHtCategoryCodePromoted)
+            );
+            const codePrice =
+              Number.isFinite(subCatCodeVal)
+                ? subCatCodeVal
+                : (Number.isFinite(catCodeVal) ? catCodeVal : null);
+
+            const displayPrice = calculPrice(product, promotionCodes);
+            const hasAnyPromo = (codePrice != null) || (productPromoPrice != null);
+            const [euros, cents] = displayPrice.toFixed(2).split('.');
+
+            // Stock
+            const raw = (product?.stockStatus ?? '').trim();
+            const lower = raw.toLowerCase();
+            const isIn = lower === 'en stock';
+            const isOut = lower === 'en rupture';
+            const stockCls = isIn ? 'in' : isOut ? 'out' : 'warn';
+            const stockLabel =
+              lower.includes('plus que') ? 'Bientôt en rupture' :
+              raw || 'Disponibilité limitée';
+
+            const cardAosProps = isMobile ? {} : { 'data-aos': 'zoom-in' };
+            const isSoon = /bient[oô]t/i.test(stockLabel);
+
+            return (
+              <article
+                key={product.id}
+                className="product-card"
+                {...cardAosProps}
               >
-                <i className="bi bi-cart-plus" aria-hidden="true"></i>
-              </button>
-            )}
-          </div>
+                {/* === Fond blanc derrière l'image === */}
+                <div className="product-thumb" style={{ background:'#fff', borderRadius:12, padding:8 }}>
+                  <Link to={`/product/${product.id}`} className="thumb-link">
+                    <img src={toMediaUrl(img)} alt={name} />
+                  </Link>
 
-          <div className="product-meta">
-            <h3 className="product-name">{name}</h3>
-            {product.previewDescription && (
-              <p className="product-preview text-muted" title={product.previewDescription}>
-                {product.previewDescription}
-              </p>
-            )}
-          </div>
-
-            <div className="new-price-row">
-              <span className={`card-stock ${stockCls}`} title={stockLabel}>
-                <span className={`card-stock-dot ${stockCls}`} />
-                <span className="card-stock-txt">{stockLabel}</span>
-              </span>
-
-              <div className={`price-stack ${hasAnyPromo ? 'has-promo' : ''}`}>
-                {hasAnyPromo && (
-                  <span className="price-old">
-                    {priceRef.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
-                  </span>
-                )}
-                <div className={`price ${hasAnyPromo ? 'price--promo' : ''}`}>
-                  <span className="euros">{euros}€</span>
-                  <sup className="cents">{cents}</sup>
+                  {hasAnyPromo && <span className="promo-pill">Promotion</span>}
+                  <div className="thumb-overlay" aria-hidden="true" />
+                  {!isOut && (
+                    <button
+                      type="button"
+                      className="thumb-add-btn"
+                      title="Ajouter au panier"
+                      aria-label="Ajouter au panier"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const payloadItem = {
+                          id: product.id,
+                          name,
+                          price: displayPrice,
+                          image: img,
+                          packageProfil: product.packageProfil,
+                          containedCode: product.containedCode
+                        };
+                        dispatch(addToCartRequest(payloadItem, 1));
+                        setLastAdded({ id: product.id, name });
+                        setShowAdded(true);
+                      }}
+                    >
+                      <i className="bi bi-cart-plus" aria-hidden="true"></i>
+                    </button>
+                  )}
                 </div>
-              </div>
-            </div>
-        </article>
-      );
-    })}
-  </div>
 
-  {/* Bouton “+” en bas sur mobile */}
-  <div className="new-actions new-actions--mobile">
-    <button
-      type="button"
-      className="icon-btn bg-primary text-white fw-bold"
-      aria-label="Voir plus"
-      onClick={() => navigate('/news')}
-    >
-      +
-    </button>
-  </div>
-</section>
+                <div className="product-meta">
+                  <h3 className="product-name">{name}</h3>
+                  {product.previewDescription && (
+                    <p className="product-preview text-muted" title={product.previewDescription}>
+                      {product.previewDescription}
+                    </p>
+                  )}
+                </div>
+
+                <div className="new-price-row">
+                  <span className={`card-stock ${stockCls}`} title={stockLabel}>
+                    <span className={`card-stock-dot ${stockCls}`} />
+                    <span className="card-stock-txt">{stockLabel}</span>
+                  </span>
+
+                  <div className={`price-stack ${hasAnyPromo ? 'has-promo' : ''}`}>
+                    {hasAnyPromo && (
+                      <span className="price-old">
+                        {priceRef.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+                      </span>
+                    )}
+                    <div className={`price ${hasAnyPromo ? 'price--promo' : ''}`}>
+                      <span className="euros">{euros}€</span>
+                      <sup className="cents">{cents}</sup>
+                    </div>
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+
+        {/* Bouton “+” en bas sur mobile */}
+        <div className="new-actions new-actions--mobile">
+          <button
+            type="button"
+            className="icon-btn bg-primary text-white fw-bold"
+            aria-label="Voir plus"
+            onClick={() => navigate('/news')}
+          >
+            +
+          </button>
+        </div>
+      </section>
 
       {/* ===================== MODALE ajout panier ===================== */}
       <GenericModal

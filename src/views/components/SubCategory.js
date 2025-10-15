@@ -45,6 +45,18 @@ const getSubcatParentId = (sc) =>
 // ✅ Display flag on products (display/Display/published/Published)
 const getDisplayFromProduct = (p) => toBool(p?.display ?? p?.Display ?? p?.published ?? p?.Published);
 
+/* --- COVER IMAGE HELPERS: position 1 prioritaire, sinon plus petite position, sinon placeholder --- */
+const pickCoverFromList = (list) => {
+  if (!Array.isArray(list) || list.length === 0) return "/images/placeholder.jpg";
+  const pos1 = list.find((i) => Number(i?.position) === 1 && i?.url);
+  if (pos1?.url) return pos1.url;
+  const sorted = [...list].sort(
+    (a, b) => Number(a?.position ?? 9999) - Number(b?.position ?? 9999)
+  );
+  const first = sorted.find((i) => !!i?.url);
+  return first?.url || "/images/placeholder.jpg";
+};
+
 /* -------- Component -------- */
 export const SubCategory = () => {
   const { id: routeSubCategoryId } = useParams();
@@ -156,17 +168,17 @@ export const SubCategory = () => {
   };
   const goTo = (p) => navigate(p.type === "category" ? `/category/${p.id}` : `/subcategory/${p.id}`);
 
-  // ✅ Bannière — robust idSubCategory + placeholder en minuscule
+  /* ===== Bannière sous-catégorie : image position 1 prioritaire ===== */
   const subCategoryBannerUrl = useMemo(() => {
-    const bySubCat = images.find((i) => getImageSubCategoryId(i) === Number(routeSubCategoryId));
-    return bySubCat?.url || "/images/placeholder.jpg";
+    const list = images.filter((i) => getImageSubCategoryId(i) === Number(routeSubCategoryId));
+    return pickCoverFromList(list);
   }, [images, routeSubCategoryId]);
 
-  // ✅ Image produit — robust idProduct + placeholder en minuscule
-  const getProductImage = (productId) => {
+  /* ===== Image vitrine produit : position 1 prioritaire ===== */
+  const getProductCoverImage = (productId) => {
     const pid = Number(productId);
-    const first = images.find((i) => getImageProductId(i) === pid);
-    return first?.url || "/images/placeholder.jpg";
+    const list = images.filter((i) => getImageProductId(i) === pid);
+    return pickCoverFromList(list);
   };
 
   const promotionCodes  = useSelector((s) => s.promotionCodes?.promotionCodes) || [];
@@ -289,7 +301,7 @@ export const SubCategory = () => {
 
   return (
     <div className="category-page">
-      {/* Bannière */}
+      {/* Bannière (image position 1 prioritaire) */}
       <section
         className="category-hero"
         style={{ "--hero-url": `url("${toMediaUrl(subCategoryBannerUrl)}")` }}
@@ -361,7 +373,7 @@ export const SubCategory = () => {
 
           {filteredSorted.map(({ product, name, priceRef, displayPrice, hasAnyPromo }) => {
             const pid = getProductId(product);
-            const img = getProductImage(pid);
+            const img = getProductCoverImage(pid); // <<< image position 1 prioritaire
             const [euros, cents] = displayPrice.toFixed(2).split(".");
             const raw = (product?.stockStatus ?? "").trim();
             const lower = raw.toLowerCase();

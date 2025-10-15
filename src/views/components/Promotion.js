@@ -66,10 +66,21 @@ export const Promotion = () => {
   // Sauvegarde panier Redux -> LS
   useEffect(() => { dispatch(saveCartRequest(items)); }, [items, dispatch]);
 
-  // Image principale du produit
-  const getProductImage = (productId) => {
+  // ===== Image vitrine (position 1 prioritaire) =====
+  const getProductCoverImage = (productId) => {
     const productImages = images.filter((i) => String(i.idProduct) === String(productId));
-    return productImages.length > 0 ? productImages[0].url : "/Images/placeholder.jpg";
+    if (!productImages.length) return "/Images/placeholder.jpg";
+
+    // 1) priorité à la position 1
+    const pos1 = productImages.find((i) => Number(i.position) === 1 && i.url);
+    if (pos1?.url) return pos1.url;
+
+    // 2) sinon, plus petite position existante
+    const sorted = [...productImages].sort(
+      (a, b) => Number(a.position ?? 9999) - Number(b.position ?? 9999)
+    );
+    const first = sorted.find((i) => !!i.url);
+    return first?.url || "/Images/placeholder.jpg";
   };
 
   // ==== Calcul du prix affiché (cohérent avec Category/News) ====
@@ -216,10 +227,10 @@ export const Promotion = () => {
     return list;
   }, [augmented, search, sortKey]);
 
-  // Bannière = image du premier produit en promo
+  // Bannière = image vitrine (position 1) du premier produit en promo
   const bannerUrl = useMemo(() => {
     const firstPromo = filteredSorted[0]?.product;
-    return firstPromo ? getProductImage(firstPromo.id) : "/Images/placeholder.jpg";
+    return firstPromo ? getProductCoverImage(firstPromo.id) : "/Images/placeholder.jpg";
   }, [filteredSorted, images]);
 
   /* ---------- Modal “ajouté au panier” ---------- */
@@ -289,7 +300,8 @@ export const Promotion = () => {
           )}
 
           {filteredSorted.map(({ product, name, priceRef, displayPrice }) => {
-            const img = getProductImage(product.id);
+            // >>> image vitrine position 1 (fallback inclus)
+            const img = getProductCoverImage(product.id);
             const [euros, cents] = displayPrice.toFixed(2).split(".");
 
             const raw   = (product?.stockStatus ?? "").trim();
@@ -299,8 +311,6 @@ export const Promotion = () => {
             const stockCls = isIn ? "in" : isOut ? "out" : "warn";
             const stockLabel =
               lower.includes("plus que") ? "Bientôt en rupture" : raw || "Disponibilité limitée";
-
-            const hasAnyPromo = displayPrice < (toNumOrNull(product.priceTtc) ?? 0) - 1e-6;
 
             return (
               <article key={product.id} className="product-card" data-aos="zoom-in">
@@ -339,7 +349,9 @@ export const Promotion = () => {
                   )}
                 </div>
 
-                <h3 className="product-name">{[product.brand, product.model].filter(Boolean).join(" ") || name}</h3>
+                <h3 className="product-name">
+                  {[product.brand, product.model].filter(Boolean).join(" ") || name}
+                </h3>
 
                 {product.previewDescription && (
                   <p className="product-preview text-muted" title={product.previewDescription}>
@@ -351,14 +363,14 @@ export const Promotion = () => {
                 <div className="new-price-row">
                   <span className={`card-stock ${stockCls}`} title={stockLabel}>
                     <span className={`card-stock-dot ${stockCls}`} />
-                    <span className="card-stock-txt">{stockLabel}</span> {/* ← important */}
+                    <span className="card-stock-txt">{stockLabel}</span>
                   </span>
 
-                  <div className="price-stack has-promo"> {/* ← has-promo comme sur Category */}
+                  <div className="price-stack has-promo">
                     <span className="price-old">
                       {priceRef.toLocaleString("fr-FR", { style: "currency", currency: "EUR" })}
                     </span>
-                    <div className="price price--promo">  {/* ← pas 'product-price--promo' */}
+                    <div className="price price--promo">
                       <span className="euros">{euros}€</span>
                       <sup className="cents">{cents}</sup>
                     </div>

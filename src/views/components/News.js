@@ -58,10 +58,21 @@ export const News = () => {
   /* Sauvegarde panier */
   useEffect(() => { dispatch(saveCartRequest(items)); }, [items, dispatch]);
 
-  /* Image principale d’un produit */
-  const getProductImage = (productId) => {
+  /* ===== Image vitrine (position 1 prioritaire) ===== */
+  const getProductCoverImage = (productId) => {
     const productImages = images.filter((i) => String(i.idProduct) === String(productId));
-    return productImages.length > 0 ? productImages[0].url : "/Images/placeholder.jpg";
+    if (!productImages.length) return "/Images/placeholder.jpg";
+
+    // 1) priorité à la position 1
+    const pos1 = productImages.find((i) => Number(i.position) === 1 && i.url);
+    if (pos1?.url) return pos1.url;
+
+    // 2) sinon, plus petite position existante
+    const sorted = [...productImages].sort(
+      (a, b) => Number(a.position ?? 9999) - Number(b.position ?? 9999)
+    );
+    const first = sorted.find((i) => !!i.url);
+    return first?.url || "/Images/placeholder.jpg";
   };
 
   /* ---------- Recherche + tri ---------- */
@@ -186,10 +197,10 @@ export const News = () => {
     return list;
   }, [augmented, search, sortKey]);
 
-  /* ---------- Héros : image du produit le plus récent dispo ---------- */
+  /* ---------- Héros : image vitrine position 1 du plus récent ---------- */
   const heroUrl = useMemo(() => {
     const top = filteredSorted[0]?.product || productsAll[0];
-    return top ? getProductImage(top.id) : "/Images/placeholder.jpg";
+    return top ? getProductCoverImage(top.id) : "/Images/placeholder.jpg";
   }, [filteredSorted, productsAll]);
 
   /* ---------- Modale panier ---------- */
@@ -251,7 +262,8 @@ export const News = () => {
           )}
 
           {filteredSorted.map(({ product, name, priceRef, displayPrice, hasAnyPromo }) => {
-            const img = getProductImage(product.id);
+            // >>>> image vitrine position 1 (fallback inclus)
+            const img = getProductCoverImage(product.id);
             const [euros, cents] = displayPrice.toFixed(2).split(".");
 
             const raw = (product?.stockStatus ?? "").trim();
