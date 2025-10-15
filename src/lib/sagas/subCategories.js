@@ -1,8 +1,10 @@
 import {takeEvery, takeLatest, call, put, fork} from "redux-saga/effects";
 import * as actions from "../actions/SubCategoryActions";
 import * as actionsProducts from "../actions/ProductActions";
+import * as actionsImages from "../actions/ImageActions";
 import * as api from "../api/subCategories";
 import * as apiProducts from "../api/products";
+import * as apiImages from "../api/images";
 
 function* getSubCategories() {
     try {
@@ -19,6 +21,11 @@ function* addSubCategory(action) {
     try {
         const response = yield call (api.addSubCategory, action.payload);
         console.log("SubCategory added :",response.data);
+
+
+        const images = yield call (apiImages.getImages);
+        yield put (actionsImages.getImageSuccess({images : images.data}));
+
         const subCategories = yield call (api.getSubCategories);
         yield put (actions.getSubCategorySuccess({subCategories : subCategories.data}));
     }
@@ -31,8 +38,12 @@ function* updateSubCategory(action) {
     try {
         const response = yield call (api.updateSubCategory, action.payload);
         console.log("SubCategory updated :",response.data);
+        
         const subCategories = yield call (api.getSubCategories);
         yield put (actions.getSubCategorySuccess({subCategories : subCategories.data}));
+
+        const images = yield call (apiImages.getImages);
+        yield put (actionsImages.getImageSuccess({images : images.data}));
 
         const products = yield call (apiProducts.getProducts);
         yield put (actionsProducts.getProductUserSuccess({products : products.data}));

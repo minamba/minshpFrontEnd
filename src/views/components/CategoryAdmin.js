@@ -283,9 +283,6 @@ export const CategoryAdmin = () => {
         Display: !!formData.display,
         IdImage: Number(idImage)
       }));
-      // if (idImage) {
-      //   await dispatch(updateImageRequest({ id: Number(idImage), idCategory: Number(currentId) }));
-      // }
     } else {
       const addPayload = {
         name: formData.name,
@@ -295,7 +292,6 @@ export const CategoryAdmin = () => {
         Display: !!formData.display,
       };
       await dispatch(addCategoryRequest(addPayload));
-      await dispatch(getCategoryRequest());
 
       const created = [...categoriesFromStore].reverse().find((c) => c.name === formData.name);
       if (idImage && created?.id) {
@@ -303,8 +299,6 @@ export const CategoryAdmin = () => {
       }
     }
 
-    await dispatch(getImageRequest());
-    await dispatch(getCategoryRequest());
     setShowModal(false);
   };
 

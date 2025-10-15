@@ -1,8 +1,10 @@
-import {takeEvery, takeLatest, call, put, fork} from "redux-saga/effects";
+import {takeEvery, takeLatest, call, put, fork, delay} from "redux-saga/effects";
 import * as actions from "../actions/CategoryActions";
 import * as actionsProducts from "../actions/ProductActions";
+import * as actionsImages from "../actions/ImageActions";
 import * as api from "../api/categories";
 import * as apiProducts from "../api/products";
+import * as apiImages from "../api/images";
 
 function* getCategories() {
     try {
@@ -19,6 +21,10 @@ function* addCategory(action) {
     try {
         const response = yield call (api.addCategory, action.payload);
         console.log("Category added :",response.data);
+
+        const images = yield call (apiImages.getImages);
+        yield put (actionsImages.getImageSuccess({images : images.data}));
+
         const categories = yield call (api.getCategories);
         yield put (actions.getCategorySuccess({categories : categories.data}));
     }
@@ -31,11 +37,16 @@ function* updateCategory(action) {
     try {
         const response = yield call (api.updateCategory, action.payload);
         console.log("Category updated :",response.data);
-        const categories = yield call (api.getCategories);
-        yield put (actions.getCategorySuccess({categories : categories.data}));
 
         const products = yield call (apiProducts.getProducts);
         yield put (actionsProducts.getProductUserSuccess({products : products.data}));
+
+        const images = yield call (apiImages.getImages);
+        yield put (actionsImages.getImageSuccess({images : images.data}));
+        
+        const categories = yield call (api.getCategories);
+        yield put (actions.getCategorySuccess({categories : categories.data}));
+
     }
     catch (error) {
         yield put (actions.updateCategoryFailure({error : error.response?.data || error.message}));

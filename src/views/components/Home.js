@@ -83,7 +83,7 @@ export const Home = () => {
   // Sauvegarde panier quand items changent
   useEffect(() => { dispatch(saveCartRequest(items)); }, [items, dispatch]);
 
-  const NEW_MAX = 5;
+  const NEW_MAX = 4;
 
   const mainProduct     = allProducts.find((p) => p.main === true) || null;
   const galleryProducts = allProducts.filter((p) => p.id !== mainProduct?.id);
