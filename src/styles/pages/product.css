@@ -57,7 +57,7 @@
     display:flex;
     align-items:center;
     justify-content:center;
-    background:#f6f7f9;
+    background:white;
     border-radius:18px;
     padding:18px;
     box-shadow:var(--shadow-2);
