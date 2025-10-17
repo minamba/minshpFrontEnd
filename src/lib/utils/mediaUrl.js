@@ -3,8 +3,8 @@
 // Host courant (localhost sur PC, IP sur mobile, domaine en prod)
 const API_HOST = window.location.hostname;
 const API_PORT = 5054; // ton port API
-const API_BASE = `http://${API_HOST}:${API_PORT}`;
-//const API_BASE = "https://minshp.com";
+//const API_BASE = `http://${API_HOST}:${API_PORT}`;
+const API_BASE = "https://minshp.com";
 
 /**
  * Convertit un chemin relatif (images/xxx.jpg, videos/yyy.mp4)
