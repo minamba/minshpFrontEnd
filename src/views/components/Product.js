@@ -2,7 +2,7 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ProductSpecs } from '../../components/index';
+import { ProductSpecs } from '../../components/index'; // <-- utilisé comme fonction, pas comme composant
 import { addToCartRequest, saveCartRequest } from '../../lib/actions/CartActions';
 import { GenericModal } from '../../components/index';
 import { toMediaUrl } from '../../lib/utils/mediaUrl';
@@ -11,9 +11,9 @@ import { getFeaturesCategoryByProductRequest, clearFeaturesForProduct } from "..
 import "../../styles/pages/product.css";
 import { calculPrice } from '../../lib/utils/Helpers';
 import DOMPurify from 'dompurify';
+import { getStockUiByProductId } from '../../lib/utils/stockUi';
 
-/* ---------------- Swipe helpers (lightbox) ---------------- */
-const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+/* --------- Swipe helpers (lightbox) --------- */
 const useSwipe = ({ onSwipeLeft, onSwipeRight, threshold = 40 }) => {
   const startX = useRef(0);
   const lastX = useRef(0);
@@ -116,8 +116,7 @@ export const Product = () => {
   const hasVideo = !!(heroVideo?.url && String(heroVideo.url).trim() !== '');
 
   // Index UI
-  // mainIndex = image vitrine — DOIT rester fixe sur mobile
-  const [mainIndex, setMainIndex] = useState(0);
+  const [mainIndex, setMainIndex] = useState(0);      // image vitrine (mobile verrouillé)
   const [lightboxIndex, setLightboxIndex] = useState(0);
 
   useEffect(() => {
@@ -150,7 +149,7 @@ export const Product = () => {
   const next = () =>
     setLightboxIndex((i) => (i + 1) % imageUrls.length);
 
-  // Bloque scroll & interactions derrière la LB
+  // Bloque scroll derrière la LB
   useEffect(() => {
     const pageEl = document.querySelector('.product-page');
     if (isLightboxOpen) {
@@ -183,7 +182,7 @@ export const Product = () => {
     threshold: 40
   });
 
-  // Prix / promos (inchangé)
+  // Prix / promos
   const computeBadgeFromProduct = (product, promotionCodes = []) => {
     if (!product) return { badgePct: null, refPriceTtc: null, until: null, source: null };
     const now = new Date();
@@ -239,21 +238,11 @@ export const Product = () => {
   const hasPrice = Number.isFinite(displayPrice);
 
   // Stock
-  const stockStatusRaw = (product?.stockStatus ?? '').trim();
-  const stockIn  = stockStatusRaw.toLowerCase() === 'en stock';
-  const stockOutStatus = stockStatusRaw.toLowerCase() === 'en rupture';
-  const stockForProduct = useMemo(() => {
-    if (!product) return null;
-    return stocks.find((st) => String(st?.idProduct ?? st?.Id_product ?? st?.IdProduct) === String(product.id)) || null;
-  }, [stocks, product]);
-  const availableQty = useMemo(() => {
-    const q = Number(stockForProduct?.quantity ?? stockForProduct?.Quantity ?? stockForProduct?.qty ?? stockForProduct?.Qty ?? 0);
-    return Number.isFinite(q) && q > 0 ? q : 0;
-  }, [stockForProduct]);
-  const isActuallyOut = stockOutStatus || availableQty <= 0;
-  const stockStatusLabel = stockStatusRaw || (availableQty > 0 ? `Disponibilité limitée` : `En rupture`);
-  const stockRowClass = !isActuallyOut && stockIn ? 'stock-in' : isActuallyOut ? 'stock-out' : 'stock-warn';
-  const stockDotClass = !isActuallyOut && stockIn ? 'in' : isActuallyOut ? 'out' : 'warn';
+  const { cls: stockCls, label: stockLabel, qty: availableQty = 0, isOut: isActuallyOut } =
+    getStockUiByProductId(stocks, product?.id);
+  const stockRowClass = stockCls === 'in' ? 'stock-in' : stockCls === 'out' ? 'stock-out' : 'stock-warn';
+  const stockDotClass = stockCls;
+  const stockStatusLabel = stockLabel;
 
   // Achat
   const [qty, setQty] = useState(1);
@@ -268,9 +257,9 @@ export const Product = () => {
     if (isActuallyOut || !product) return;
     const payloadItem = {
       id: product.id,
-      name: product.name || product.title,
+      name: product.brand + ' ' + product.model || product.title,
       price: displayPrice,
-      image: currentMainUrl, // image vitrine utilisée pour le panier
+      image: currentMainUrl,
       packageProfil: product.packageProfil,
       containedCode: product.containedCode,
     };
@@ -336,6 +325,9 @@ export const Product = () => {
     };
   }, [hasVideo]);
 
+  /* -------- Specs : 1 seul appel (rafraîchit comme avant) -------- */
+  const { specs = {} } = (ProductSpecs(pid, product) || {});
+
   // Skeleton
   if (!product) {
     return (
@@ -356,12 +348,7 @@ export const Product = () => {
     );
   }
 
-  /* ------------------------------------------------------------
-     Rendu
-     - Thumbs: desktop => change la vitrine ; mobile => ouvre LB
-     - Vitrine: clic => ouvre LB
-     - Lightbox: swipe, flèches, esc, thumbs
-  ------------------------------------------------------------- */
+  /* ------------------------------ Rendu ------------------------------ */
   return (
     <div className="product-page" onContextMenu={handleContextMenu}>
       <div className="product-main">
@@ -373,11 +360,9 @@ export const Product = () => {
               className="thumb"
               onClick={() => {
                 if (isMobile) {
-                  // 🔒 Mobile : on ne change pas la vitrine, on ouvre la LB
-                  openLightbox(i);
+                  openLightbox(i);      // mobile : vitrine verrouillée
                 } else {
-                  // 🖥️ Desktop : la vitrine suit la sélection
-                  setMainIndex(i);
+                  setMainIndex(i);      // desktop : vitrine suit la selection
                 }
               }}
               aria-label={`Sélectionner l'image ${i + 1}`}
@@ -395,7 +380,7 @@ export const Product = () => {
             alt={product?.name || product?.title || 'Image produit'}
             onClick={() => openLightbox(mainIndex)}
             role="button"
-            style={{ cursor: "zoom-in" }}
+            style={{ cursor: 'zoom-in' }}
             draggable={false}
           />
         </div>
@@ -436,16 +421,25 @@ export const Product = () => {
             </div>
 
             <div className="buy-row">
-              <select className="qty-select" value={qty} onChange={(e) => setQty(Number(e.target.value))}
-                aria-label="Quantité" disabled={isActuallyOut || availableQty <= 0}>
+              <select
+                className="qty-select"
+                value={qty}
+                onChange={(e) => setQty(Number(e.target.value))}
+                aria-label="Quantité"
+                disabled={isActuallyOut || availableQty <= 0}
+              >
                 {Array.from({ length: Math.min(Math.max(0, availableQty), 50) }, (_, i) => i + 1).map((n) => (
                   <option key={n} value={n}>{n}</option>
                 ))}
               </select>
 
-              <button className="buy-button buy-accent" onClick={addToCart}
-                disabled={isActuallyOut} aria-disabled={isActuallyOut}
-                title={isActuallyOut ? "Article en rupture" : "Ajouter au panier"}>
+              <button
+                className="buy-button buy-accent"
+                onClick={addToCart}
+                disabled={isActuallyOut}
+                aria-disabled={isActuallyOut}
+                title={isActuallyOut ? 'Article en rupture' : 'Ajouter au panier'}
+              >
                 🛍️ Ajouter au panier
               </button>
             </div>
@@ -458,15 +452,13 @@ export const Product = () => {
         </div>
       </div>
 
-      {/* Lightbox moderne : swipe + flèches + thumbs */}
+      {/* Lightbox */}
       {isLightboxOpen && (
         <div
           className="lb-overlay"
           role="dialog"
           aria-modal="true"
-          onClick={(e) => {
-            if (e.target.classList.contains('lb-overlay')) closeLightbox();
-          }}
+          onClick={(e) => { if (e.target.classList.contains('lb-overlay')) closeLightbox(); }}
         >
           <div
             className="lb-content"
@@ -488,34 +480,26 @@ export const Product = () => {
                 <button className="lb-btn lb-arrow lb-prev" onClick={prev} aria-label="Précédent">‹</button>
               )}
 
-<div
-  className="lb-fit"
-  onClick={(e) => e.stopPropagation()}
-  style={{
-    position: 'relative',
-    width: '100%',
-    height: '100%',
-  }}
->
-  <div
-    className="lb-bgi"
-    style={{
-      position: 'absolute',
-      inset: 0,
-      margin: 'auto',
-      /* marge de sécurité pour éviter tout “bord collé” et défilement */
-      padding: 0,
-      /* image en background -> aucune règle <img> ne s’applique */
-      backgroundImage: `url(${imageUrls[lightboxIndex]})`,
-      backgroundRepeat: 'no-repeat',
-      backgroundPosition: 'center',
-      backgroundSize: 'contain',
-      /* empêche tout débordement vertical/horizontal */
-      maxWidth: '100%',
-      maxHeight: '100%',
-    }}
-  />
-</div>
+              <div
+                className="lb-fit"
+                onClick={(e) => e.stopPropagation()}
+                style={{ position: 'relative', width: '100%', height: '100%' }}
+              >
+                <div
+                  className="lb-bgi"
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    margin: 'auto',
+                    backgroundImage: `url(${imageUrls[lightboxIndex]})`,
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'center',
+                    backgroundSize: 'contain',
+                    maxWidth: '100%',
+                    maxHeight: '100%',
+                  }}
+                />
+              </div>
 
               {imageUrls.length > 1 && (
                 <button className="lb-btn lb-arrow lb-next" onClick={next} aria-label="Suivant">›</button>
@@ -541,37 +525,51 @@ export const Product = () => {
       )}
 
       {/* Description */}
-      <section className='mt-5'>
+      <section className="mt-5">
         <h2 className="specs-title">Description</h2>
-        <div className="product-desc product-description-html mb-3 bg-description"
-             dangerouslySetInnerHTML={{ __html: cleanDescriptionHtml }} />
+        <div
+          className="product-desc product-description-html mb-3 bg-description"
+          dangerouslySetInnerHTML={{ __html: cleanDescriptionHtml }}
+        />
       </section>
 
       {/* Vidéo / Parallax */}
       {hasVideo ? (
         <section className="product-video-section">
-          <video ref={videoRef} className="product-video" src={toMediaUrl(heroVideo.url)}
-            autoPlay muted playsInline controls preload="metadata"
-            controlsList="nodownload noplaybackrate noremoteplayback" disablePictureInPicture
-            onContextMenu={(e) => e.preventDefault()} />
+          <video
+            ref={videoRef}
+            className="product-video"
+            src={toMediaUrl(heroVideo.url)}
+            autoPlay
+            muted
+            playsInline
+            controls
+            preload="metadata"
+            controlsList="nodownload noplaybackrate noremoteplayback"
+            disablePictureInPicture
+            onContextMenu={(e) => e.preventDefault()}
+          />
         </section>
       ) : (
-        <section ref={parallaxRef} className="product-parallax"
-          style={{ '--parallax-img': `url("${toMediaUrl(parallaxUrl)}")`, minHeight: isMobile ? '28vh' : '42vh' }}
-          aria-hidden="true" />
+        <section
+          ref={parallaxRef}
+          className="product-parallax"
+          style={{ '--parallax-img': `url("${parallaxUrl}")`, minHeight: isMobile ? '28vh' : '42vh' }}
+          aria-hidden="true"
+        />
       )}
 
-      {/* Caractéristiques */}
+      {/* Caractéristiques techniques (via specs retournés) */}
       <section className="specs-wrap">
         <h2 className="specs-title">Caractéristiques techniques</h2>
         <div className="specs-layout">
           <nav className="specs-nav">
-            {Object.keys((ProductSpecs(pid, product) || { specs: {} }).specs || {}).map((s) => (
+            {Object.keys(specs).map((s) => (
               <a key={s} href={`#${s.replace(/\s+/g, '')}`}>{s}</a>
             ))}
           </nav>
           <div className="specs-content">
-            {Object.entries((ProductSpecs(pid, product) || { specs: {} }).specs || {}).map(([section, rows]) => (
+            {Object.entries(specs).map(([section, rows]) => (
               <section key={section} id={section.replace(/\s+/g, '')} className="specs-section">
                 <h3>{section}</h3>
                 <div className="specs-table">
@@ -597,8 +595,8 @@ export const Product = () => {
         title="Ajouté au panier"
         message="Cet article a bien été ajouté au panier."
         actions={[
-          { label: "Fermer",          variant: "light",   onClick: closeAdded },
-          { label: "Voir mon panier", variant: "primary", onClick: goToCart, autoFocus: true },
+          { label: 'Fermer',          variant: 'light',   onClick: closeAdded },
+          { label: 'Voir mon panier', variant: 'primary', onClick: goToCart, autoFocus: true },
         ]}
       />
     </div>

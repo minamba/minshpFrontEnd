@@ -8,6 +8,7 @@ import { GenericModal } from "../../components";
 import { toMediaUrl } from "../../lib/utils/mediaUrl";
 import { calculPrice } from "../../lib/utils/Helpers";
 import { getProductsPagedUserRequest } from "../../lib/actions/ProductActions";
+import { getStockUiByProductId } from "../../lib/utils/stockUi";
 
 /* -------------------- Helpers -------------------- */
 const parseDate = (val) => {
@@ -40,6 +41,7 @@ export const News = () => {
 
   const images = useSelector((s) => s.images?.images) || [];
   const items  = useSelector((s) => s.items?.items) || [];
+  const stocks = useSelector((s) => s.stocks?.stocks) || [];
 
   /* Chargement initial (tri date desc) */
   useEffect(() => {
@@ -266,13 +268,7 @@ export const News = () => {
             const img = getProductCoverImage(product.id);
             const [euros, cents] = displayPrice.toFixed(2).split(".");
 
-            const raw = (product?.stockStatus ?? "").trim();
-            const lower = raw.toLowerCase();
-            const isIn  = lower === "en stock";
-            const isOut = lower === "en rupture";
-            const stockCls = isIn ? "in" : isOut ? "out" : "warn";
-            const stockLabel =
-              lower.includes("plus que") ? "Bientôt en rupture" : raw || "Disponibilité limitée";
+            const { cls: stockCls, label: stockLabel, isOut } = getStockUiByProductId(stocks, product.id);
 
             return (
               <article key={product.id} className="product-card" data-aos="zoom-in">
@@ -295,7 +291,7 @@ export const News = () => {
                         e.stopPropagation();
                         const payloadItem = {
                           id: product.id,
-                          name,
+                          name: product.brand + ' ' + product.model,
                           price: displayPrice,
                           image: img,
                           packageProfil: product.packageProfil,

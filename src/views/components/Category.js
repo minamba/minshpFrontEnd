@@ -10,6 +10,7 @@ import { toMediaUrl } from "../../lib/utils/mediaUrl";
 import { calculPrice } from "../../lib/utils/Helpers";
 import { getProductsPagedUserRequest } from "../../lib/actions/ProductActions";
 import { ScrollHint } from "../../components";
+import { getStockUiByProductId } from "../../lib/utils/stockUi";
 
 /* -------------------- Helpers (définis ici) -------------------- */
 const parseDate = (val) => {
@@ -84,6 +85,7 @@ export const Category = () => {
   let productsAll    = fullProducts.length ? fullProducts : pagedItems;
   const promotionCodes = useSelector((s) => s.promotionCodes?.promotionCodes) || [];
   const loading      = !!prodState.loading;
+  const stocks       = useSelector((s) => s.stocks?.stocks) || [];
 
   productsAll = productsAll.filter((p) => p.display === true);
 
@@ -432,13 +434,7 @@ export const Category = () => {
             const img = getProductCoverImage(product.id); // <<< position 1 prioritaire
             const [euros, cents] = displayPrice.toFixed(2).split(".");
 
-            const raw = (product?.stockStatus ?? "").trim();
-            const lower = raw.toLowerCase();
-            const isIn  = lower === "en stock";
-            const isOut = lower === "en rupture";
-            const stockCls = isIn ? "in" : isOut ? "out" : "warn";
-            const stockLabel =
-              lower.includes("plus que") ? "Bientôt en rupture" : raw || "Disponibilité limitée";
+            const { cls: stockCls, label: stockLabel, isOut } = getStockUiByProductId(stocks, product.id);
 
             return (
               <article key={product.id} className="product-card" data-aos="zoom-in">
@@ -461,7 +457,7 @@ export const Category = () => {
                         e.stopPropagation();
                         const payloadItem = {
                           id: product.id,
-                          name,
+                          name : product.brand + ' ' + product.model || product.title,
                           price: displayPrice,
                           image: img,
                           packageProfil: product.packageProfil,

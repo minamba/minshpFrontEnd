@@ -7,6 +7,7 @@ import { GenericModal } from "../../components";
 import { calculPrice } from "../../lib/utils/Helpers";
 import { toMediaUrl } from "../../lib/utils/mediaUrl";
 import { getProductsPagedUserRequest } from "../../lib/actions/ProductActions";
+import { getStockUiByProductId } from "../../lib/utils/stockUi";
 
 /* -------- Helpers -------- */
 const parseDate = (v) => (v ? (isNaN(new Date(v)) ? null : new Date(v)) : null);
@@ -82,6 +83,7 @@ export const SubCategory = () => {
   const items         = useSelector((s) => s.items?.items) || [];
   const subCategories = useSelector((s) => s.subCategories?.subCategories) || [];
   const categories    = useSelector((s) => s.categories?.categories) || [];
+  const stocks       = useSelector((s) => s.stocks?.stocks) || [];
 
   // Sauvegarde panier
   useEffect(() => { dispatch(saveCartRequest(items)); }, [items, dispatch]);
@@ -375,12 +377,8 @@ export const SubCategory = () => {
             const pid = getProductId(product);
             const img = getProductCoverImage(pid); // <<< image position 1 prioritaire
             const [euros, cents] = displayPrice.toFixed(2).split(".");
-            const raw = (product?.stockStatus ?? "").trim();
-            const lower = raw.toLowerCase();
-            const isIn  = lower === "en stock";
-            const isOut = lower === "en rupture";
-            const stockCls = isIn ? "in" : isOut ? "out" : "warn";
-            const stockLabel = lower.includes("plus que") ? "Bientôt en rupture" : raw || "Disponibilité limitée";
+
+            const { cls: stockCls, label: stockLabel, isOut } = getStockUiByProductId(stocks, product.id);
 
             return (
               <article key={pid} className="product-card" data-aos="zoom-in">
@@ -396,7 +394,7 @@ export const SubCategory = () => {
                       className="thumb-add-btn"
                       onClick={(e) => {
                         e.preventDefault(); e.stopPropagation();
-                        const payloadItem = { id: pid, name, price: displayPrice, image: img, packageProfil: product.packageProfil, containedCode: product.containedCode };
+                        const payloadItem = { id: pid, name: product.brand + ' ' + product.model, price: displayPrice, image: img, packageProfil: product.packageProfil, containedCode: product.containedCode };
                         dispatch(addToCartRequest(payloadItem, 1));
                         setLastAdded({ id: pid, name });
                         setShowAdded(true);

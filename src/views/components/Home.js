@@ -8,11 +8,13 @@ import { GenericModal, LoadingOverlay } from '../../components';
 import { calculPrice } from '../../lib/utils/Helpers';
 import { toMediaUrl } from '../../lib/utils/mediaUrl';
 import { getProductsPagedUserRequest } from '../../lib/actions/ProductActions';
+import { getStockUiByProductId } from '../../lib/utils/stockUi';
 
 export const Home = () => {
   const prodState     = useSelector((s) => s.products) || {};
   const fullProducts  = Array.isArray(prodState.products) ? prodState.products : [];
   const pagedItems    = Array.isArray(prodState.items)    ? prodState.items    : [];
+  const stocks       = useSelector((s) => s.stocks?.stocks) || [];
 
   let allProducts   = fullProducts.length ? fullProducts : pagedItems;
   allProducts = allProducts.filter(
@@ -338,14 +340,7 @@ export const Home = () => {
             const [euros, cents] = displayPrice.toFixed(2).split('.');
 
             // Stock
-            const raw = (product?.stockStatus ?? '').trim();
-            const lower = raw.toLowerCase();
-            const isIn = lower === 'en stock';
-            const isOut = lower === 'en rupture';
-            const stockCls = isIn ? 'in' : isOut ? 'out' : 'warn';
-            const stockLabel =
-              lower.includes('plus que') ? 'Bientôt en rupture' :
-              raw || 'Disponibilité limitée';
+            const { cls: stockCls, label: stockLabel, isOut } = getStockUiByProductId(stocks, product.id);
 
             const cardAosProps = isMobile ? {} : { 'data-aos': 'zoom-in' };
             const isSoon = /bient[oô]t/i.test(stockLabel);
@@ -375,7 +370,7 @@ export const Home = () => {
                         e.stopPropagation();
                         const payloadItem = {
                           id: product.id,
-                          name,
+                          name: product.brand + ' ' + product.model,
                           price: displayPrice,
                           image: img,
                           packageProfil: product.packageProfil,

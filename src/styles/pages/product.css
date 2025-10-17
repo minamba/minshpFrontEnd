@@ -563,7 +563,10 @@
 .lb-content { box-sizing: border-box; }
 .lb-stage   { overflow: hidden; }
 
-
+.specs-value {
+  color: #6c757d;        /* gris neutre / muted */
+  font-weight: 500;      /* optionnel : légèrement moins fort */
+}
 
 
 

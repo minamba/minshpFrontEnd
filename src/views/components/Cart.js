@@ -14,6 +14,7 @@ import { GenericModal } from "../../components";
 import { getPromotionCodesRequest } from "../../lib/actions/PromotionCodeActions";
 import { calculPriceForApplyPromoCode } from "../../lib/utils/Helpers";
 import { toMediaUrl } from "../../lib/utils/mediaUrl";
+import { getStockUiByProductId } from "../../lib/utils/stockUi";
 
 /* ---------- helpers format/ids ---------- */
 const fmt = (n) =>
@@ -344,16 +345,8 @@ export const Cart = () => {
 
   // Stock UI (badge)
   const getStockUi = (productId) => {
-    const prod = products.find((p) => String(p.id) === String(productId));
-    const raw = (prod?.stockStatus ?? "").trim();
-    const lower = raw.toLowerCase();
-    const isIn = lower === "en stock";
-    const isOut = lower === "en rupture";
-    const cls = isIn ? "in" : isOut ? "out" : "warn";
-    const label = lower.includes("plus que")
-      ? "Bientôt en rupture"
-      : raw || "Disponibilité limitée";
-    return { cls, label, isOut };
+    const { cls: stockCls, label: stockLabel, isOut } = getStockUiByProductId(stocks,productId);
+    return { cls: stockCls, label: stockLabel, isOut };
   };
 
   // Stock disponible (quantité)
