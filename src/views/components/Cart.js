@@ -204,33 +204,46 @@ export const Cart = () => {
   }, [paymentConfirmed, dispatch, clearPromoMap]);
 
   // enrichir lignes (nom, img, prix)
-  const enrich = useCallback(
-    (arr) =>
-      (arr || []).map((it) => {
-        const pid = it.productId ?? it.id;
-        const prod = products.find((p) => String(p.id) === String(pid));
-        const name = prod.brand + " " + prod.model || it.title || prod?.name || prod?.title || "Produit";
-        const img =
-          it.image ||
-          it.imageUrl ||
-          images.find((im) => String(im.idProduct) === String(pid))?.url ||
-          "/Images/placeholder.jpg";
+const enrich = useCallback(
+  (arr = []) =>
+    (arr || []).map((it) => {
+      const pid = it.productId ?? it.id;
+      const prod =
+        products.find((p) => String(p.id) === String(pid)) || null;
 
-        const price =
-          it.price != null
-            ? Number(it.price)
-            : Number(it.priceTtc ?? prod?.priceTtc ?? 0);
+      const brand = prod?.brand ?? it?.brand ?? "";
+      const model = prod?.model ?? it?.model ?? "";
+      const compositeName = [brand, model].filter(Boolean).join(" ");
 
-        return {
-          id: pid,
-          name,
-          price,
-          qty: Number(it.qty ?? 1),
-          imageUrl: img,
-        };
-      }),
-    [products, images]
-  );
+      const name =
+        compositeName ||
+        it?.title ||
+        prod?.name ||
+        prod?.title ||
+        it?.name ||
+        "Produit";
+
+      const img =
+        it.image ||
+        it.imageUrl ||
+        images.find((im) => String(im.idProduct) === String(pid))?.url ||
+        "/Images/placeholder.jpg";
+
+      const price =
+        it.price != null
+          ? Number(it.price)
+          : Number(it.priceTtc ?? prod?.priceTtc ?? prod?.price ?? 0);
+
+      return {
+        id: pid,
+        name,
+        price,
+        qty: Number(it.qty ?? 1),
+        imageUrl: img,
+      };
+    }),
+  [products, images]
+);
 
   const [clock, setClock] = useState(Date.now());
   useEffect(() => {
