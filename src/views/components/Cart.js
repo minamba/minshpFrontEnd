@@ -209,8 +209,7 @@ export const Cart = () => {
       (arr || []).map((it) => {
         const pid = it.productId ?? it.id;
         const prod = products.find((p) => String(p.id) === String(pid));
-        const name =
-          it.name || it.title || prod?.name || prod?.title || "Produit";
+        const name = prod.brand + " " + prod.model || it.title || prod?.name || prod?.title || "Produit";
         const img =
           it.image ||
           it.imageUrl ||
