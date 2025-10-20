@@ -654,7 +654,7 @@ const Product = () => {
       </section>
 
       {/* Avis clients */}
-      <section id="reviews" className="reviews-wrap">
+      <section id="reviews" className="reviews-wrap mt-5">
         <h2 className="specs-title">Avis clients</h2>
         <ProductReviews
           productId={product.id}
@@ -699,7 +699,7 @@ const Product = () => {
             <div className="app-modal__dialog">
               <div className="app-modal__header">
                 <h5 className="app-modal__title">
-                  {existingRate ? "Modifier votre avis" : "Donner votre avis"}
+                  {existingRate ? "Modifier mon avis" : "Donner mon avis"}
                 </h5>
                 <button
                   type="button"

@@ -195,9 +195,9 @@ const reviews = useMemo(() => {
             type="button"
             className="reviews-cta"
             onClick={onAddReview}
-            aria-label="Donner votre avis"
+            aria-label="Donner mon avis"
           >
-            Donner votre avis
+            Donner mon avis
           </button>
         </aside>
 

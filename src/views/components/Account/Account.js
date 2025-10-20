@@ -600,7 +600,7 @@ export const Account = () => {
                           <div className="order-actions">
                             {/* Bouton EXISTANT connecté */}
                             <button
-                              className="gbtn gbtn--primary"
+                              className="gbtn bg-secondary text-white"
                               onClick={() => onOrderReviewClick(o)}
                             >
                               Donner mon avis
