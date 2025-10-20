@@ -123,7 +123,7 @@ export const Home = () => {
   const heroImageSrc = heroImage99?.url ? toMediaUrl(heroImage99.url) : IMAGE_FALLBACK;
 
   // Nouveautés (tri par date de création)
-  const NEW_MAX = 5;
+  const NEW_MAX = 4;
   let newestProducts = useMemo(() => {
     return [...allProducts]
       .sort((a, b) => (Date.parse(b?.creationDate || 0) - Date.parse(a?.creationDate || 0)))
