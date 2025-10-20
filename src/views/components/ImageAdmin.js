@@ -12,18 +12,19 @@ import { postUploadRequest } from '../../lib/actions/UploadActions';
 import { toMediaUrl } from '../../lib/utils/mediaUrl';
 
 export const ImageAdmin = () => {
-  const imagesFromStore    = useSelector((s) => s.images.images) || [];
-  const productsFromStore  = useSelector((s) => s.products.products) || [];
-  const categoriesFromStore= useSelector((s) => s.categories?.categories) || []; // ✅ catégories du store
+  const imagesFromStore     = useSelector((s) => s.images.images) || [];
+  const productsFromStore   = useSelector((s) => s.products.products) || [];
+  const categoriesFromStore = useSelector((s) => s.categories?.categories) || [];
   const dispatch = useDispatch();
 
-  const [showModal, setShowModal]     = useState(false);
-  const [isEditing, setIsEditing]     = useState(false);
-  const [currentId, setCurrentId]     = useState(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategoryId, setSelectedCategoryId] = useState(''); // ✅ filtre catégorie
-  const [selectedProductId, setSelectedProductId]   = useState(''); // ✅ filtre produit
+  const [showModal, setShowModal]         = useState(false);
+  const [isEditing, setIsEditing]         = useState(false);
+  const [currentId, setCurrentId]         = useState(null);
+  const [searchQuery, setSearchQuery]     = useState('');
+  const [selectedCategoryId, setSelectedCategoryId] = useState(''); // filtre global table
+  const [selectedProductId, setSelectedProductId]   = useState(''); // filtre global table
 
+  // Etat du formulaire + prévisualisation
   const [formData, setFormData] = useState({
     file: null,
     description: '',
@@ -34,12 +35,14 @@ export const ImageAdmin = () => {
   });
   const [previewUrl, setPreviewUrl] = useState('');
 
+  // ✅ Nouvel état: filtre catégorie *dans la modale*
+  const [modalCategoryId, setModalCategoryId] = useState('');
+
   const collator = useMemo(() => new Intl.Collator('fr', { sensitivity: 'base' }), []);
 
   useEffect(() => {
     dispatch(getImageRequest());
     dispatch(getProductUserRequest());
-    // Les catégories sont supposées déjà chargées ailleurs ; on les lit depuis le store.
   }, [dispatch]);
 
   // ESC pour fermer + bloquer le scroll
@@ -63,6 +66,7 @@ export const ImageAdmin = () => {
 
   // ------- Helpers -------
   const getProductById = (id) => productsFromStore.find(p => String(p.id) === String(id));
+  const getCategoryById = (id) => categoriesFromStore.find(c => String(c.id) === String(id));
 
   const getProductLabel = (p) => {
     if (!p) return 'Produit inconnu';
@@ -73,9 +77,6 @@ export const ImageAdmin = () => {
 
   const getProductName = (id) => getProductLabel(getProductById(id));
 
-  const getCategoryById = (id) => categoriesFromStore.find(c => String(c.id) === String(id));
-
-  // Récupère l'id de catégorie du produit (prend idCategory si présent, sinon essaie par nom)
   const getCategoryIdForProduct = (p) => {
     if (!p) return null;
     if (p.idCategory != null) return p.idCategory;
@@ -97,14 +98,14 @@ export const ImageAdmin = () => {
     return cat ? cat.name : 'Catégorie inconnue';
   };
 
-  // Produits triés
+  // Produits triés (global)
   const sortedProducts = useMemo(() => {
     return [...productsFromStore].sort((a, b) =>
       collator.compare(getProductLabel(a), getProductLabel(b))
     );
   }, [productsFromStore, collator]);
 
-  // Produits filtrés par catégorie (pour le sélecteur Produit)
+  // Produits filtrés par catégorie (pour le *filtre global* Produit)
   const productsForProductFilter = useMemo(() => {
     const pool = selectedCategoryId
       ? sortedProducts.filter(p => String(getCategoryIdForProduct(p)) === String(selectedCategoryId))
@@ -112,7 +113,7 @@ export const ImageAdmin = () => {
     return pool;
   }, [sortedProducts, selectedCategoryId]);
 
-  // Si on change la catégorie et que le produit choisi n'appartient plus à cette catégorie -> reset
+  // Si on change la catégorie globale et que le produit global choisi n'appartient plus à cette catégorie -> reset
   useEffect(() => {
     if (!selectedProductId) return;
     if (!selectedCategoryId) return;
@@ -121,7 +122,8 @@ export const ImageAdmin = () => {
     if (String(prodCatId) !== String(selectedCategoryId)) {
       setSelectedProductId('');
     }
-  }, [selectedCategoryId]); // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCategoryId]);
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -140,6 +142,10 @@ export const ImageAdmin = () => {
     setIsEditing(false);
     setCurrentId(null);
     setFormData({ file: null, description: '', idProduct: '', title: '', position: '', display: false });
+
+    // 🔁 reset filtre catégorie de la modale
+    setModalCategoryId('');
+
     if (previewUrl?.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
     setPreviewUrl('');
     setShowModal(true);
@@ -156,6 +162,11 @@ export const ImageAdmin = () => {
       position: image.position ?? '',
       display: Boolean(image.display),
     });
+
+    // Préselection de la catégorie dans la modale selon l'image
+    const initCat = getCategoryIdForProductId(image.idProduct);
+    setModalCategoryId(initCat ? String(initCat) : '');
+
     if (previewUrl?.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(image.url || '');
     setShowModal(true);
@@ -198,9 +209,8 @@ export const ImageAdmin = () => {
     setShowModal(false);
   };
 
-  // ------- Tri + filtres des images -------
+  // ------- Tri + filtres du tableau principal -------
   const sortedImages = useMemo(() => {
-    // Tri principal par nom de produit (FR)
     return [...imagesFromStore].sort((a, b) =>
       collator.compare(getProductName(a.idProduct), getProductName(b.idProduct))
     );
@@ -210,16 +220,13 @@ export const ImageAdmin = () => {
     const q = searchQuery.trim().toLowerCase();
 
     return sortedImages.filter((img) => {
-      // Filtre catégorie
       if (selectedCategoryId) {
         const catId = getCategoryIdForProductId(img.idProduct);
         if (String(catId) !== String(selectedCategoryId)) return false;
       }
-      // Filtre produit
       if (selectedProductId && String(img.idProduct) !== String(selectedProductId)) {
         return false;
       }
-      // Filtre texte
       if (!q) return true;
       const url   = String(img.url || '').toLowerCase();
       const desc  = String(img.description || '').toLowerCase();
@@ -229,10 +236,35 @@ export const ImageAdmin = () => {
     });
   }, [sortedImages, selectedCategoryId, selectedProductId, searchQuery]);
 
-  // Catégories triées pour le filtre
+  // Catégories triées (global + modale)
   const sortedCategories = useMemo(() => {
-    return [...categoriesFromStore].sort((a, b) => collator.compare(a?.name ?? '', b?.name ?? ''));
+    return [...categoriesFromStore].sort((a, b) =>
+      collator.compare(a?.name ?? '', b?.name ?? '')
+    );
   }, [categoriesFromStore, collator]);
+
+  // ✅ Produits filtrés *dans la modale* + tri alphabétique FR
+  const modalProducts = useMemo(() => {
+    const byCategory = modalCategoryId
+      ? sortedProducts.filter(p => String(getCategoryIdForProduct(p)) === String(modalCategoryId))
+      : sortedProducts;
+
+    return [...byCategory].sort((a, b) =>
+      collator.compare(getProductLabel(a), getProductLabel(b))
+    );
+  }, [sortedProducts, modalCategoryId, collator]);
+
+  // Si changement de catégorie *dans la modale* rend le produit invalide -> reset idProduct
+  useEffect(() => {
+    if (!formData.idProduct) return;
+    if (!modalCategoryId) return;
+    const prod = getProductById(formData.idProduct);
+    const prodCatId = getCategoryIdForProduct(prod);
+    if (String(prodCatId) !== String(modalCategoryId)) {
+      setFormData((prev) => ({ ...prev, idProduct: '' }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modalCategoryId]);
 
   return (
     <div className='container py-5'>
@@ -240,7 +272,7 @@ export const ImageAdmin = () => {
 
       <div className="d-flex flex-wrap gap-2 justify-content-between mb-3">
         <div className="d-flex gap-2 flex-grow-1">
-          {/* ✅ Filtre Catégorie */}
+          {/* Filtre Catégorie (global tableau) */}
           <select
             className="form-select"
             style={{ minWidth: 220 }}
@@ -253,7 +285,7 @@ export const ImageAdmin = () => {
             ))}
           </select>
 
-          {/* ✅ Filtre Produit (dépend de la catégorie choisie) */}
+          {/* Filtre Produit (global tableau) */}
           <select
             className="form-select"
             style={{ minWidth: 260 }}
@@ -400,6 +432,22 @@ export const ImageAdmin = () => {
                 />
               </div>
 
+              {/* ✅ Sélecteur Catégorie dans la modale (filtre la liste des produits) */}
+              <div className="mb-3">
+                <label>Catégorie</label>
+                <select
+                  className="form-select"
+                  value={modalCategoryId}
+                  onChange={(e) => setModalCategoryId(e.target.value)}
+                >
+                  <option value="">Toutes les catégories</option>
+                  {sortedCategories.map(cat => (
+                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* ✅ Sélecteur Produit (tri alphabétique, filtré par catégorie de la modale) */}
               <div className="mb-3">
                 <label>Produit</label>
                 <select
@@ -410,7 +458,7 @@ export const ImageAdmin = () => {
                   required
                 >
                   <option value="">Sélectionnez un produit</option>
-                  {productsForProductFilter.map((product) => (
+                  {modalProducts.map((product) => (
                     <option key={product.id} value={product.id}>
                       {getProductLabel(product)}
                     </option>

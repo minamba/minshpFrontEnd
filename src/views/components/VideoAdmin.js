@@ -19,10 +19,12 @@ export const VideoAdmin = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [currentId, setCurrentId] = useState(null);
 
+  // Filtres globaux tableau
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategoryId, setSelectedCategoryId] = useState(''); // ✅ filtre Catégorie
-  const [selectedProductId, setSelectedProductId]   = useState(''); // ✅ filtre Produit
+  const [selectedCategoryId, setSelectedCategoryId] = useState('');
+  const [selectedProductId, setSelectedProductId]   = useState('');
 
+  // État formulaire + preview
   const [formData, setFormData] = useState({
     file: null,
     description: '',
@@ -32,6 +34,9 @@ export const VideoAdmin = () => {
     display: false,
   });
   const [previewUrl, setPreviewUrl] = useState('');
+
+  // 🔹 Nouvel état : filtre Catégorie dans la modale
+  const [modalCategoryId, setModalCategoryId] = useState('');
 
   const collator = useMemo(() => new Intl.Collator('fr', { sensitivity: 'base' }), []);
 
@@ -93,14 +98,14 @@ export const VideoAdmin = () => {
     return c ? c.name : 'Catégorie inconnue';
   };
 
-  // Produits triés (pour filtres et modale)
+  // Produits triés (global + modale)
   const sortedProducts = useMemo(() => {
     return [...productsFromStore].sort((a, b) =>
       collator.compare(getProductLabel(a), getProductLabel(b))
     );
   }, [productsFromStore, collator]);
 
-  // Produits disponibles pour le filtre Produit (dépend du filtre Catégorie)
+  // Produits disponibles pour le filtre Produit (global)
   const productsForProductFilter = useMemo(() => {
     const pool = selectedCategoryId
       ? sortedProducts.filter(p => String(getCategoryIdForProduct(p)) === String(selectedCategoryId))
@@ -108,7 +113,7 @@ export const VideoAdmin = () => {
     return pool;
   }, [sortedProducts, selectedCategoryId]);
 
-  // Reset produit si on change la catégorie et qu'il n'appartient plus
+  // Reset produit global si on change la catégorie et qu'il n'appartient plus
   useEffect(() => {
     if (!selectedProductId || !selectedCategoryId) return;
     const prod = getProductById(selectedProductId);
@@ -136,6 +141,7 @@ export const VideoAdmin = () => {
     setIsEditing(false);
     setCurrentId(null);
     setFormData({ file: null, description: '', idProduct: '', title: '', position: '', display: false });
+    setModalCategoryId(''); // reset filtre catégorie modale
     if (previewUrl?.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
     setPreviewUrl('');
     setShowModal(true);
@@ -152,8 +158,13 @@ export const VideoAdmin = () => {
       position: video.position != null ? String(video.position) : '',
       display: Boolean(video.display),
     });
+
+    // Préselection de la catégorie dans la modale selon la vidéo
+    const initCat = getCategoryIdForProductId(video.idProduct);
+    setModalCategoryId(initCat ? String(initCat) : '');
+
     if (previewUrl?.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
-    setPreviewUrl(toMediaUrl(video.url || ''));
+    setPreviewUrl(video.url || '');
     setShowModal(true);
   };
 
@@ -184,9 +195,8 @@ export const VideoAdmin = () => {
     setShowModal(false);
   };
 
-  // ------- Tri + filtres des vidéos -------
+  // ------- Tri + filtres des vidéos (tableau) -------
   const sortedVideos = useMemo(() => {
-    // Tri principal par nom de produit
     return [...videosFromStore].sort((a, b) =>
       collator.compare(getProductName(a.idProduct), getProductName(b.idProduct))
     );
@@ -195,16 +205,13 @@ export const VideoAdmin = () => {
   const filteredVideos = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return sortedVideos.filter((vid) => {
-      // Filtre catégorie
       if (selectedCategoryId) {
         const catId = getCategoryIdForProductId(vid.idProduct);
         if (String(catId) !== String(selectedCategoryId)) return false;
       }
-      // Filtre produit
       if (selectedProductId && String(vid.idProduct) !== String(selectedProductId)) {
         return false;
       }
-      // Filtre texte
       if (!q) return true;
       const url   = String(vid.url || '').toLowerCase();
       const desc  = String(vid.description || '').toLowerCase();
@@ -214,12 +221,35 @@ export const VideoAdmin = () => {
     });
   }, [sortedVideos, selectedCategoryId, selectedProductId, searchQuery]);
 
-  // Catégories triées pour le filtre
+  // Catégories triées (global + modale)
   const sortedCategories = useMemo(() => {
     return [...categoriesFromStore].sort((a, b) =>
       collator.compare(a?.name ?? '', b?.name ?? '')
     );
   }, [categoriesFromStore, collator]);
+
+  // 🔹 Produits filtrés *dans la modale* + tri alphabétique FR
+  const modalProducts = useMemo(() => {
+    const byCategory = modalCategoryId
+      ? sortedProducts.filter(p => String(getCategoryIdForProduct(p)) === String(modalCategoryId))
+      : sortedProducts;
+
+    return [...byCategory].sort((a, b) =>
+      collator.compare(getProductLabel(a), getProductLabel(b))
+    );
+  }, [sortedProducts, modalCategoryId, collator]);
+
+  // Si changement de catégorie *dans la modale* rend le produit invalide -> reset idProduct
+  useEffect(() => {
+    if (!formData.idProduct) return;
+    if (!modalCategoryId) return;
+    const prod = getProductById(formData.idProduct);
+    const prodCatId = getCategoryIdForProduct(prod);
+    if (String(prodCatId) !== String(modalCategoryId)) {
+      setFormData((prev) => ({ ...prev, idProduct: '' }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modalCategoryId]);
 
   return (
     <div className='container py-5'>
@@ -227,7 +257,7 @@ export const VideoAdmin = () => {
 
       <div className="d-flex flex-wrap gap-2 justify-content-between mb-3">
         <div className="d-flex gap-2 flex-grow-1">
-          {/* ✅ Filtre Catégorie */}
+          {/* ✅ Filtre Catégorie (global) */}
           <select
             className="form-select"
             style={{ minWidth: 220 }}
@@ -240,7 +270,7 @@ export const VideoAdmin = () => {
             ))}
           </select>
 
-          {/* ✅ Filtre Produit (dépend de la Catégorie) */}
+          {/* ✅ Filtre Produit (global, dépend de la Catégorie) */}
           <select
             className="form-select"
             style={{ minWidth: 260 }}
@@ -355,7 +385,7 @@ export const VideoAdmin = () => {
                 {previewUrl && (
                   <div className="mt-2">
                     <video width="200" controls>
-                      <source src={previewUrl} type="video/mp4" />
+                      <source src={toMediaUrl(previewUrl)} type="video/mp4" />
                       Votre navigateur ne supporte pas la vidéo.
                     </video>
                   </div>
@@ -398,6 +428,22 @@ export const VideoAdmin = () => {
                 />
               </div>
 
+              {/* ✅ Sélecteur Catégorie dans la modale (filtre la liste des produits) */}
+              <div className="mb-3">
+                <label>Catégorie</label>
+                <select
+                  className="form-select"
+                  value={modalCategoryId}
+                  onChange={(e) => setModalCategoryId(e.target.value)}
+                >
+                  <option value="">Toutes les catégories</option>
+                  {sortedCategories.map(cat => (
+                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* ✅ Sélecteur Produit (tri alphabétique, filtré par catégorie de la modale) */}
               <div className="mb-3">
                 <label>Produit</label>
                 <select
@@ -408,7 +454,7 @@ export const VideoAdmin = () => {
                   required
                 >
                   <option value="">Sélectionnez un produit</option>
-                  {productsForProductFilter.map((product) => (
+                  {modalProducts.map((product) => (
                     <option key={product.id} value={product.id}>
                       {getProductLabel(product)}
                     </option>
@@ -445,4 +491,3 @@ export const VideoAdmin = () => {
     </div>
   );
 };
-

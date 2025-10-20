@@ -868,3 +868,36 @@
   border: 1px solid rgba(145, 97, 9, 0.25);
   backdrop-filter: blur(3px);
 }
+
+
+
+/* ===== Page verrouillée quand la lightbox est ouverte ===== */
+.product-page.is-locked {
+  touch-action: none; /* empêche les gestes (pinch/scroll) */
+}
+
+/* Coupe toutes les interactions derrière la lightbox */
+.product-page.is-locked > *:not(.lb-overlay) {
+  pointer-events: none !important;
+  user-select: none !important;
+}
+
+/* Optionnel : si tu veux aussi éviter les focus via tab */
+.product-page.is-locked > *:not(.lb-overlay) :is(a, button, input, textarea, select) {
+  pointer-events: none !important;
+}
+
+
+/* Empêche l’overscroll/elastic sur iOS + overflow partout */
+html.scroll-lock, body.scroll-lock {
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
+  height: 100% !important;
+}
+
+/* (facultatif) évite les “rebonds” sur certains navigateurs */
+*,
+*::before,
+*::after {
+  overscroll-behavior: contain;
+}

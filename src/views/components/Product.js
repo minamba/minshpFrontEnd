@@ -282,6 +282,79 @@ const Product = () => {
     }
   }, [hasVideo, heroVideo?.url]);
 
+
+// 🔒 Lock total de la page quand la lightbox est ouverte (desktop + mobile + iOS)
+useEffect(() => {
+  if (!isLightboxOpen) return;
+
+  // 1) Mémoriser l’état courant
+  const scrollY = window.scrollY || window.pageYOffset || 0;
+  const html = document.documentElement;
+  const body = document.body;
+
+  const prevHtmlOverflow = html.style.overflow;
+  const prevHtmlTouch    = html.style.touchAction;
+  const prevHtmlHeight   = html.style.height;
+
+  const prevBodyOverflow = body.style.overflow;
+  const prevBodyTouch    = body.style.touchAction;
+  const prevBodyPos      = body.style.position;
+  const prevBodyTop      = body.style.top;
+  const prevBodyWidth    = body.style.width;
+  const prevBodyHeight   = body.style.height;
+
+  // 2) Appliquer le lock
+  html.classList.add('scroll-lock');
+  body.classList.add('scroll-lock');
+
+  html.style.overflow    = 'hidden';
+  html.style.touchAction = 'none';
+  html.style.height      = '100%';
+
+  body.style.overflow    = 'hidden';
+  body.style.touchAction = 'none';
+  body.style.position    = 'fixed';        // fige la page
+  body.style.top         = `-${scrollY}px`; // garde le viewport au bon endroit
+  body.style.width       = '100%';
+  body.style.height      = '100%';
+
+  // 3) Bloquer molette/gestes/clavier (PageUp, PageDown, Space, Arrows, Home/End)
+  const prevent = (e) => e.preventDefault();
+  const preventKeys = (e) => {
+    const keys = new Set([32,33,34,35,36,37,38,39,40]); // space, pgup/dn, end/home, arrows
+    if (keys.has(e.keyCode)) e.preventDefault();
+  };
+  window.addEventListener('wheel',     prevent, { passive: false });
+  window.addEventListener('touchmove', prevent, { passive: false });
+  window.addEventListener('keydown',   preventKeys, { passive: false });
+
+  // 4) Cleanup : restauration styles + position
+  return () => {
+    window.removeEventListener('wheel',     prevent);
+    window.removeEventListener('touchmove', prevent);
+    window.removeEventListener('keydown',   preventKeys);
+
+    html.style.overflow    = prevHtmlOverflow;
+    html.style.touchAction = prevHtmlTouch;
+    html.style.height      = prevHtmlHeight;
+
+    body.style.overflow = prevBodyOverflow;
+    body.style.touchAction = prevBodyTouch;
+    body.style.position = prevBodyPos;
+    body.style.top      = prevBodyTop;
+    body.style.width    = prevBodyWidth;
+    body.style.height   = prevBodyHeight;
+
+    html.classList.remove('scroll-lock');
+    body.classList.remove('scroll-lock');
+
+    // remettre le scroll à la même place
+    const y = Math.abs(parseInt(prevBodyTop || '0', 10)) || scrollY;
+    window.scrollTo(0, y);
+  };
+}, [isLightboxOpen]);
+
+
   // Parallax
   const parallaxRef = useRef(null);
   const pickImageByPos = (arr, pos) => arr.find((x) => Number(x?.position) === pos && typeof x?.url === 'string' && x.url.trim() !== '');
@@ -405,7 +478,7 @@ const Product = () => {
 
   /* ------------------------------ Rendu ------------------------------ */
   return (
-    <div className="product-page" onContextMenu={handleContextMenu}>
+    <div className={`product-page ${isLightboxOpen ? 'is-locked' : ''}`} onContextMenu={handleContextMenu}>
       <div className="product-main">
         {/* Vignettes */}
         <div className="thumbs-col">
