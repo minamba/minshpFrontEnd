@@ -441,3 +441,17 @@
 }
 
 
+/* ---- Rating (étoiles bleues) ---- */
+:root{
+  --star-blue: #0ea5e9;   /* bleu */
+  --star-empty: #d1d5db;  /* gris clair */
+}
+.rating{
+  display:inline-flex; align-items:center; gap:6px;
+}
+.rating__stars{ display:inline-flex; align-items:center; gap:2px; line-height:1; }
+.rating__count{
+  font-weight:700; font-size:.9rem; color:#6b7280; /* gris texte "15 avis" */
+}
+.home-container .new-grid .rating{ margin-top:2px; }
+.rating--sm .rating__count{ font-size:.85rem; }

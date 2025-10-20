@@ -2,23 +2,31 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ProductSpecs } from '../../components/index'; // <-- utilisé comme fonction, pas comme composant
+import { ProductSpecs } from '../../components';
 import { addToCartRequest, saveCartRequest } from '../../lib/actions/CartActions';
-import { GenericModal } from '../../components/index';
+import { GenericModal } from '../../components';
 import { toMediaUrl } from '../../lib/utils/mediaUrl';
-import { getProductsPagedUserRequest } from "../../lib/actions/ProductActions";
-import { getFeaturesCategoryByProductRequest, clearFeaturesForProduct } from "../../lib/actions/FeatureCategoryActions";
-import "../../styles/pages/product.css";
+import { getProductUserRequest } from '../../lib/actions/ProductActions';
+import { getFeaturesCategoryByProductRequest, clearFeaturesForProduct } from '../../lib/actions/FeatureCategoryActions';
+import '../../styles/pages/product.css';
 import { calculPrice } from '../../lib/utils/Helpers';
 import DOMPurify from 'dompurify';
 import { getStockUiByProductId } from '../../lib/utils/stockUi';
+import RatingStars from '../../lib/utils/RatingStars';
+import ProductReviews from '../../components/ProductReviews';
+
+// ➜ actions avis
+import {
+  addCustomerRateRequest,
+  updateCustomerRateRequest,
+  getCustomerRateRequest,          // ✅ (refresh après submit)
+} from '../../lib/actions/CustomerRateActions';
 
 /* --------- Swipe helpers (lightbox) --------- */
 const useSwipe = ({ onSwipeLeft, onSwipeRight, threshold = 40 }) => {
   const startX = useRef(0);
   const lastX = useRef(0);
   const isDown = useRef(false);
-
   const onStart = (x) => { isDown.current = true; startX.current = x; lastX.current = x; };
   const onMove  = (x) => { if (isDown.current) lastX.current = x; };
   const onEnd   = () => {
@@ -31,50 +39,89 @@ const useSwipe = ({ onSwipeLeft, onSwipeRight, threshold = 40 }) => {
   return { onStart, onMove, onEnd };
 };
 
-export const Product = () => {
+const Product = () => {
   const { id } = useParams();
   const pid = Number(id);
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
   useEffect(() => { window.scrollTo({ top: 0, left: 0, behavior: 'auto' }); }, [id]);
+
   useEffect(() => {
     if (!pid) return;
     dispatch(clearFeaturesForProduct(pid));
     dispatch(getFeaturesCategoryByProductRequest(pid));
   }, [dispatch, pid]);
 
-  const prodState       = useSelector((s) => s.products) || {};
-  const fullProducts    = Array.isArray(prodState.products) ? prodState.products : [];
-  const pagedItems      = Array.isArray(prodState.items)    ? prodState.items    : [];
-  const productsAll     = fullProducts.length ? fullProducts : pagedItems;
-  let images            = useSelector((s) => s.images?.images) || [];
-  let videos            = useSelector((s) => s.videos?.videos) || [];
-  const items           = useSelector((s) => s.items?.items) || [];
-  const promotionCodes  = useSelector((s) => s.promotionCodes?.promotionCodes) || [];
-  const stocks          = useSelector((s) => s.stocks?.stocks) || [];
+  // ---- STORE ----
+  const prodState      = useSelector((s) => s.products) || {};
+  const fullProducts   = Array.isArray(prodState.products) ? prodState.products : [];
+  const productsAll    = fullProducts;
+  const customerState  = useSelector((s) => s.customers.customers) || {};
+
+  const account        = useSelector((s) => s.account) || {};
+  const userID         = account?.user?.id;
+  const customer       = customerState?.find((c) => c.idAspNetUser === userID);
+  const currentCustomerId = customer?.id;
+
+  // Achats (CustomerOrderProduct)
+  const orderProductsState = useSelector((s) => s.orderProducts) || {};
+  const orderProducts = Array.isArray(orderProductsState.orderProducts)
+    ? orderProductsState.orderProducts
+    : (Array.isArray(orderProductsState.items) ? orderProductsState.items : []);
+
+  // Avis (CustomerRates)
+  const customerRatesState = useSelector((s) => s.customerRates) || {};
+  const customerRates = Array.isArray(customerRatesState.customerRates)
+    ? customerRatesState.customerRates
+    : (Array.isArray(customerRatesState.items) ? customerRatesState.items : []);
+
+  // Divers
+  const items          = useSelector((s) => s.items?.items) || [];
+  const stocks         = useSelector((s) => s.stocks?.stocks) || [];
+  let images           = useSelector((s) => s.images?.images) || [];
+  let videos           = useSelector((s) => s.videos?.videos) || [];
+  const promotionCodes = useSelector((s) => s.promotionCodes?.promotionCodes) || [];
 
   images = images.filter((i) => i.display === true && i.position !== 99);
   videos = videos.filter((v) => v.display === true);
 
   useEffect(() => { dispatch(saveCartRequest(items)); }, [items, dispatch]);
 
-  // fetch ciblé si produit manquant
-  const requestedOnceRef = useRef(null);
   useEffect(() => {
-    if (!id) return;
-    const found = Array.isArray(productsAll) && productsAll.some((p) => String(p.id) === String(id));
-    if (found) return;
-    if (requestedOnceRef.current === String(id)) return;
-    requestedOnceRef.current = String(id);
-    dispatch(getProductsPagedUserRequest({ page: 1, pageSize: 1, sort: "CreationDate:desc", filter: { Id: id } }));
-  }, [dispatch, id, productsAll?.length]);
+    if (!fullProducts.length) dispatch(getProductUserRequest());
+  }, [dispatch, fullProducts.length]);
+
+  useEffect(() => {
+    if (!pid) return;
+    const found = Array.isArray(productsAll) && productsAll.some((p) => String(p.id) === String(pid));
+    if (!found) dispatch(getProductUserRequest());
+  }, [dispatch, pid, productsAll]);
 
   const product = useMemo(
-    () => (productsAll || []).find((p) => String(p.id) === String(id)) || null,
-    [productsAll, id]
+    () => (productsAll || []).find((p) => String(p.id) === String(pid)) || null,
+    [productsAll, pid]
   );
 
+  // Acheté ?
+  const hasBought = useMemo(() => {
+    if (!currentCustomerId || !product) return false;
+    return (orderProducts || []).some(op =>
+      String(op.productId ?? op.idProduct) === String(product.id) &&
+      String(op.customerId ?? op.idCustomer) === String(currentCustomerId)
+    );
+  }, [orderProducts, currentCustomerId, product]);
+
+  // Avis existant ?
+  const existingRate = useMemo(() => {
+    if (!currentCustomerId || !product) return null;
+    return (customerRates || []).find(r =>
+      String(r.productId ?? r.idProduct) === String(product.id) &&
+      String(r.customerId ?? r.idCustomer) === String(currentCustomerId)
+    ) || null;
+  }, [customerRates, currentCustomerId, product]);
+
+  // Description nettoyée
   const cleanDescriptionHtml = useMemo(() => {
     const raw = product?.description ?? '';
     const fallback = 'Découvrez ce produit au design soigné...';
@@ -85,7 +132,7 @@ export const Product = () => {
     });
   }, [product?.description]);
 
-  // Images produit
+  // Images / vidéos
   const productImagesRaw = useMemo(() => {
     if (!product) return [];
     return images.filter((i) => String(i.idProduct) === String(product.id));
@@ -98,35 +145,29 @@ export const Product = () => {
   }, [productImagesRaw]);
 
   const imageUrls = useMemo(
-    () => (productImagesSorted || []).map(img => toMediaUrl(img.url)),
+    () => (productImagesSorted || []).map((img) => toMediaUrl(img.url)),
     [productImagesSorted]
   );
 
   const firstPos1Index = useMemo(
-    () => Math.max(0, productImagesSorted.findIndex(x => Number(x.position) === 1)),
+    () => Math.max(0, productImagesSorted.findIndex((x) => Number(x.position) === 1)),
     [productImagesSorted]
   );
 
-  // Vidéos
   const productVideos = useMemo(() => {
     if (!product) return [];
     return (videos || []).filter((v) => String(v.idProduct) === String(product.id) && v.position === 2);
   }, [videos, product]);
+
   const heroVideo = useMemo(() => productVideos.find((v) => v.position === 1) || productVideos[0], [productVideos]);
   const hasVideo = !!(heroVideo?.url && String(heroVideo.url).trim() !== '');
 
-  // Index UI
-  const [mainIndex, setMainIndex] = useState(0);      // image vitrine (mobile verrouillé)
+  // UI states
+  const [mainIndex, setMainIndex] = useState(0);
   const [lightboxIndex, setLightboxIndex] = useState(0);
-
-  useEffect(() => {
-    setMainIndex(firstPos1Index);
-    setLightboxIndex(firstPos1Index);
-  }, [firstPos1Index]);
-
+  useEffect(() => { setMainIndex(firstPos1Index); setLightboxIndex(firstPos1Index); }, [firstPos1Index]);
   const currentMainUrl = imageUrls[mainIndex] || '/Images/placeholder.jpg';
 
-  // Détection mobile
   const [isMobile, setIsMobile] = useState(() =>
     typeof window !== 'undefined' ? window.matchMedia('(max-width: 768px)').matches : false
   );
@@ -134,55 +175,24 @@ export const Product = () => {
     const mq = window.matchMedia('(max-width: 768px)');
     const handler = (e) => setIsMobile(e.matches);
     mq.addEventListener ? mq.addEventListener('change', handler) : mq.addListener(handler);
-    return () => {
-      mq.removeEventListener ? mq.removeEventListener('change', handler) : mq.removeListener(handler);
-    };
+    return () => { mq.removeEventListener ? mq.removeEventListener('change', handler) : mq.removeListener(handler); };
   }, []);
 
-  // Lightbox
   const [isLightboxOpen, setLightboxOpen] = useState(false);
   const openLightbox  = (idx) => { setLightboxIndex(idx); setLightboxOpen(true); };
   const closeLightbox = () => { setLightboxOpen(false); };
 
-  const prev = () =>
-    setLightboxIndex((i) => (i - 1 + imageUrls.length) % imageUrls.length);
-  const next = () =>
-    setLightboxIndex((i) => (i + 1) % imageUrls.length);
-
-  // Bloque scroll derrière la LB
-  useEffect(() => {
-    const pageEl = document.querySelector('.product-page');
-    if (isLightboxOpen) {
-      const prevOverflow = document.body.style.overflow;
-      document.body.style.overflow = 'hidden';
-      pageEl?.classList?.add('no-touch-while-lb');
-      return () => {
-        document.body.style.overflow = prevOverflow;
-        pageEl?.classList?.remove('no-touch-while-lb');
-      };
-    }
-  }, [isLightboxOpen]);
-
-  // Clavier LB
-  useEffect(() => {
-    if (!isLightboxOpen) return;
-    const onKey = (e) => {
-      if (e.key === 'Escape') closeLightbox();
-      if (e.key === 'ArrowLeft') prev();
-      if (e.key === 'ArrowRight') next();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [isLightboxOpen]);
-
-  // Swipe LB
   const { onStart, onMove, onEnd } = useSwipe({
-    onSwipeLeft: next,
-    onSwipeRight: prev,
-    threshold: 40
+    onSwipeLeft: () => setLightboxIndex((i) => (i + 1) % imageUrls.length),
+    onSwipeRight: () => setLightboxIndex((i) => (i - 1 + imageUrls.length) % imageUrls.length),
+    threshold: 40,
   });
 
   // Prix / promos
+  const toNum = (x) => { const n = typeof x === 'number' ? x : parseFloat(x); return Number.isFinite(n) ? n : null; };
+  const parseDate = (val) => { if (!val) return null; const d = new Date(val); return Number.isNaN(d.getTime()) ? null : d; };
+  const formatEndShort = (val) => { const d = parseDate(val); if (!d) return null; const dd = String(d.getDate()).padStart(2,'0'); const mm = String(d.getMonth()+1).padStart(2,'0'); return `${dd}/${mm}`; };
+
   const computeBadgeFromProduct = (product, promotionCodes = []) => {
     if (!product) return { badgePct: null, refPriceTtc: null, until: null, source: null };
     const now = new Date();
@@ -190,8 +200,8 @@ export const Product = () => {
     const endProd = product?.promotions?.[0]?.endDate;
     const subPromoId = product?.subCategoryVm?.promotionCodes?.[0]?.id ?? product?.subCategoryVm?.idPromotionCode ?? null;
     const catPromoId = product?.categoryVm?.promotionCodes?.[0]?.id ?? product?.categoryVm?.idPromotionCode ?? null;
-    const endSub = promotionCodes.find(p => p.id === subPromoId)?.endDate;
-    const endCat = promotionCodes.find(p => p.id === catPromoId)?.endDate;
+    const endSub = promotionCodes.find((p) => p.id === subPromoId)?.endDate;
+    const endCat = promotionCodes.find((p) => p.id === catPromoId)?.endDate;
     const baseHt  = typeof product?.price === 'number' ? product.price : parseFloat(product?.price ?? 0);
     const subHt   = product?.priceHtSubCategoryCodePromoted;
     const catHt   = product?.priceHtCategoryCodePromoted;
@@ -201,14 +211,10 @@ export const Product = () => {
     const refPriceTtc = (baseHt ?? 0) * tvaMultiplier + tax;
     const pctFrom = (ht) => (!ht || !baseHt || baseHt <= 0) ? null : Math.max(0, Math.round((1 - (ht / baseHt)) * 100)) || null;
     if (subHt != null && isActive(endSub)) return { badgePct: pctFrom(subHt), refPriceTtc, until: endSub, source: 'subcategory' };
-    if (catHt != null && isActive(endCat)) return { badgePct: pctFrom(catHt), refPriceTtc, until: endCat, source: 'category' };
-    if (prodHt != null && isActive(endProd)) return { badgePct: pctFrom(prodHt), refPriceTtc, until: endProd, source: 'product' };
+    if (catHt   != null && isActive(endCat)) return { badgePct: pctFrom(catHt), refPriceTtc, until: endCat, source: 'category' };
+    if (prodHt  != null && isActive(endProd)) return { badgePct: pctFrom(prodHt), refPriceTtc, until: endProd, source: 'product' };
     return { badgePct: null, refPriceTtc: null, until: null, source: 'base' };
   };
-
-  const toNum = (x) => { const n = typeof x === 'number' ? x : parseFloat(x); return Number.isFinite(n) ? n : null; };
-  const parseDate = (val) => { if (!val) return null; const d = new Date(val); return Number.isNaN(d.getTime()) ? null : d; };
-  const formatEndShort = (val) => { const d = parseDate(val); if (!d) return null; const dd = String(d.getDate()).padStart(2,'0'); const mm = String(d.getMonth()+1).padStart(2,'0'); return `${dd}/${mm}`; };
 
   const rawFirstPromo = product?.promotions?.[0] ?? null;
   const activePromo = useMemo(() => {
@@ -220,7 +226,7 @@ export const Product = () => {
     const pct   = Number(rawFirstPromo.purcentage) || 0;
     if (pct <= 0) return null;
     if (start && start.getTime() > now.getTime()) return null;
-    if (end && end.getTime() < startOfToday.getTime()) return null;
+    if (end && end.getTime()   < startOfToday.getTime()) return null;
     return rawFirstPromo;
   }, [rawFirstPromo]);
 
@@ -228,14 +234,6 @@ export const Product = () => {
   const displayPrice = calculPrice(product, promotionCodes);
   const { badgePct, refPriceTtc } = useMemo(() => computeBadgeFromProduct(product, promotionCodes), [product, promotionCodes]);
   const priceRef = useMemo(() => (Number.isFinite(refPriceTtc) ? refPriceTtc : toNum(product?.priceTtc) ?? 0), [refPriceTtc, product]);
-  const productPromoPct = activePromo ? Number(activePromo.purcentage) || 0 : 0;
-  const discountedPriceProduct = useMemo(() => {
-    if (!activePromo) return priceRef;
-    const p = toNum(product?.priceHtPromoted);
-    if (p != null) return p;
-    return +(priceRef * (1 - productPromoPct / 100)).toFixed(2);
-  }, [activePromo, product, priceRef, productPromoPct]);
-  const hasPrice = Number.isFinite(displayPrice);
 
   // Stock
   const { cls: stockCls, label: stockLabel, qty: availableQty = 0, isOut: isActuallyOut } =
@@ -284,21 +282,20 @@ export const Product = () => {
     }
   }, [hasVideo, heroVideo?.url]);
 
-  const handleContextMenu = (e) => e.preventDefault();
-
   // Parallax
-  const pickImageByPos = (arr, pos) => arr.find(x => Number(x?.position) === pos && typeof x?.url === 'string' && x.url.trim() !== '');
+  const parallaxRef = useRef(null);
+  const pickImageByPos = (arr, pos) => arr.find((x) => Number(x?.position) === pos && typeof x?.url === 'string' && x.url.trim() !== '');
   const parallaxImgObj = useMemo(() => {
     if (!Array.isArray(productImagesRaw) || productImagesRaw.length === 0) return { url: '/Images/parallax-default.jpg' };
     const pos100 = pickImageByPos(productImagesRaw, 100);
     if (pos100) return pos100;
     const pos1 = pickImageByPos(productImagesRaw, 1);
     if (pos1) return pos1;
-    const firstValid = productImagesRaw.find(x => typeof x?.url === 'string' && x.url.trim() !== '');
+    const firstValid = productImagesRaw.find((x) => typeof x?.url === 'string' && x.url.trim() !== '');
     return firstValid || { url: '/Images/parallax-default.jpg' };
   }, [productImagesRaw]);
   const parallaxUrl = toMediaUrl(parallaxImgObj?.url) || '/Images/parallax-default.jpg';
-  const parallaxRef = useRef(null);
+
   useEffect(() => {
     if (hasVideo) return;
     const el = parallaxRef.current; if (!el) return;
@@ -325,8 +322,60 @@ export const Product = () => {
     };
   }, [hasVideo]);
 
-  /* -------- Specs : 1 seul appel (rafraîchit comme avant) -------- */
+  /* -------- Specs -------- */
   const { specs = {} } = (ProductSpecs(pid, product) || {});
+
+  /* ===================== AVIS : Modales ===================== */
+  // 1) Modale “vous devez acheter”
+  const [isNotBuyerOpen, setNotBuyerOpen] = useState(false);
+
+  // 2) Modale d’avis
+  const [isRateOpen, setRateOpen] = useState(false);
+  const [rateValue, setRateValue] = useState(existingRate?.rate ?? existingRate?.note ?? 0);
+  const [rateTitle, setRateTitle] = useState(existingRate?.title ?? '');
+  const [rateMsg, setRateMsg]     = useState(existingRate?.message ?? '');
+
+  // ✅ 3) Modale de confirmation (NOUVEAU)
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmText, setConfirmText] = useState('');
+
+  const openRateModal = () => {
+    if (!hasBought) {
+      setNotBuyerOpen(true);
+      return;
+    }
+    setRateValue(existingRate?.rate ?? existingRate?.note ?? 0);
+    setRateTitle(existingRate?.title ?? '');
+    setRateMsg(existingRate?.message ?? '');
+    setRateOpen(true);
+  };
+  const closeRate = () => setRateOpen(false);
+
+  const submitRate = async (e) => {
+    e.preventDefault();
+    if (!currentCustomerId || !product) return;
+
+    const payload = {
+      Id: existingRate?.id || null,
+      IdCustomer: currentCustomerId,
+      IdProduct: product.id,
+      Rate: Number(rateValue) || 0,
+      Title: (rateTitle || '').trim(),
+      Message: (rateMsg || '').trim(),
+    };
+
+    if (existingRate?.id) {
+      await dispatch(updateCustomerRateRequest(payload));
+      setConfirmText('Votre avis a bien été modifié');   // ✅ message update
+    } else {
+      await dispatch(addCustomerRateRequest(payload));
+      setConfirmText('Votre avis a bien été ajouté');     // ✅ message add
+    }
+
+    setRateOpen(false);
+    setConfirmOpen(true);                                 // ✅ affiche la modale
+    dispatch(getCustomerRateRequest());                   // refresh des avis
+  };
 
   // Skeleton
   if (!product) {
@@ -348,6 +397,12 @@ export const Product = () => {
     );
   }
 
+  const handleContextMenu = (e) => e.preventDefault();
+  const goToReviews = () => {
+    const el = document.getElementById('reviews');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   /* ------------------------------ Rendu ------------------------------ */
   return (
     <div className="product-page" onContextMenu={handleContextMenu}>
@@ -358,13 +413,7 @@ export const Product = () => {
             <button
               key={i}
               className="thumb"
-              onClick={() => {
-                if (isMobile) {
-                  openLightbox(i);      // mobile : vitrine verrouillée
-                } else {
-                  setMainIndex(i);      // desktop : vitrine suit la selection
-                }
-              }}
+              onClick={() => { if (isMobile) openLightbox(i); else setMainIndex(i); }}
               aria-label={`Sélectionner l'image ${i + 1}`}
             >
               <img src={src} alt={`Miniature ${i + 1}`} loading="lazy" />
@@ -372,7 +421,7 @@ export const Product = () => {
           ))}
         </div>
 
-        {/* Image principale (vitrine) */}
+        {/* Image principale */}
         <div className="product-main-image-wrap">
           <img
             className="product-main-image"
@@ -392,7 +441,28 @@ export const Product = () => {
             {product?.brand + ' ' + product?.model || product?.title || 'Produit'}
           </h1>
 
-          <div className="details-stack">
+          {/* Étoiles + compteur cliquable */}
+          <div className="product-rating-center">
+            <RatingStars
+              value={Number(product.rate) || 0}
+              count={product.numberRate || 0}
+              size="sm"
+              className="rating--no-count"
+            />
+            {Number(product.numberRate) > 0 && (
+              <button
+                type="button"
+                className="rating-jump-link"
+                onClick={goToReviews}
+                aria-label="Voir les avis"
+              >
+                {product.numberRate} {product.numberRate > 1 ? 'avis' : 'avis'}
+              </button>
+            )}
+          </div>
+
+          {/* Prix & stock */}
+          <div className="details-stack" style={{ marginTop: 12 }}>
             {Number.isFinite(displayPrice) && (
               <>
                 {Number.isFinite(badgePct) && badgePct > 0 && (
@@ -477,14 +547,10 @@ export const Product = () => {
 
             <div className="lb-stage">
               {imageUrls.length > 1 && (
-                <button className="lb-btn lb-arrow lb-prev" onClick={prev} aria-label="Précédent">‹</button>
+                <button className="lb-btn lb-arrow lb-prev" onClick={() => setLightboxIndex((i)=> (i-1+imageUrls.length)%imageUrls.length)} aria-label="Précédent">‹</button>
               )}
 
-              <div
-                className="lb-fit"
-                onClick={(e) => e.stopPropagation()}
-                style={{ position: 'relative', width: '100%', height: '100%' }}
-              >
+              <div className="lb-fit" onClick={(e) => e.stopPropagation()} style={{ position: 'relative', width: '100%', height: '100%' }}>
                 <div
                   className="lb-bgi"
                   style={{
@@ -502,7 +568,7 @@ export const Product = () => {
               </div>
 
               {imageUrls.length > 1 && (
-                <button className="lb-btn lb-arrow lb-next" onClick={next} aria-label="Suivant">›</button>
+                <button className="lb-btn lb-arrow lb-next" onClick={() => setLightboxIndex((i)=> (i+1)%imageUrls.length)} aria-label="Suivant">›</button>
               )}
             </div>
 
@@ -559,7 +625,7 @@ export const Product = () => {
         />
       )}
 
-      {/* Caractéristiques techniques (via specs retournés) */}
+      {/* Caractéristiques techniques */}
       <section className="specs-wrap">
         <h2 className="specs-title">Caractéristiques techniques</h2>
         <div className="specs-layout">
@@ -577,7 +643,7 @@ export const Product = () => {
                     <div key={i} className="specs-row">
                       <div className="specs-label">{row.label}</div>
                       <div className="specs-line" aria-hidden="true" />
-                      <div className="specs-value">{row.value ?? '—'}</div>
+                      <div className="specs-value text-muted">{row.value ?? '—'}</div>
                     </div>
                   ))}
                 </div>
@@ -585,6 +651,17 @@ export const Product = () => {
             ))}
           </div>
         </div>
+      </section>
+
+      {/* Avis clients */}
+      <section id="reviews" className="reviews-wrap">
+        <h2 className="specs-title">Avis clients</h2>
+        <ProductReviews
+          productId={product.id}
+          average={Number(product?.rate) || undefined}
+          totalCount={product?.numberRate || undefined}
+          onAddReview={openRateModal}  // ➜ Ouvre la bonne modale selon hasBought/existingRate
+        />
       </section>
 
       {/* Modale ajout panier */}
@@ -597,6 +674,122 @@ export const Product = () => {
         actions={[
           { label: 'Fermer',          variant: 'light',   onClick: closeAdded },
           { label: 'Voir mon panier', variant: 'primary', onClick: goToCart, autoFocus: true },
+        ]}
+      />
+
+      {/* Modale « vous devez avoir acheté » */}
+      <GenericModal
+        open={isNotBuyerOpen}
+        onClose={() => setNotBuyerOpen(false)}
+        variant="warning"
+        title="Avis réservé aux acheteurs"
+        message="Vous devez avoir acheté ce produit pour donner un avis. Cela nous permet de garantir des retours authentiques."
+        actions={[
+          { label: 'OK', variant: 'primary', onClick: () => setNotBuyerOpen(false), autoFocus: true },
+        ]}
+      />
+
+      {/* Modale Avis */}
+      {isRateOpen && (
+        <>
+          {/* Backdrop */}
+          <div className="app-backdrop" onClick={closeRate} />
+          {/* Dialog */}
+          <div className="app-modal" role="dialog" aria-modal="true">
+            <div className="app-modal__dialog">
+              <div className="app-modal__header">
+                <h5 className="app-modal__title">
+                  {existingRate ? "Modifier votre avis" : "Donner votre avis"}
+                </h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={closeRate}
+                  aria-label="Fermer"
+                />
+              </div>
+
+              <form onSubmit={submitRate} className="rate-form">
+                <div className="app-modal__body">
+                  {/* Note */}
+                  <div className="mb-3">
+                    <label className="form-label">
+                      <strong>Sélectionnez votre note *</strong>
+                    </label>
+                    <div className="rate-stars">
+                      {[1,2,3,4,5].map((n) => {
+                        const on = n <= (Number(rateValue) || 0);
+                        return (
+                          <button
+                            key={n}
+                            type="button"
+                            className={`star-btn ${on ? 'is-on' : ''}`}
+                            onClick={() => setRateValue(n)}
+                            aria-label={`Note ${n}`}
+                            title={`${n} ${n>1?'étoiles':'étoile'}`}
+                          >
+                            {on ? '★' : '☆'}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Titre */}
+                  <div className="mb-3">
+                    <label className="form-label">
+                      <strong>Titre de votre commentaire *</strong> <small>(0/100 max)</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={rateTitle}
+                      maxLength={100}
+                      onChange={(e) => setRateTitle(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  {/* Message */}
+                  <div className="mb-2">
+                    <label className="form-label">
+                      <strong>Commentaire détaillé *</strong> <small>(30 caractères min)</small>
+                    </label>
+                    <textarea
+                      className="form-control"
+                      rows={6}
+                      placeholder="Pourquoi avez-vous donné cette note ? Détaillez ce que vous avez apprécié ou non, et votre usage du produit."
+                      value={rateMsg}
+                      onChange={(e) => setRateMsg(e.target.value)}
+                      minLength={30}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="app-modal__footer">
+                  <button type="button" className="btn btn-light" onClick={closeRate}>
+                    Annuler
+                  </button>
+                  <button type="submit" className="btn btn-primary">
+                    {existingRate ? "Mettre à jour" : "Publier l’avis"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ✅ Modale de confirmation après ajout/modification d'avis */}
+      <GenericModal
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        variant="success"
+        title="Merci !"
+        message={confirmText}
+        actions={[
+          { label: 'OK', variant: 'primary', onClick: () => setConfirmOpen(false), autoFocus: true },
         ]}
       />
     </div>

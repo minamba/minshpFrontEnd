@@ -569,4 +569,302 @@
 }
 
 
+/* Centrer le bloc rating comme le titre */
+.product-rating-center{
+  display:flex;
+  justify-content:center;
+  margin:.25rem 0 .5rem;
+}
 
+/* (optionnel) assurer le bleu des étoiles ici aussi */
+:root{
+  --star-blue:#0ea5e9;   /* bleu */
+  --star-empty:#d1d5db;  /* gris clair */
+}
+
+
+
+
+
+/* ===== AVIS CLIENTS ===== */
+.reviews-section{ margin-top:2.5rem; }
+.reviews-grid{
+  display:grid; grid-template-columns:280px 1fr; gap:32px;
+  align-items:start;
+}
+@media (max-width:900px){
+  .reviews-grid{ grid-template-columns:1fr; }
+}
+
+/* Colonne gauche (summary) */
+.reviews-summary{
+  background:#fff; border-radius:16px; box-shadow:var(--shadow-2, 0 10px 30px rgba(0,0,0,.08));
+  padding:18px;
+}
+.reviews-h3{ margin:0 0 .25rem; font-weight:800; font-size:1.1rem; }
+.reviews-average{ display:flex; flex-direction:column; gap:6px; margin-bottom:10px; }
+.reviews-guideline{ font-size:.9rem; color:#6b7280; }
+
+.reviews-bars{ list-style:none; margin:8px 0 14px; padding:0; display:flex; flex-direction:column; gap:8px; }
+.reviews-bar{ display:grid; grid-template-columns:auto 1fr auto; gap:10px; align-items:center; }
+.reviews-bar-left{ min-width:90px; }
+.reviews-bar-mid{ }
+.reviews-bar-track{ height:8px; border-radius:999px; background:#eef2f7; overflow:hidden; }
+.reviews-bar-fill{ height:100%; background:var(--star-blue,#0ea5e9); }
+
+.reviews-cta{
+  display:inline-flex; align-items:center; justify-content:center;
+  padding:.55rem 1rem; border:1.5px solid #111; border-radius:999px; background:#fff;
+  font-weight:700; cursor:pointer; transition:transform .05s, box-shadow .2s;
+}
+.reviews-cta:hover{ transform:translateY(-1px); box-shadow:0 10px 24px rgba(0,0,0,.08); }
+
+/* Colonne droite (liste) */
+.reviews-list{ background:#fff; border-radius:16px; box-shadow:var(--shadow-2, 0 10px 30px rgba(0,0,0,.08)); padding:6px 18px; }
+.reviews-empty{ color:#6b7280; padding:12px 0; }
+
+.review-card{ padding:12px 0; }
+.review-head{
+  display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:10px;
+}
+.review-author{ font-weight:700; }
+.review-date{ color:#6b7280; font-size:.9rem; }
+.review-title{ margin:.3rem 0 .2rem; font-weight:700; }
+.review-body{ margin:0 0 .4rem; color:#111; line-height:1.55; }
+.review-meta{ color:#6b7280; font-size:.9rem; }
+.review-sep{ border:0; border-top:1px solid #eee; margin:12px 0 6px; }
+
+/* étoiles bleues (fallback) */
+:root{
+  --star-blue:#0e53e9;
+  --star-empty:#d1d5db;
+}
+
+
+
+/* Compact: étoiles + "n avis" sur la même ligne */
+.reviews-bars--compact { margin-top: 8px; }
+.reviews-bar--compact{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:6px 0;
+}
+
+/* on n'affiche plus la barre ni la colonne droite */
+.reviews-bar--compact .reviews-bar-mid,
+.reviews-bar--compact .reviews-bar-right { display:none !important; }
+
+.reviews-bar-left{
+  display:flex; align-items:center; gap:10px;
+}
+
+/* compteur à côté des étoiles */
+.reviews-row-count{
+  font-weight:700; color:#6b7280; /* adapte si besoin */
+}
+
+/* lignes sans avis en atténué */
+.reviews-bar--compact.is-zero{
+  opacity:.4;
+}
+
+
+/* Supprime le compteur interne du composant étoiles pour éviter le doublon */
+.rating--no-count .rating__count { display: none !important; }
+
+/* Compact: étoiles + compteur */
+.reviews-bars--compact { margin-top: 8px; }
+.reviews-bar--compact { display:flex; align-items:center; padding:6px 0; }
+.reviews-bar--compact .reviews-bar-left { display:flex; align-items:center; gap:10px; }
+
+/* Met en avant les lignes avec des avis, atténue les 0 */
+.reviews-bar--compact.has-reviews { opacity: 1; font-weight: 700; }
+.reviews-bar--compact.is-zero     { opacity: .35; font-weight: 600; }
+
+/* Par sécurité, aucun autre compteur à droite */
+.reviews-bar--compact .reviews-bar-mid,
+.reviews-bar--compact .reviews-bar-right { display: none !important; }
+
+
+
+/* Carte avis à droite */
+.review-card {
+  padding: 20px 0;
+  border: none;
+  width: 100%;
+}
+
+/* Ligne de séparation visible et pleine largeur */
+.review-sep {
+  width: 100%;
+  height: 2px; /* épaisseur */
+  background: #ccc; /* gris clair visible */
+  border: none;
+  margin: 24px 0 0;
+  opacity: 0.8;
+}
+
+/* ❌ Masquer le HR du dernier commentaire */
+.review-card:last-of-type .review-sep {
+  display: none;
+}
+
+/* Ligne du haut : étoiles + date */
+.review-toprow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.review-date-right {
+  color: #9aa3af;
+  font-size: 0.95rem;
+  white-space: nowrap;
+}
+
+/* Auteur */
+.review-author-line {
+  margin-bottom: 10px;
+  color: #111827;
+  font-weight: 600;
+}
+
+/* Titre */
+.review-title {
+  margin: 0 0 8px 0;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1.4;
+}
+
+/* Message */
+.review-message {
+  margin: 0 0 12px;
+  line-height: 1.55;
+}
+
+.review-message.muted {
+  color: #6b7280;
+}
+
+/* Pied */
+.review-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: #9aa3af;
+  font-size: 0.9rem;
+}
+
+/* Liste globale */
+.reviews-list {
+  width: 100%;
+}
+
+/* Empêche le doublon "X avis" généré par RatingStars */
+.rating--no-count .rating__count {
+  display: none !important;
+}
+
+
+
+/* Cache le compteur intégré de RatingStars pour éviter le doublon */
+.product-rating-center .rating__count,
+.rating--no-count .rating__count {
+  display: none !important;
+}
+
+/* Ligne étoiles + lien compteur cliquable */
+.product-rating-center{
+  display:flex;
+  align-items:center;
+  justify-content:center; /* centré comme le titre */
+  gap:10px;
+  margin-top:6px;
+}
+
+.rating-jump-link{
+  background:none;
+  border:0;
+  padding:0;
+  font:inherit;
+  color:#2563eb;           /* bleu lien */
+  cursor:pointer;
+  text-decoration:underline;
+}
+.rating-jump-link:hover{ color:#1d4ed8; }
+
+
+
+/* ===== Backdrop + Modale AVIS (z-index maîtrisé) ===== */
+.app-backdrop{
+  position: fixed; inset: 0;
+  background: rgba(11, 18, 32, .45);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  z-index: 1990;            /* derrière la modale */
+}
+
+.app-modal{
+  position: fixed; inset: 0;
+  display: grid; place-items: center;
+  z-index: 2000;            /* devant le backdrop */
+}
+
+.app-modal__dialog{
+  width: min(720px, 96vw);
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.25);
+  overflow: hidden;
+}
+
+.app-modal__header{
+  display:flex; align-items:center; justify-content:space-between;
+  padding: 16px 18px 8px;
+  border-bottom: none;
+}
+.app-modal__title{ margin:0; font-weight:800; }
+
+.app-modal__body{ padding: 8px 18px 6px; }
+.app-modal__footer{
+  display:flex; gap:10px; justify-content:flex-end;
+  padding: 12px 18px 16px;
+  border-top:none;
+}
+
+/* Étoiles bleues */
+:root{
+  --star-blue:#0e5be9;   /* bleu */
+  --star-empty:#d1d5db;  /* gris clair */
+}
+.rate-stars{ font-size: 0; }              /* supprime l'espace entre boutons inline */
+.star-btn{
+  font-size: 28px; line-height: 1;
+  background: none; border: none; cursor: pointer;
+  padding: 2px 4px;
+  color: var(--star-empty);
+  transition: transform .08s ease, color .15s ease;
+}
+.star-btn.is-on{ color: var(--star-blue); filter: drop-shadow(0 1px 2px rgba(0,0,0,.18)); }
+.star-btn:hover{ transform: translateY(-1px) scale(1.03); }
+
+/* Libellés en gras dans le formulaire d'avis */
+.rate-form .form-label{ font-weight: 700; }
+
+
+
+.verified-badge {
+  margin-left: 10px;
+  padding: 2px 8px 3px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #c27706;  /* vert émeraude */
+  background: rgba(238, 195, 52, 0.12); /* fond translucide */
+  border: 1px solid rgba(145, 97, 9, 0.25);
+  backdrop-filter: blur(3px);
+}

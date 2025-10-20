@@ -440,6 +440,7 @@ export const Navbar = () => {
                       <Link to="/admin/promotions" onClick={closeAllDropdowns}>Promotions</Link>
                       <Link to="/admin/taxes" onClick={closeAllDropdowns}>Taxes</Link>
                       <Link to="/admin/packageProfil" onClick={closeAllDropdowns}>Profils de colis</Link>
+                      <Link to="/admin/customerRates" onClick={closeAllDropdowns}>Avis clients</Link>
                       <Link to="/admin/newsletter" onClick={closeAllDropdowns}>Newsletter</Link>
                     </div>
                   )}

@@ -14,6 +14,15 @@ import { getOrderCustomerProductRequest } from "../../../lib/actions/OrderCustom
 import { getProductUserRequest } from "../../../lib/actions/ProductActions";
 import { toMediaUrl } from "../../../lib/utils/mediaUrl";
 
+// ✅ NEW: on réutilise la modale générique (comme sur Product)
+import { GenericModal } from "../../../components";
+
+import {
+  getCustomerRateRequest,
+  addCustomerRateRequest,
+  updateCustomerRateRequest,
+} from "../../../lib/actions/CustomerRateActions";
+
 /* ===== Helpers ===== */
 const getId = (x) => x?.id ?? x?.Id ?? x?.orderId ?? x?.OrderId ?? x?.orderID ?? null;
 const getOrderIdFromOP = (op) => op?.idOrder ?? op?.orderId ?? op?.OrderId ?? op?.IdOrder ?? null;
@@ -58,12 +67,11 @@ const isDelivered = (status) => {
   return n.includes("livre") || n.includes("delivre") || n.includes("delivered") || n.includes("effectuee");
 };
 
-/* ===== Pager — numéros masqués & “Suivant” masqué si page vide ===== */
+/* ===== Pager ===== */
 const Pager = ({ page, setPage, totalPages, loading, hasItems }) => {
   if (totalPages <= 1) return null;
 
-  // taille de la fenêtre de numéros à l'écran
-  const windowSize = 10; // ↑ baisse un peu pour mobile
+  const windowSize = 10;
   let start = Math.max(1, page - Math.floor(windowSize / 2));
   let end = Math.min(totalPages, start + windowSize - 1);
   if (end - start + 1 < windowSize) start = Math.max(1, end - windowSize + 1);
@@ -75,7 +83,6 @@ const Pager = ({ page, setPage, totalPages, loading, hasItems }) => {
 
   return (
     <div className="orders-pagination" role="navigation" aria-label="Pagination">
-      {/* ← flèche gauche */}
       <button
         className="pg-btn pg-arrow"
         aria-label="Page précédente"
@@ -85,7 +92,6 @@ const Pager = ({ page, setPage, totalPages, loading, hasItems }) => {
         <i className="bi bi-chevron-left" aria-hidden="true" />
       </button>
 
-      {/* bandeau des numéros (fenêtre glissante) */}
       <div className="pg-strip" aria-hidden={!hasItems}>
         {start > 1 && (
           <>
@@ -116,7 +122,6 @@ const Pager = ({ page, setPage, totalPages, loading, hasItems }) => {
         )}
       </div>
 
-      {/* → flèche droite (masquée si page vide) */}
       {hasItems && (
         <button
           className="pg-btn pg-arrow"
@@ -175,8 +180,14 @@ export const Account = () => {
 
   const orderSlice = useSelector((s) => s?.orders) || {};
   const itemsServer = Array.isArray(orderSlice.items) ? orderSlice.items : [];
-  const serverTotalCount = Number(orderSlice.totalCount ?? 0); // comme OrderAdmin
+  const serverTotalCount = Number(orderSlice.totalCount ?? 0);
   const loading = !!orderSlice.loading;
+
+  // Avis
+  const customerRatesState = useSelector((s) => s?.customerRates) || {};
+  const customerRates = Array.isArray(customerRatesState.customerRates)
+    ? customerRatesState.customerRates
+    : (Array.isArray(customerRatesState.items) ? customerRatesState.items : []);
 
   // Client courant
   const uid = user?.id || null;
@@ -184,13 +195,14 @@ export const Account = () => {
     () => customers.find((c) => c?.idAspNetUser && c.idAspNetUser === uid) || null,
     [customers, uid]
   );
+  const currentCustomerId = currentCustomer?.id;
 
   // UI
   const [activeMenu, setActiveMenu] = useState("orders");
   const [period, setPeriod] = useState("6m");
   const [openId, setOpenId] = useState(null);
   const [page, setPage] = useState(1);
-  const PAGE_SIZE = 10; // fixe
+  const PAGE_SIZE = 10;
 
   // Période -> minDate ISO
   const minDateISO = useMemo(() => {
@@ -207,9 +219,10 @@ export const Account = () => {
   useEffect(() => {
     dispatch(getOrderCustomerProductRequest());
     dispatch(getProductUserRequest());
+    dispatch(getCustomerRateRequest()); // pour pré-remplissage
   }, [dispatch]);
 
-  // Fetch paginé SERVEUR (filtré client + période)
+  // Fetch paginé SERVEUR
   const lastQueryRef = useRef("");
   useEffect(() => {
     if (!currentCustomer || activeMenu !== "orders") return;
@@ -235,7 +248,7 @@ export const Account = () => {
     setOpenId(null);
   }, [dispatch, currentCustomer, activeMenu, page, minDateISO]);
 
-  // Sécurité côté UI : on n’affiche que les items du client + période
+  // Filtrage client/période (sécurité UI)
   const listClient = useMemo(() => {
     if (!currentCustomer) return [];
     const list = itemsServer.filter((o) => String(getCustomerIdFromOrder(o)) === String(currentCustomer.id));
@@ -246,14 +259,13 @@ export const Account = () => {
     });
   }, [itemsServer, currentCustomer, minDateISO]);
 
-  // Totaux et indices -> serveur (comme OrderAdmin)
+  // Totaux/pagination
   const totalCount = serverTotalCount;
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
   const pageClamped = Math.max(1, Math.min(page, totalPages));
   const startIdx = totalCount ? (pageClamped - 1) * PAGE_SIZE + 1 : 0;
   const endIdx = totalCount ? Math.min(totalCount, pageClamped * PAGE_SIZE) : listClient.length;
 
-  // Compteur “en cours” (sur la page visible)
   const currentCount = useMemo(
     () => listClient.filter((o) => !isDelivered(orderStatus(o))).length,
     [listClient]
@@ -317,8 +329,86 @@ export const Account = () => {
     navigate("/");
   };
 
-  // Reset page si période change
   useEffect(() => { setPage(1); setOpenId(null); }, [period]);
+
+  /* ===================== AVIS : Modales ===================== */
+  const [isRateOpen, setRateOpen] = useState(false);
+  const [rateValue, setRateValue] = useState(0);
+  const [rateTitle, setRateTitle] = useState("");
+  const [rateMsg, setRateMsg] = useState("");
+  const [rateProductId, setRateProductId] = useState(null);
+  const [existingRateId, setExistingRateId] = useState(null);
+
+  // Choix produit si plusieurs articles
+  const [isChooserOpen, setChooserOpen] = useState(false);
+  const [chooserItems, setChooserItems] = useState([]); // [{productId, name}]
+
+  // ✅ NEW: modal de confirmation
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmText, setConfirmText] = useState("");
+
+  const openRateModalForProduct = (productId) => {
+    if (!currentCustomerId || !productId) return;
+
+    const existing = (customerRates || []).find(
+      (r) =>
+        String(r.customerId ?? r.idCustomer) === String(currentCustomerId) &&
+        String(r.productId ?? r.idProduct) === String(productId)
+    );
+
+    setRateProductId(productId);
+    setExistingRateId(existing?.id ?? existing?.Id ?? null);
+    setRateValue(existing?.rate ?? existing?.note ?? 0);
+    setRateTitle(existing?.title ?? "");
+    setRateMsg(existing?.message ?? "");
+    setRateOpen(true);
+  };
+
+  const closeRate = () => setRateOpen(false);
+
+  const submitRate = async (e) => {
+    e.preventDefault();
+    if (!currentCustomerId || !rateProductId) return;
+
+    const payload = {
+      Id: existingRateId || null,
+      IdCustomer: currentCustomerId,
+      IdProduct: rateProductId,
+      Rate: Number(rateValue) || 0,
+      Title: (rateTitle || "").trim(),
+      Message: (rateMsg || "").trim(),
+    };
+
+    if (existingRateId) {
+      await dispatch(updateCustomerRateRequest(payload));
+      setConfirmText("Votre avis a bien été modifié");  // ✅ NEW
+    } else {
+      await dispatch(addCustomerRateRequest(payload));
+      setConfirmText("Votre avis a bien été ajouté");    // ✅ NEW
+    }
+
+    setRateOpen(false);
+    setConfirmOpen(true);                                 // ✅ NEW
+    dispatch(getCustomerRateRequest());                   // pour refléter la modification
+  };
+
+  // Connecter le bouton existant
+  const onOrderReviewClick = (order) => {
+    const items = itemsForOrder(order);
+    if (!items || items.length === 0) return;
+
+    if (items.length === 1) {
+      openRateModalForProduct(items[0].productId);
+    } else {
+      setChooserItems(items.map(it => ({ productId: it.productId, name: it.name })));
+      setChooserOpen(true);
+    }
+  };
+
+  const chooseProductAndOpen = (productId) => {
+    setChooserOpen(false);
+    openRateModalForProduct(productId);
+  };
 
   return (
     <div className="account-page">
@@ -385,14 +475,6 @@ export const Account = () => {
             <div className="account-counter__num">{listClient.filter(o => !isDelivered(orderStatus(o))).length}</div>
             <div className="account-counter__label">Commande en cours</div>
           </div>
-          {currentCustomer && (
-            <img
-              className="account-hero__img"
-              src={"/Imgs/account-empty.png"}
-              alt=""
-              onError={(e) => (e.currentTarget.style.display = "none")}
-            />
-          )}
         </div>
 
         {activeMenu === "orders" && (
@@ -412,8 +494,6 @@ export const Account = () => {
                 </select>
               </div>
             </header>
-
-
 
             {/* Liste */}
             <div className="orders-table">
@@ -518,6 +598,13 @@ export const Account = () => {
                           <hr />
 
                           <div className="order-actions">
+                            {/* Bouton EXISTANT connecté */}
+                            <button
+                              className="gbtn gbtn--primary"
+                              onClick={() => onOrderReviewClick(o)}
+                            >
+                              Donner mon avis
+                            </button>
                             <button
                               className="gbtn gbtn--primary"
                               onClick={() => dispatch(downloadInvoiceRequest(o.id))}
@@ -532,7 +619,7 @@ export const Account = () => {
                 })}
             </div>
 
-            {/* Pager BOTTOM + compteur */}
+            {/* Pager BOTTOM */}
             <div className="d-flex align-items-center justify-content-between mt-2 flex-wrap gap-2">
               <span className="text-muted">
                 {totalCount ? `${startIdx}–${endIdx} sur ${totalCount}` : "—"}
@@ -553,6 +640,146 @@ export const Account = () => {
           <Address user={user} enableAddressAutocomplete={true} preservePhoneOnFavorite={true} />
         )}
       </section>
+
+      {/* ===== Modale de CHOIX de produit (si plusieurs articles) ===== */}
+      {isChooserOpen && (
+        <>
+          <div className="app-backdrop" onClick={() => setChooserOpen(false)} />
+          <div className="app-modal" role="dialog" aria-modal="true">
+            <div className="app-modal__dialog">
+              <div className="app-modal__header">
+                <h5 className="app-modal__title">Choisissez un article</h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setChooserOpen(false)}
+                  aria-label="Fermer"
+                />
+              </div>
+              <div className="app-modal__body">
+                {chooserItems.map((it) => (
+                  <button
+                    key={it.productId}
+                    className="gbtn gbtn--primary mb-2"
+                    onClick={() => chooseProductAndOpen(it.productId)}
+                  >
+                    {it.name}
+                  </button>
+                ))}
+              </div>
+              <div className="app-modal__footer">
+                <button type="button" className="btn btn-light" onClick={() => setChooserOpen(false)}>
+                  Annuler
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ===== Modale Avis ===== */}
+      {isRateOpen && (
+        <>
+          <div className="app-backdrop" onClick={closeRate} />
+          <div className="app-modal" role="dialog" aria-modal="true">
+            <div className="app-modal__dialog">
+              <div className="app-modal__header">
+                <h5 className="app-modal__title">
+                  {existingRateId ? "Modifier votre avis" : "Donner votre avis"}
+                </h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={closeRate}
+                  aria-label="Fermer"
+                />
+              </div>
+
+              <form onSubmit={submitRate} className="rate-form">
+                <div className="app-modal__body">
+                  {/* Note */}
+                  <div className="mb-3">
+                    <label className="form-label">
+                      <strong>Sélectionnez votre note *</strong>
+                    </label>
+                    <div className="rate-stars">
+                      {[1,2,3,4,5].map((n) => {
+                        const on = n <= (Number(rateValue) || 0);
+                        return (
+                          <button
+                            key={n}
+                            type="button"
+                            className={`star-btn ${on ? 'is-on' : ''}`}
+                            onClick={() => setRateValue(n)}
+                            aria-label={`Note ${n}`}
+                            title={`${n} ${n>1?'étoiles':'étoile'}`}
+                          >
+                            {on ? '★' : '☆'}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Titre */}
+                  <div className="mb-3">
+                    <label className="form-label">
+                      <strong>Titre de votre commentaire *</strong> <small>(0/100 max)</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={rateTitle}
+                      maxLength={100}
+                      onChange={(e) => setRateTitle(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  {/* Message */}
+                  <div className="mb-2">
+                    <label className="form-label">
+                      <strong>Commentaire détaillé *</strong> <small>(30 caractères min)</small>
+                    </label>
+                    <textarea
+                      className="form-control"
+                      rows={6}
+                      placeholder="Pourquoi avez-vous donné cette note ? Détaillez ce que vous avez apprécié ou non, et votre usage du produit."
+                      value={rateMsg}
+                      onChange={(e) => setRateMsg(e.target.value)}
+                      minLength={30}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="app-modal__footer">
+                  <button type="button" className="btn btn-light" onClick={closeRate}>
+                    Annuler
+                  </button>
+                  <button type="submit" className="btn btn-primary">
+                    {existingRateId ? "Mettre à jour" : "Publier l’avis"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ✅ NEW: Modale de confirmation (réutilise GenericModal) */}
+      <GenericModal
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        variant="success"
+        title="Merci !"
+        message={confirmText}
+        actions={[
+          { label: "OK", variant: "primary", onClick: () => setConfirmOpen(false), autoFocus: true },
+        ]}
+      />
     </div>
   );
 };
+
+export default Account;

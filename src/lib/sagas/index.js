@@ -26,6 +26,7 @@ import invoicesSaga from "./invoices";
 import rolesSaga from "./roles";
 import customerPromotionsSaga from "./customerPromotions";
 import newLetterSaga from "./newLetter";
+import customerRatesSaga from "./customerRates";
 import { all } from "redux-saga/effects";
 
 
@@ -58,6 +59,7 @@ export default function* rootSaga() {
         invoicesSaga(),
         rolesSaga(),
         customerPromotionsSaga(),
-        newLetterSaga()
+        newLetterSaga(),
+        customerRatesSaga()
     ]);
 }

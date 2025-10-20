@@ -28,6 +28,7 @@ import {PackageProfilAdmin} from './PackageProfilAdmin';
 import {SubCategoryAdmin} from './SubCategoryAdmin';
 import {InvoiceAdmin} from './InvoiceAdmin';
 import {CustomerPromotionAdmin} from './CustomerPromotionAdmin';
+import {CustomerRatesAdmin} from './CustomerRatesAdmin';
 import GeneralConditionsOfSale from './GeneralConditionsOfSale';
 import {LegalNotices} from './LegalNotices';
 import {PrivacyPolicy} from './LegalNotices';
@@ -49,7 +50,7 @@ import { getFeatureCategoryRequest } from "../../lib/actions/FeatureCategoryActi
 import { getCustomerRequest } from "../../lib/actions/CustomerActions";
 import { getBillingAddressRequest } from "../../lib/actions/BillingAddressActions";
 import { getDeliveryAddressRequest } from "../../lib/actions/DeliveryAddressActions";
-import {Product} from './Product';
+import Product from './Product';
 import { getFeaturesCategoryByProductRequest } from "../../lib/actions/FeatureCategoryActions";
 import { getRolesRequest } from "../../lib/actions/RoleActions";
 import {PromotionCodeAdmin} from './PromotionCodeAdmin';
@@ -77,6 +78,7 @@ import {Maintenance} from './Maintenance/Maintenance';
 import MaintenanceGate from './Authentication/MaintenanceGate';
 import { getCustomerPromotionCodeRequest } from "../../lib/actions/CustomerPromotionCodeActions";
 import { getNewsletterRequest } from "../../lib/actions/NewLetterActions";
+import { getCustomerRateRequest } from "../../lib/actions/CustomerRateActions";
 import { hasConsent } from "./CookieConsent";
 import { getProductsPagedUserRequest} from "../../lib/actions/ProductActions";
 
@@ -110,6 +112,7 @@ useEffect(() => {
         dispatch(getCategoryRequest());
         dispatch(getProductUserRequest());
         dispatch(getStockRequest());
+        dispatch(getCustomerRateRequest());
         dispatch(getFeatureProductRequest());
         dispatch(getImageRequest());
         dispatch(getVideoRequest());
@@ -127,6 +130,7 @@ useEffect(() => {
         dispatch(getInvoiceRequest());
         dispatch(getCustomerPromotionCodeRequest());
         dispatch(getNewsletterRequest());
+
     }, []);
 
     useEffect(() => {
@@ -163,6 +167,7 @@ useEffect(() => {
                             <Route path="/admin/subCategory" element={<RequireAuth><SubCategoryAdmin/></RequireAuth>}/>
                             <Route path="/admin/customerPromotions" element={<RequireAuth><CustomerPromotionAdmin/></RequireAuth>}/>
                             <Route path="/admin/newsletter" element={<RequireAuth><NewLetterAdmin/></RequireAuth>}/>
+                            <Route path="/admin/customerRates" element={<RequireAuth><CustomerRatesAdmin/></RequireAuth>}/>
                         </Route>
 
                         {/* Other page */}

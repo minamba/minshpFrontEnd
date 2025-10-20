@@ -9,6 +9,7 @@ import { toMediaUrl } from "../../lib/utils/mediaUrl";
 import { calculPrice } from "../../lib/utils/Helpers";
 import { getProductsPagedUserRequest } from "../../lib/actions/ProductActions";
 import { getStockUiByProductId } from "../../lib/utils/stockUi";
+import RatingStars from "../../lib/utils/RatingStars";
 
 /* -------------------- Helpers -------------------- */
 const parseDate = (val) => {
@@ -316,6 +317,12 @@ export const News = () => {
                     {product.previewDescription}
                   </p>
                 )}
+
+                <RatingStars
+                  value={Number(product.rate) || 0}
+                  count={product.numberRate || 0}
+                  size="sm"
+                />
 
                 {/* === Bloc identique à Category : statut compressible + prix à droite === */}
                 <div

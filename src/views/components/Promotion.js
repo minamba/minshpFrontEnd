@@ -14,6 +14,7 @@ import { GenericModal } from "../../components";
 import { toMediaUrl } from "../../lib/utils/mediaUrl";
 import { getProductsPagedUserRequest } from "../../lib/actions/ProductActions";
 import { getStockUiByProductId } from "../../lib/utils/stockUi";
+import RatingStars from "../../lib/utils/RatingStars";
 
 /* ---------- Helpers ---------- */
 const parseDate = (val) => {
@@ -354,6 +355,12 @@ export const Promotion = () => {
                     {product.previewDescription}
                   </p>
                 )}
+
+                <RatingStars
+                  value={Number(product.rate) || 0}
+                  count={product.numberRate || 0}
+                  size="sm"
+                />
 
                 {/* === Statut + Prix : EXACTEMENT comme Category/News === */}
                 <div className="new-price-row">

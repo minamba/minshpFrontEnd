@@ -69,7 +69,7 @@ export default function productReducer(state = initialState, action) {
         loading: false,
         products: Array.isArray(action.payload?.products)
           ? action.payload.products
-          : [],
+          : (Array.isArray(action.payload) ? action.payload : []),
         error: null,
       };
 

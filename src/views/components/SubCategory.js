@@ -8,6 +8,7 @@ import { calculPrice } from "../../lib/utils/Helpers";
 import { toMediaUrl } from "../../lib/utils/mediaUrl";
 import { getProductsPagedUserRequest } from "../../lib/actions/ProductActions";
 import { getStockUiByProductId } from "../../lib/utils/stockUi";
+import RatingStars from "../../lib/utils/RatingStars";
 
 /* -------- Helpers -------- */
 const parseDate = (v) => (v ? (isNaN(new Date(v)) ? null : new Date(v)) : null);
@@ -411,6 +412,13 @@ export const SubCategory = () => {
                     {product.previewDescription}
                   </p>
                 )}
+
+                <RatingStars
+                  value={Number(product.rate) || 0}
+                  count={product.numberRate || 0}
+                  size="sm"
+                />
+
                 <div className="new-price-row">
                   <span className={`card-stock ${stockCls}`}>
                     <span className={`card-stock-dot ${stockCls}`} />

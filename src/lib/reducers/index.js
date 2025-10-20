@@ -27,6 +27,7 @@ import invoiceReducer from "./InvoiceReducers";
 import roleReducer from "./RoleReducers";
 import customerPromotionCodeReducer from "./CustomerPromotionCodeReducers";
 import newLetterReducer from "./NewLetterReducers";
+import customerRateReducer from "./CustomerRateReducers";
 
 export default combineReducers({
     products : productReducer,
@@ -57,4 +58,5 @@ export default combineReducers({
     roles : roleReducer,
     customerPromotionCodes : customerPromotionCodeReducer,
     newsletters : newLetterReducer,
+    customerRates : customerRateReducer,
 })

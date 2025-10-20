@@ -11,6 +11,7 @@ import { calculPrice } from "../../lib/utils/Helpers";
 import { getProductsPagedUserRequest } from "../../lib/actions/ProductActions";
 import { ScrollHint } from "../../components";
 import { getStockUiByProductId } from "../../lib/utils/stockUi";
+import RatingStars from "../../lib/utils/RatingStars";
 
 /* -------------------- Helpers (définis ici) -------------------- */
 const parseDate = (val) => {
@@ -479,6 +480,12 @@ export const Category = () => {
                     {product.previewDescription}
                   </p>
                 )}
+
+                <RatingStars
+                  value={Number(product.rate) || 0}
+                  count={product.numberRate || 0}
+                  size="sm"
+                />
 
                 {/* Alignement identique à Home : statut compressible + prix à droite */}
                 <div

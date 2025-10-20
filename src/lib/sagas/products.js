@@ -33,7 +33,7 @@ function* onGetProductsPaged(action) {
 function* getProducts() {
     try {
         const response = yield call (api.getProducts);
-        console.log("Products :",response.data);
+        console.log("full Products from saga :",response.data);
         yield put (actions.getProductUserSuccess({products : response.data}));
         const stocks = yield call (apiStocks.getStocks);
         yield put (actionsStocks.getStockSuccess({stocks : stocks.data}));
