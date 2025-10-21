@@ -620,6 +620,8 @@ export const Navbar = () => {
                 <Link className="mm-item" to="/admin/packageProfil" onClick={onNavLink}>Profils de colis <span>›</span></Link>
                 <Link className="mm-item" to="/admin/customerRates" onClick={onNavLink}>Avis clients <span>›</span></Link>
                 <Link className="mm-item" to="/admin/newsletter" onClick={onNavLink}>Newsletter <span>›</span></Link>
+                
+                
               </div>
             </div>
           )}

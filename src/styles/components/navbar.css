@@ -154,7 +154,7 @@
   .mm-chevron{ opacity:.7; transition:transform .18s ease; }
   .mm-sec-btn[aria-expanded="true"] .mm-chevron{ transform:rotate(180deg); }
   .mm-sub{ max-height:0; overflow:hidden; transition:max-height .22s ease; background:#0f131b; }
-  .mm-sub.open{ max-height:1000px; }
+  .mm-sub.open{ max-height:none; }
   .mm-item{ display:flex; align-items:center; justify-content:space-between; gap:8px; padding:12px 14px; color:#e6e8ee; font-weight:800; text-decoration:none; }
   .mm-item:hover{ background:#0b0f16; }
   .mm-link{ display:block; padding:14px; color:#fff; font-weight:900; text-decoration:none; }
