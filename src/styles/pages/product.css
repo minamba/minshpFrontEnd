@@ -901,3 +901,117 @@ html.scroll-lock, body.scroll-lock {
 *::after {
   overscroll-behavior: contain;
 }
+
+
+
+
+
+/* <= 390px : label au-dessus, valeur en dessous */
+@media (max-width: 390px){
+  .specs-row{
+    display: grid;
+    grid-template-columns: 1fr;      /* une seule colonne */
+    grid-template-rows: auto auto;   /* label puis valeur */
+    row-gap: 4px;
+    align-items: start;
+  }
+
+  /* on cache la ligne "-----" du milieu */
+  .specs-line{ display: none !important; }
+
+  /* le label passe en ligne 1 */
+  .specs-label{
+    min-width: 0;
+    white-space: normal;            /* autorise le retour à la ligne */
+    overflow: visible;
+    text-overflow: unset;
+  }
+
+  /* la valeur passe en ligne 2, à gauche, et peut s'étendre */
+  .specs-value{
+    justify-self: start;
+    text-align: left;
+    min-width: 0;
+    white-space: normal;            /* wrap normal */
+    overflow-wrap: anywhere;        /* coupe proprement si un mot est trop long */
+    word-break: break-word;
+    color: #0f172a;                 /* même couleur que desktop */
+    font-weight: 600;               /* un peu moins “gras” si tu veux */
+  }
+}
+
+
+
+/* ============================
+   REVIEWS — Très petits écrans
+   ============================ */
+@media (max-width: 400px){
+
+  /* grille déjà en 1 colonne, on compacte juste un peu */
+  .reviews-summary{ padding:12px; }
+  .reviews-list   { width:100%; }
+
+  /* bouton plein largeur */
+  .reviews-cta{
+    width:100%;
+    justify-content:center;
+  }
+
+  /* lignes "5★  X avis" compactes et wrap si besoin */
+  .reviews-bars--compact { margin-top:6px; }
+  .reviews-bar--compact  { padding:4px 0; }
+  .reviews-bar-left{
+    flex-wrap:wrap;
+    row-gap:2px;
+  }
+  .reviews-row-count{
+    font-weight:700;
+    font-size:.95rem;
+    white-space:normal;
+  }
+
+  /* une carte avis bien lisible */
+  .review-card   { padding:14px 0; }
+  .review-title  { font-size:1rem; word-break:break-word; overflow-wrap:anywhere; }
+  .review-message{ font-size:.95rem; word-break:break-word; overflow-wrap:anywhere; }
+  .review-footer { font-size:.85rem; }
+
+  /* Ligne du haut : étoiles au-dessus, date en dessous (gauche) */
+  .review-toprow{
+    flex-direction:column;
+    align-items:flex-start;
+    gap:4px;
+  }
+  .review-stars{
+    transform:scale(.95);           /* mini gain de place */
+    transform-origin:left top;
+  }
+  .review-date-right{
+    align-self:flex-start;
+    font-size:.85rem;
+    white-space:normal;             /* permet le retour à la ligne */
+  }
+
+  /* Auteur + badge sur une ligne, wrap si long */
+  .review-author-line{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    flex-wrap:wrap;
+    font-size:.95rem;
+  }
+  .verified-badge{
+    margin-left:0;                  /* pas de décalage inutile */
+    font-size:.75rem;
+    padding:2px 6px 3px;
+  }
+
+  /* Séparateur visible mais compact */
+  .review-sep{
+    height:1px;
+    margin:18px 0 0;
+    opacity:.9;
+  }
+}
+
+

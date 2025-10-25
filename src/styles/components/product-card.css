@@ -327,4 +327,29 @@
 
 
 
+/* ===== Très petits écrans (≤ 400px) : 1 colonne ===== */
+@media (max-width: 400px){
+  /* Grilles catégorie & sous-catégorie en une seule colonne */
+  .category-page section#category-products > .new-grid,
+  .category-page section#subcategory-products > .new-grid,
+  section#news-products > .new-grid,
+  section#promo-products > .new-grid{
+    grid-template-columns: repeat(1, minmax(0,1fr)) !important;
+    justify-items: stretch !important;
+  }
+
+  /* Les cartes occupent toute la largeur */
+  .category-page #category-products .product-card,
+  .category-page #subcategory-products .product-card,
+  #news-products .product-card,
+  #promo-products .product-card{
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+  }
+
+  /* Un peu moins de marge interne pour respirer */
+  .new-section{ padding: 2rem 12px; }
+  .product-card{ padding: 12px; border-radius: 16px; }
+}
 

@@ -737,3 +737,24 @@ section#promo-products > .new-grid {
 
 
 
+/* ===== Ultra-petit (≤ 400px) : 1 colonne partout ===== */
+@media (max-width:400px){
+  /* Grilles en une seule colonne */
+  .category-page section#category-products  > .new-grid,
+  .category-page section#subcategory-products > .new-grid,
+  .category-page section#news-products      > .new-grid,
+  .category-page section#promo-products     > .new-grid{
+    grid-template-columns: 1fr !important;
+    justify-items: stretch !important;
+  }
+
+  /* Cartes pleine largeur (+ ceinture et bretelles) */
+  .category-page #category-products .product-card,
+  .category-page #subcategory-products .product-card,
+  .category-page #news-products .product-card,
+  .category-page #promo-products .product-card{
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+  }
+}
