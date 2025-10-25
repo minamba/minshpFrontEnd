@@ -655,6 +655,45 @@
 .lb-content { box-sizing: border-box; }
 .lb-stage   { overflow: hidden; }
 
+
+
+/* Cacher toutes les barres de scroll dans la lightbox (Windows/Firefox/WebKit) */
+.lb-overlay,
+.lb-content,
+.lb-stage,
+.lb-fit,
+.lb-thumbs {
+  /* Firefox */
+  scrollbar-width: none;
+  /* IE/Edge Legacy */
+  -ms-overflow-style: none;
+}
+
+/* WebKit (Chrome/Edge/Opera/Safari) */
+.lb-overlay::-webkit-scrollbar,
+.lb-content::-webkit-scrollbar,
+.lb-stage::-webkit-scrollbar,
+.lb-fit::-webkit-scrollbar,
+.lb-thumbs::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+/* La rangée de vignettes garde son défilement horizontal, mais sans barre visible */
+.lb-thumbs {
+  overflow-x: auto;      /* conserve le scroll */
+  overflow-y: hidden;    /* évite une barre verticale parasite */
+}
+
+/* Évite tout “rebond”/propagation du scroll sous la lightbox */
+.lb-overlay {
+  overscroll-behavior: contain;
+}
+
+
+
+
 .specs-value {
   color: #6c757d;        /* gris neutre / muted */
   font-weight: 500;      /* optionnel : légèrement moins fort */
