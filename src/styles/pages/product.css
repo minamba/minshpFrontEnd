@@ -421,6 +421,7 @@
 @keyframes lbFade { from { opacity: 0 } to { opacity: 1 } }
 
 .lb-content{
+  position: relative;                     /* NEW: pour gérer les z-index internes */
   width: min(96vw, 1400px);
   height: min(92vh, 860px);
   background: #0b1220;
@@ -432,6 +433,8 @@
 }
 
 .lb-topbar{
+  position: relative;                     /* NEW: au-dessus de l'image */
+  z-index: 4;                             /* NEW */
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -451,10 +454,10 @@
   appearance: none; border: 0; background: transparent; color: #fff;
   width: 40px; height: 40px; border-radius: 12px;
   display: grid; place-items: center; cursor: pointer;
-  transition: transform .08s ease, background .18s ease, opacity .2s ease;
+  transition: background .18s ease, opacity .2s ease;  /* NEW: plus de transform ici */
 }
-.lb-btn:hover{ background: rgba(255,255,255,.08); transform: translateY(-1px); }
-.lb-btn:active{ transform: translateY(0); }
+.lb-btn:hover{ background: rgba(255,255,255,.08); }    /* NEW: pas de translateY */
+.lb-btn:active{ opacity:.9; }                           /* NEW: léger feedback sans bouger */
 
 .lb-close{
   font-size: 26px; line-height: 1; font-weight: 300;
@@ -467,14 +470,103 @@
   overflow: hidden;
 }
 
-.lb-image{
+/* Conteneur qui reçoit le background-image */
+.lb-fit{
+  position: relative;
+  z-index: 1;                                           /* NEW: sous les flèches */
+}
+
+/* L’image de fond ne doit JAMAIS intercepter les clics des flèches */
+.lb-bgi{
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  max-width: 100%;
+  max-height: 100%;
+  pointer-events: none;                                  /* NEW: laisse passer les clics */
+  z-index: 1;                                            /* NEW */
+}
+
+/* Flèches : toujours au-dessus de l’image et stables sur hover */
+.lb-arrow{
+  position: absolute;
+  top: 50%; transform: translateY(-50%);                /* garder la même transform */
+  font-size: 38px; line-height: 0;
+  width: 48px; height: 48px; border-radius: 14px;
+  background: rgba(255,255,255,.06);
+  box-shadow: var(--shadow-2);
+  backdrop-filter: blur(3px);
+  z-index: 3;                                           /* NEW: > image */
+  will-change: transform;
+}
+.lb-prev{ left: 14px; }
+.lb-next{ right: 14px; }
+
+/* Empêche tout “saut” au survol/active */
+.lb-arrow:hover,
+.lb-arrow:active{
+  transform: translateY(-50%);                          /* NEW: pas de translateY additionnel */
+  background: rgba(255,255,255,.10);
+}
+
+.lb-thumbs{
+  position: relative; z-index: 2;                       /* NEW: sous la topbar, au-dessus image */
+  display: flex; gap: 10px;
+  align-items: center; justify-content: center;
+  padding: 10px 14px 16px;
+  background: linear-gradient(0deg, rgba(255,255,255,.06), transparent);
+  overflow-x: auto;
+}
+.lb-thumb{
+  flex: 0 0 auto;
+  width: 68px; height: 68px;
+  border-radius: 10px; background: #0f172a; border: 1px solid #1f2937;
+  padding: 0; box-shadow: var(--shadow-1);
+  opacity: .85; transition: opacity .15s ease, transform .08s ease, border-color .2s ease;
+}
+.lb-thumb:hover{ opacity: 1; transform: translateY(-1px); }
+.lb-thumb.is-active{
+  border-color: #416bf5;
+  box-shadow: 0 8px 22px rgba(65,107,245,.28);
+  opacity: 1;
+}
+.lb-thumb img{
+  width: 100%; height: 100%; object-fit: cover; border-radius: 9px;
+}
+
+/* Responsive */
+@media (max-width: 992px){
+  .lb-content{
+    width: 100vw; height: 100dvh; border-radius: 0;
+    grid-template-rows: 56px 1fr 92px;
+  }
+  .lb-arrow{ width: 44px; height: 44px; }
+  .lb-thumb{ width: 64px; height: 64px; }
+}
+@media (max-width: 560px){
+  .lb-thumb{ width: 58px; height: 58px; }
+  .lb-arrow{ display:none; } /* on privilégie le swipe sur très petit écran */
+}
+
+/* ==== visibilité/photo desktop (ne change pas) ==== */
+.lb-stage { padding: 0; overflow: hidden; }
+.lb-stage .lb-image{
+  width: auto !important;
+  height: auto !important;
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
-  user-select: none;
-  -webkit-user-drag: none;
-  animation: lbIn .2s ease-out;
+  display: block;
+  box-sizing: border-box;
+  transform: none;
 }
+@media (max-width: 992px){
+  .lb-stage .lb-image{ max-width: 100%; max-height: 100%; }
+}
+
 @keyframes lbIn { from { opacity: 0; transform: scale(.985) } to { opacity: 1; transform: scale(1) } }
 
 .lb-arrow{
