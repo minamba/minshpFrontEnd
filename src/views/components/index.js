@@ -32,6 +32,7 @@ import {CustomerRatesAdmin} from './CustomerRatesAdmin';
 import GeneralConditionsOfSale from './GeneralConditionsOfSale';
 import {LegalNotices} from './LegalNotices';
 import {PrivacyPolicy} from './LegalNotices';
+import {Contact} from './Contact';
 import CookieConsent from './CookieConsent';
 import Success from './Succes';
 import {Cancel} from './Cancel';
@@ -197,6 +198,7 @@ useEffect(() => {
                             <Route path="/generalConditionsOfSales" element={<GeneralConditionsOfSale/>}/>
                             <Route path="/legalNotices" element={<LegalNotices/>}/>
                             <Route path="/privacyPolicy" element={<PrivacyPolicy/>}/>
+                            <Route path="/contact" element={<Contact/>}/>
                              
                     </Routes>
                 </main>
